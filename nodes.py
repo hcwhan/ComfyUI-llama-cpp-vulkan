@@ -25,11 +25,12 @@ from llama_cpp.llama_chat_format import (
 
 try:
     from llama_cpp.llama_chat_format import MTMDChatHandler
+    chat_handlers += ["DeepSeek-OCR"]
     _MTMD = True
 except:
     _MTMD = False
 
-chat_handlers = ["None", "LLaVA-1.5", "LLaVA-1.6", "Moondream2", "nanoLLaVA", "llama3-Vision-Alpha", "MiniCPM-v2.6", "MiniCPM-v4.5", "MiniCPM-v4.5-Thinking"]
+chat_handlers = ["None", "LLaVA-1.5", "LLaVA-1.6", "Moondream2", "nanoLLaVA", "llama3-Vision-Alpha", "MiniCPM-v2.6"]
 
 try:
     from llama_cpp.llama_chat_format import Gemma3ChatHandler
@@ -45,7 +46,7 @@ except:
 
 try:
     from llama_cpp.llama_chat_format import Qwen25VLChatHandler
-    chat_handlers += ["Qwen2.5-VL"]
+    chat_handlers += ["Qwen2.5-VL", "MinerU2.5-Pro"]
 except:
     Qwen25VLChatHandler = None
 
@@ -57,7 +58,7 @@ except:
     
 try:
     from llama_cpp.llama_chat_format import Qwen35ChatHandler
-    chat_handlers += ["Qwen3.5", "Qwen3.5-Thinking"]
+    chat_handlers += ["Qwen3.5", "Qwen3.5-Thinking", "Qwen3.6", "Qwen3.6-Thinking"]
 except:
     Qwen35ChatHandler = None
     
@@ -80,6 +81,36 @@ try:
     chat_handlers += ["Granite-Docling"]
 except:
     GraniteDoclingChatHandler = None
+    
+try:
+    from llama_cpp.llama_chat_format import MiniCPMv45ChatHandler
+    chat_handlers += "MiniCPM-v4.5", "MiniCPM-v4.5-Thinking"
+except:
+    MiniCPMv45ChatHandler = None
+    
+try:
+    from llama_cpp.llama_chat_format import MiniCPMv46ChatHandler
+    chat_handlers += "MiniCPM-v4.6", "MiniCPM-v4.6-Thinking"
+except:
+    MiniCPMv46ChatHandler = None
+    
+try:
+    from llama_cpp.llama_chat_format import PaddleOCRChatHandler
+    chat_handlers += "PaddleOCR-VL-1.5"
+except:
+    PaddleOCRChatHandler = None
+    
+try:
+    from llama_cpp.llama_chat_format import Qwen3ASRChatHandler
+    chat_handlers += "Qwen3-ASR"
+except:
+    Qwen3ASRChatHandler = None
+    
+try:
+    from llama_cpp.llama_chat_format import Step3VLChatHandler
+    chat_handlers += "Step3-VL"
+except:
+    Step3VLChatHandler = None
 
 class AnyType(str):
     def __ne__(self, __value: object) -> bool:
@@ -129,11 +160,13 @@ class LLAMA_CPP_STORAGE:
     def load_model(cls, config):
         def get_chat_handler(chat_handler):
             match chat_handler:
-                case "Qwen3.5"|"Qwen3.5-Thinking":
+                case "Qwen3.5"|"Qwen3.5-Thinking"|"Qwen3.6"|"Qwen3.6-Thinking":
                     return Qwen35ChatHandler
                 case "Qwen3-VL"|"Qwen3-VL-Thinking":
                     return Qwen3VLChatHandler
-                case "Qwen2.5-VL":
+                case "Qwen3-ASR":
+                    return Qwen3ASRChatHandler
+                case "Qwen2.5-VL"|"MinerU2.5-Pro":
                     return Qwen25VLChatHandler
                 case "LLaVA-1.5":
                     return Llava15ChatHandler
@@ -148,7 +181,9 @@ class LLAMA_CPP_STORAGE:
                 case "MiniCPM-v2.6":
                     return MiniCPMv26ChatHandler
                 case "MiniCPM-v4.5"|"MiniCPM-v4.5-Thinking":
-                    return MiniCPMv26ChatHandler
+                    return MiniCPMv45ChatHandler
+                case "MiniCPM-v4.6"|"MiniCPM-v4.6-Thinking":
+                    return MiniCPMv46ChatHandler
                 case "Gemma3":
                     return Gemma3ChatHandler
                 case "Gemma4":
@@ -163,6 +198,12 @@ class LLAMA_CPP_STORAGE:
                     return LFM25VLChatHandler
                 case "Granite-Docling":
                     return GraniteDoclingChatHandler
+                case "DeepSeek-OCR":
+                    return MTMDChatHandler
+                case "PaddleOCR-VL-1.5":
+                    return PaddleOCRChatHandler
+                case "Step3-VL":
+                    return Step3VLChatHandler
                 case "None":
                     return None
                 case _:
