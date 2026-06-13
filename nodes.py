@@ -84,31 +84,31 @@ except:
     
 try:
     from llama_cpp.llama_chat_format import MiniCPMv45ChatHandler
-    chat_handlers += "MiniCPM-v4.5", "MiniCPM-v4.5-Thinking"
+    chat_handlers += ["MiniCPM-v4.5", "MiniCPM-v4.5-Thinking"]
 except:
     MiniCPMv45ChatHandler = None
     
 try:
     from llama_cpp.llama_chat_format import MiniCPMv46ChatHandler
-    chat_handlers += "MiniCPM-v4.6", "MiniCPM-v4.6-Thinking"
+    chat_handlers += ["MiniCPM-v4.6", "MiniCPM-v4.6-Thinking"]
 except:
     MiniCPMv46ChatHandler = None
     
 try:
     from llama_cpp.llama_chat_format import PaddleOCRChatHandler
-    chat_handlers += "PaddleOCR-VL-1.5"
+    chat_handlers += ["PaddleOCR-VL-1.5"]
 except:
     PaddleOCRChatHandler = None
     
 try:
     from llama_cpp.llama_chat_format import Qwen3ASRChatHandler
-    chat_handlers += "Qwen3-ASR"
+    chat_handlers += ["Qwen3-ASR"]
 except:
     Qwen3ASRChatHandler = None
     
 try:
     from llama_cpp.llama_chat_format import Step3VLChatHandler
-    chat_handlers += "Step3-VL"
+    chat_handlers += ["Step3-VL"]
 except:
     Step3VLChatHandler = None
 
@@ -504,23 +504,10 @@ class llama_cpp_instruct_adv:
             #raise RuntimeError("The model has been unloaded or failed to load!")
         
         if parameters is None:
-            parameters = {
-                "max_tokens": 1024,
-                "top_k": 30,
-                "top_p": 0.9,
-                "min_p": 0.05,
-                "typical_p": 1.0,
-                "temperature": 0.8,
-                "repeat_penalty": 1.0,
-                "frequency_penalty": 0.0,
-                "presence_penalty": 1.0,
-                "mirostat_mode": 0,
-                "mirostat_eta": 0.1,
-                "mirostat_tau": 5.0
-            }
+            parameters = {}
         
         if _MTMD:
-            parameters.pop("presence_penalty", None)
+            parameters.pop("present_penalty", None)
             
         _uid = parameters.get("state_uid", None)
         _parameters = parameters.copy()
@@ -648,8 +635,9 @@ class llama_cpp_parameters:
                 "temperature": ("FLOAT", {"default": 0.8, "min": 0.0, "max": 2.0, "step": 0.01}),
                 "repeat_penalty": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 10.0, "step": 0.01}),
                 "frequency_penalty": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, "step": 0.01}),
-                "presence_penalty": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 2.0, "step": 0.01}),
+                "present_penalty": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 2.0, "step": 0.01}),
                 #"tfs_z": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 10.0, "step": 0.01}),
+                #"penalty_last_n": ("INT", {"default": 64, "min": -1, "max": 8192, "step": 1}),
                 "mirostat_mode": ("INT", {"default": 0, "min": 0, "max": 2, "step": 1}),
                 "mirostat_eta": ("FLOAT", {"default": 0.1, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "mirostat_tau": ("FLOAT", {"default": 5.0, "min": 0.0, "max": 10.0, "step": 0.01}),
