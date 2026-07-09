@@ -37,7 +37,7 @@ try:
     chat_handlers += ["Gemma3"]
 except:
     Gemma3ChatHandler = None
-    
+
 try:
     from llama_cpp.llama_chat_format import Gemma4ChatHandler
     chat_handlers += ["Gemma4"]
@@ -55,13 +55,13 @@ try:
     chat_handlers += ["Qwen3-VL", "Qwen3-VL-Thinking"]
 except:
     Qwen3VLChatHandler = None
-    
+
 try:
     from llama_cpp.llama_chat_format import Qwen35ChatHandler
     chat_handlers += ["Qwen3.5", "Qwen3.5-Thinking", "Qwen3.6", "Qwen3.6-Thinking"]
 except:
     Qwen35ChatHandler = None
-    
+
 try:
     from llama_cpp.llama_chat_format import (GLM46VChatHandler, LFM2VLChatHandler, GLM41VChatHandler)
     chat_handlers += ["GLM-4.6V", "GLM-4.6V-Thinking", "GLM-4.1V-Thinking", "LFM2-VL"]
@@ -75,37 +75,37 @@ try:
     chat_handlers += ["LFM2.5-VL"]
 except:
     LFM25VLChatHandler = None
-    
+
 try:
     from llama_cpp.llama_chat_format import GraniteDoclingChatHandler
     chat_handlers += ["Granite-Docling"]
 except:
     GraniteDoclingChatHandler = None
-    
+
 try:
     from llama_cpp.llama_chat_format import MiniCPMv45ChatHandler
     chat_handlers += ["MiniCPM-v4.5", "MiniCPM-v4.5-Thinking"]
 except:
     MiniCPMv45ChatHandler = None
-    
+
 try:
     from llama_cpp.llama_chat_format import MiniCPMv46ChatHandler
     chat_handlers += ["MiniCPM-v4.6", "MiniCPM-v4.6-Thinking"]
 except:
     MiniCPMv46ChatHandler = None
-    
+
 try:
     from llama_cpp.llama_chat_format import PaddleOCRChatHandler
     chat_handlers += ["PaddleOCR-VL-1.5"]
 except:
     PaddleOCRChatHandler = None
-    
+
 try:
     from llama_cpp.llama_chat_format import Qwen3ASRChatHandler
     chat_handlers += ["Qwen3-ASR"]
 except:
     Qwen3ASRChatHandler = None
-    
+
 try:
     from llama_cpp.llama_chat_format import Step3VLChatHandler
     chat_handlers += ["Step3-VL"]
@@ -134,28 +134,28 @@ class LLAMA_CPP_STORAGE:
             #cls.states.pop(f"{id}", None)
             cls.messages.pop(f"{id}", None)
             cls.sys_prompts.pop(f"{id}", None)
-        
+
     @classmethod
     def clean(cls, all=False):
         try:
             cls.llm.close()
         except Exception:
             pass
-            
+
         try:
             cls.chat_handler._exit_stack.close()
         except Exception:
             pass
-        
+
         cls.llm = None
         cls.chat_handler = None
         cls.current_config = None
         if all:
             cls.clean_state()
-        
+
         gc.collect()
         mm.soft_empty_cache()
-    
+
     @classmethod
     def load_model(cls, config):
         def get_chat_handler(chat_handler):
@@ -208,7 +208,7 @@ class LLAMA_CPP_STORAGE:
                     return None
                 case _:
                     raise ValueError(f'Unknow model type: "{chat_handler}"')
-        
+
         cls.clean(all=True)
         cls.current_config = config.copy()
         model = config["model"]
@@ -219,26 +219,26 @@ class LLAMA_CPP_STORAGE:
         image_max_tokens = config["image_max_tokens"]
         image_min_tokens = config["image_min_tokens"]
         n_gpu_layers = -1
-        
+
         model_path = os.path.join(folder_paths.models_dir, 'LLM', model)
         handler = get_chat_handler(chat_handler)
-        
+
         if vram_limit != -1:
             gguf_layers = get_layer_count(model_path) or 32
             gguf_size = os.path.getsize(model_path)  * 1.55 / (1024 ** 3)
             gguf_layer_size = gguf_size / gguf_layers
-        
+
         if mmproj and mmproj != "None":
             mmproj_path = os.path.join(folder_paths.models_dir, 'LLM', mmproj)
             if chat_handler == "None":
                 raise ValueError('"chat_handler" cannot be None!')
-            
+
             if vram_limit != -1:
                 mmproj_size = os.path.getsize(mmproj_path)  * 1.55 / (1024 ** 3)
                 n_gpu_layers = max(1, int((vram_limit - mmproj_size) / gguf_layer_size))
-            
-            print(f"[llama-cpp_vlm] Loading clip:  {mmproj}")
-            
+
+            print(f"[llama-cpp-vulkan] Loading clip:  {mmproj}")
+
             think_mode = "Thinking" in chat_handler
             kwargs = {"clip_model_path": mmproj_path, "verbose": False}
             if chat_handler in ["Qwen3-VL", "Qwen3-VL-Thinking"]:
@@ -264,9 +264,9 @@ class LLAMA_CPP_STORAGE:
                 cls.chat_handler = handler(verbose=False)
             else:
                 cls.chat_handler = None
-        
-        print(f"[llama-cpp_vlm] Loading model: {model}")
-        print(f"[llama-cpp_vlm] n_gpu_layers = {n_gpu_layers}")
+
+        print(f"[llama-cpp-vulkan] Loading model: {model}")
+        print(f"[llama-cpp-vulkan] n_gpu_layers = {n_gpu_layers}")
         cls.llm = Llama(model_path, chat_handler=cls.chat_handler, n_gpu_layers=n_gpu_layers, n_ctx=n_ctx, verbose=False)
 
 any_type = AnyType("*")
@@ -278,7 +278,7 @@ if not hasattr(mm, "unload_all_models_backup"):
         result = mm.unload_all_models_backup(*args, **kwargs)
         return result
     mm.unload_all_models = patched_unload_all_models
-    print("[llama-cpp_vlm] Model cleanup hook applied!")
+    print("[llama-cpp-vulkan] Model cleanup hook applied!")
 
 llm_extensions = ['.ckpt', '.pt', '.bin', '.pth', '.safetensors', '.gguf']
 folder_paths.folder_names_and_paths["LLM"] = ([os.path.join(folder_paths.models_dir, "LLM")], llm_extensions)
@@ -317,12 +317,12 @@ def scale_image(image: torch.Tensor, max_size: int = 128):
     resized_frames = []
     img_np = np.clip(255.0 * image.cpu().numpy().squeeze(), 0, 255).astype(np.uint8)
     img_pil = Image.fromarray(img_np)
-    
+
     w, h = img_pil.size
     scale = min(max_size / max(w, h), 1.0)
     new_w, new_h = int(w * scale), int(h * scale)
     img_resized = img_pil.resize((new_w, new_h), Image.Resampling.LANCZOS)
-    
+
     return np.array(img_resized)
 
 def qwen3bbox(image, json):
@@ -342,7 +342,7 @@ def draw_bbox(image, json, mode):
     label_colors = {}
     img = Image.fromarray(np.clip(255.0 * image.cpu().numpy().squeeze(), 0, 255).astype(np.uint8))
     draw = ImageDraw.Draw(img)
-    
+
     for item in json:
         try:
             label = item["label"]
@@ -359,7 +359,7 @@ def draw_bbox(image, json, mode):
             x1 = x1 / size * img.width
             y1 = y1 / size * img.height
         bbox = (x0, y0, x1, y1)
-        
+
         if label not in label_colors:
             label_colors[label] = tuple(random.randint(80, 180) for _ in range(3))
         color = label_colors[label]
@@ -376,7 +376,7 @@ class llama_cpp_model_loader:
         all_llms = folder_paths.get_filename_list("LLM")
         model_list = [f for f in all_llms if "mmproj" not in f.lower()]
         mmproj_list = ["None"]+[f for f in all_llms if "mmproj" in f.lower()]
-            
+
         return {"required": {
             "model": (model_list,),
             "mmproj": (mmproj_list, {"default": "None"}),
@@ -399,14 +399,14 @@ class llama_cpp_model_loader:
     RETURN_TYPES = ("LLAMACPPMODEL",)
     RETURN_NAMES = ("llama_model",)
     FUNCTION = "loadmodel"
-    CATEGORY = "llama-cpp-vlm"
-    
+    CATEGORY = "llama-cpp-vulkan"
+
     '''
     @classmethod
     def IS_CHANGED(s, model, mmproj, chat_handler, n_ctx, vram_limit, image_min_tokens, image_max_tokens):
         if LLAMA_CPP_STORAGE.llm is None:
-            return float("NaN") 
-        
+            return float("NaN")
+
         custom_config = {
             "model": model,
             "mmproj": mmproj,
@@ -430,7 +430,7 @@ class llama_cpp_model_loader:
             "image_max_tokens": image_max_tokens
         }
         if not LLAMA_CPP_STORAGE.llm or LLAMA_CPP_STORAGE.current_config != custom_config:
-            print("[llama-cpp_vlm] Loading model...")
+            print("[llama-cpp-vulkan] Loading model...")
             LLAMA_CPP_STORAGE.load_model(custom_config)
         return (custom_config,)
 
@@ -479,15 +479,15 @@ class llama_cpp_instruct_adv:
                 "images": ("IMAGE",),
                 "queue_handler": (any_type, {"tooltip": "Used to control the execution order of instruct nodes."}),
             },
-            
+
         }
-    
+
     RETURN_TYPES = ("STRING", "STRING", "INT")
     RETURN_NAMES = ("output", "output_list", "state_uid")
     OUTPUT_IS_LIST = (False, True, False)
     FUNCTION = "process"
-    CATEGORY = "llama-cpp-vlm"
-    
+    CATEGORY = "llama-cpp-vulkan"
+
     def sanitize_messages(self, messages):
         clean_messages = messages.copy()
         for msg in clean_messages:
@@ -497,23 +497,23 @@ class llama_cpp_instruct_adv:
                     if isinstance(item, dict) and item.get("type") == "image_url":
                         item["image_url"]["url"] = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAACXBIWXMAAAsTAAALEwEAmpwYAAAADElEQVQImWP4//8/AAX+Av5Y8msOAAAAAElFTkSuQmCC"
         return clean_messages
-    
+
     def process(self, llama_model, preset_prompt, custom_prompt, system_prompt, inference_mode, max_frames, max_size, seed, force_offload, save_states, unique_id, parameters=None, images=None, queue_handler=None):
         if not LLAMA_CPP_STORAGE.llm:
             LLAMA_CPP_STORAGE.load_model(llama_model)
             #raise RuntimeError("The model has been unloaded or failed to load!")
-        
+
         if parameters is None:
             parameters = {}
-        
+
         if _MTMD:
             parameters.pop("present_penalty", None)
-            
+
         _uid = parameters.get("state_uid", None)
         _parameters = parameters.copy()
         _parameters.pop("state_uid", None)
         uid = unique_id.rpartition('.')[-1] if _uid in (None, -1) else _uid
-        
+
         last_sys_prompt = LLAMA_CPP_STORAGE.sys_prompts.get(f"{uid}", None)
         video_input = inference_mode == "video"
         system_prompts = "请将输入的图片序列当做视频而不是静态帧序列, " + system_prompt if video_input else system_prompt
@@ -526,7 +526,7 @@ class llama_cpp_instruct_adv:
         else:
             if save_states:
                 try:
-                    print(f"[llama-cpp_vlm] Loading state and history id={uid}...")
+                    print(f"[llama-cpp-vulkan] Loading state and history id={uid}...")
                     #LLAMA_CPP_STORAGE.llm.load_state(LLAMA_CPP_STORAGE.states[f"{uid}"])
                     messages = LLAMA_CPP_STORAGE.messages.get(f"{uid}", [])
                 except Exception as e:
@@ -541,16 +541,16 @@ class llama_cpp_instruct_adv:
         else:
             p = preset_prompts[preset_prompt].replace("#", custom_prompt.strip()).replace("@", "video" if video_input else "image")
             user_content.append({"type": "text", "text": p})
-            
+
         if images is not None:
             if not hasattr(LLAMA_CPP_STORAGE.chat_handler, "clip_model_path") or LLAMA_CPP_STORAGE.chat_handler.clip_model_path is None:
                  raise ValueError("Image input detected, but the loaded model is not configured with a mmproj module.")
-                
+
             frames = images
             if video_input:
                 indices = np.linspace(0, len(images) - 1, max_frames, dtype=int)
                 frames = [images[i] for i in indices]
-                
+
             if inference_mode == "one by one":
                 tmp_list = []
                 image_content = {
@@ -559,8 +559,8 @@ class llama_cpp_instruct_adv:
                 }
                 user_content.append(image_content)
                 messages.append({"role": "user", "content": user_content})
-                print(f"[llama-cpp_vlm] Start processing {len(frames)} images")
-                
+                print(f"[llama-cpp-vulkan] Start processing {len(frames)} images")
+
                 for i, image in enumerate(cqdm(frames)):
                     if mm.processing_interrupted():
                         raise mm.InterruptProcessingException()
@@ -575,7 +575,7 @@ class llama_cpp_instruct_adv:
                     if len(frames) > 1:
                         tmp_list.append(f"====== Image {i+1} ======")
                     tmp_list.append(text)
-                    
+
                 out1 = "\n\n".join(tmp_list)
             else:
                 for image in frames:
@@ -588,7 +588,7 @@ class llama_cpp_instruct_adv:
                         "image_url": {"url": f"data:image/jpeg;base64,{data}"}
                     }
                     user_content.append(image_content)
-                    
+
                 messages.append({"role": "user", "content": user_content})
                 output = LLAMA_CPP_STORAGE.llm.create_chat_completion(messages=messages, seed=seed, **_parameters)
                 out1 = output['choices'][0]['message']['content'].removeprefix(": ").lstrip()
@@ -598,9 +598,9 @@ class llama_cpp_instruct_adv:
             output = LLAMA_CPP_STORAGE.llm.create_chat_completion(messages=messages, seed=seed, **_parameters)
             out1 = output['choices'][0]['message']['content'].removeprefix(": ").lstrip()
             out2 = [out1]
-            
+
         if save_states:
-            print(f"[llama-cpp_vlm] Saving state id={uid}...")
+            print(f"[llama-cpp-vulkan] Saving state id={uid}...")
             #LLAMA_CPP_STORAGE.states[f"{uid}"] = LLAMA_CPP_STORAGE.llm.save_state()
             messages.append({"role": "assistant", "content": out1})
             clear_message = self.sanitize_messages(messages)
@@ -608,7 +608,7 @@ class llama_cpp_instruct_adv:
         else:
             if not LLAMA_CPP_STORAGE.messages.get(f"{uid}"):
                 LLAMA_CPP_STORAGE.sys_prompts.pop(f"{uid}", None)
-                
+
         if force_offload:
             LLAMA_CPP_STORAGE.clean()
         else:
@@ -617,7 +617,7 @@ class llama_cpp_instruct_adv:
                 LLAMA_CPP_STORAGE.llm._ctx.memory_clear(True)
                 if LLAMA_CPP_STORAGE.llm.is_hybrid and LLAMA_CPP_STORAGE.llm._hybrid_cache_mgr is not None:
                     LLAMA_CPP_STORAGE.llm._hybrid_cache_mgr.clear()
-            
+
         del messages
         gc.collect()
         return (out1, out2, uid)
@@ -650,10 +650,10 @@ class llama_cpp_parameters:
     RETURN_TYPES = ("LLAMACPPARAMS",)
     RETURN_NAMES = ("parameters",)
     FUNCTION = "process"
-    CATEGORY = "llama-cpp-vlm"
+    CATEGORY = "llama-cpp-vulkan"
     def process(self, **kwargs):
         return (kwargs,)
-    
+
 class llama_cpp_clean_states:
     @classmethod
     def INPUT_TYPES(s):
@@ -666,14 +666,14 @@ class llama_cpp_clean_states:
                 }),
             },
         }
-    
+
     RETURN_TYPES = (any_type,)
     RETURN_NAMES = ("any",)
     FUNCTION = "process"
-    CATEGORY = "llama-cpp-vlm"
-    
+    CATEGORY = "llama-cpp-vulkan"
+
     def process(self, any, state_uid):
-        print(f"[llama-cpp_vlm] Cleaning up saved states {state_uid}...")
+        print(f"[llama-cpp-vulkan] Cleaning up saved states {state_uid}...")
         LLAMA_CPP_STORAGE.clean_state(state_uid)
         return (any,)
 
@@ -681,14 +681,14 @@ class llama_cpp_unload_model:
     @classmethod
     def INPUT_TYPES(s):
         return {"required": {"any": (any_type,)}}
-    
+
     RETURN_TYPES = (any_type,)
     RETURN_NAMES = ("any",)
     FUNCTION = "process"
-    CATEGORY = "llama-cpp-vlm"
-    
+    CATEGORY = "llama-cpp-vulkan"
+
     def process(self, any):
-        print("[llama-cpp_vlm] Unloading llama model...")
+        print("[llama-cpp-vulkan] Unloading llama model...")
         LLAMA_CPP_STORAGE.clean()
         return (any,)
 
@@ -709,21 +709,21 @@ class json_to_bbox:
                 "image": ("IMAGE",),
             }
         }
-    
+
     RETURN_TYPES = ("BBOX", "IMAGE")
     RETURN_NAMES = ("bboxes", "image_list")
     OUTPUT_IS_LIST = (True, True)
     INPUT_IS_LIST = True
     FUNCTION = "process"
-    CATEGORY = "llama-cpp-vlm"
-    
+    CATEGORY = "llama-cpp-vulkan"
+
     def process(self, json, mode, label, image=None):
         mode = mode[0]
         label = label[0]
 
         flat_images_list = []
         original_structure = []
-    
+
         if image is not None:
             for img_batch in image:
                 if img_batch.ndim == 3:
@@ -734,14 +734,14 @@ class json_to_bbox:
                     original_structure.append(count)
                     for n in range(count):
                         flat_images_list.append(img_batch[n:n+1])
-        
+
         total_images = len(flat_images_list)
         output_bboxes = []
         processed_flat_results = []
-        
+
         for i, j in enumerate(json):
             bboxes = parse_json(j)
-            
+
             if label != "":
                 try:
                     bboxes = [item for item in bboxes if item["label"] == label]
@@ -751,19 +751,19 @@ class json_to_bbox:
             if total_images > 0:
                 curr_idx = i if i < total_images else (total_images - 1)
                 curr_img = flat_images_list[curr_idx]
-                
+
                 try:
                     res_img = draw_bbox(curr_img[0], bboxes, mode)
                     if res_img.ndim == 3:
                         res_img = res_img.unsqueeze(0)
                     elif res_img.ndim == 4 and res_img.shape[0] > 1:
                         res_img = res_img[0:1]
-                        
+
                     processed_flat_results.append(res_img)
                 except Exception as e:
                     print(f"Error drawing on image {curr_idx}: {e}")
                     processed_flat_results.append(curr_img)
-                    
+
             if mode in ["Qwen3-VL", "Qwen2.5-VL"]:
                 if total_images == 0:
                     raise ValueError("Image required for Qwen mode")
@@ -771,9 +771,9 @@ class json_to_bbox:
                 bbox = qwen3bbox(flat_images_list[curr_idx][0], bboxes)
             else:
                 bbox = [tuple(item["bbox_2d"]) for item in bboxes]
-                
+
             output_bboxes.append(bbox)
-            
+
         restructured_images_list = []
         cursor = 0
         for count in original_structure:
@@ -781,7 +781,7 @@ class json_to_bbox:
             if chunk:
                 restructured_images_list.append(torch.cat(chunk, dim=0))
             cursor += count
-            
+
         return (output_bboxes, restructured_images_list)
 
 class SEG:
@@ -793,10 +793,10 @@ class SEG:
         self.bbox = bbox
         self.label = label
         self.control_net_wrapper = control_net_wrapper
-        
+
     def __repr__(self):
         return (f"SEG(cropped_image={self.cropped_image}, cropped_mask=shape{self.cropped_mask.shape}, confidence={self.confidence}, bbox={self.bbox}, label='{self.label}'), control_net_wrapper={self.control_net_wrapper}")
-    
+
 class bbox_to_segs:
     @classmethod
     def INPUT_TYPES(s):
@@ -808,66 +808,66 @@ class bbox_to_segs:
                 "feather": ("INT", {"default": 0, "min": 0, "max": 100, "step": 1}),
             }
         }
-    
+
     RETURN_TYPES = ("SEGS",)
     FUNCTION = "process"
-    CATEGORY = "llama-cpp-vlm"
-    
+    CATEGORY = "llama-cpp-vulkan"
+
     def process(self, bboxes, image, dilation, feather):
         _batch_size, height, width, _channels = image.shape
         mask_shape = (height, width)
-        
+
         seg_list = []
-        image_for_cropping = image[0] 
-        
+        image_for_cropping = image[0]
+
         for bbox in bboxes:
             if not isinstance(bbox, (list, tuple)) or len(bbox) < 4:
                 print(f"Warning: Skipping invalid bbox item: {bbox}")
                 continue
-            
+
             x1, y1, x2, y2 = map(int, bbox)
             x1_exp = x1 - dilation
             y1_exp = y1 - dilation
             x2_exp = x2 + dilation
             y2_exp = y2 + dilation
-            
+
             crop_region = [x1_exp, y1_exp, x2_exp, y2_exp]
             crop_w = x2_exp - x1_exp
             crop_h = y2_exp - y1_exp
-            
+
             if crop_h <= 0 or crop_w <= 0:
                 print(f"Warning: Skipping bbox with invalid expanded size: {crop_region}")
                 continue
-            
+
             local_mask_np = np.zeros((crop_h, crop_w), dtype=np.float32)
             local_x1 = dilation
             local_y1 = dilation
             local_x2 = local_x1 + (x2 - x1)
             local_y2 = local_y1 + (y2 - y1)
             local_mask_np[local_y1:local_y2, local_x1:local_x2] = 1.0
-            
+
             if feather > 0:
                 local_mask_np = gaussian_filter(local_mask_np, sigma=feather)
-                
+
             cropped_mask_np = local_mask_np
             cropped_img_padded = torch.zeros((crop_h, crop_w, 3), dtype=image.dtype, device=image.device)
-            
+
             src_x_start = max(0, x1_exp)
             src_y_start = max(0, y1_exp)
             src_x_end = min(width, x2_exp)
             src_y_end = min(height, y2_exp)
-            
+
             dst_x_start = src_x_start - x1_exp
             dst_y_start = src_y_start - y1_exp
             dst_x_end = src_x_end - x1_exp
             dst_y_end = src_y_end - y1_exp
-            
+
             if src_x_end > src_x_start and src_y_end > src_y_start:
                 source_crop = image_for_cropping[src_y_start:src_y_end, src_x_start:src_x_end, :]
                 cropped_img_padded[dst_y_start:dst_y_end, dst_x_start:dst_x_end, :] = source_crop
-                
+
             cropped_image_tensor = cropped_img_padded.permute(2, 0, 1).unsqueeze(0)
-            
+
             seg = SEG(
                 cropped_image=cropped_image_tensor,
                 cropped_mask=cropped_mask_np,
@@ -876,13 +876,13 @@ class bbox_to_segs:
                 bbox=np.array(bbox, dtype=np.float32),
                 label="bbox"
             )
-            
+
             seg_list.append(seg)
-            
+
         segs = (mask_shape, seg_list)
-        
+
         return (segs,)
-    
+
 class bbox_to_mask:
     @classmethod
     def INPUT_TYPES(s):
@@ -894,24 +894,24 @@ class bbox_to_mask:
                 "feather": ("INT", {"default": 0, "min": 0, "max": 100, "step": 1}),
             }
         }
-    
+
     RETURN_TYPES = ("MASK",)
     RETURN_NAMES = ("mask",)
     FUNCTION = "process"
-    CATEGORY = "llama-cpp-vlm"
-    
+    CATEGORY = "llama-cpp-vulkan"
+
     def process(self, bboxes, image, dilation, feather):
         masks = []
         _batch_size, height, width, _channels = image.shape
         mask_shape = (height, width)
         combined_full_mask = torch.zeros(mask_shape, dtype=torch.float32, device=image.device)
-        
+
         for i, bbox in enumerate(bboxes):
-            
+
             if not isinstance(bbox, (list, tuple)) or len(bbox) < 4:
                 print(f"Warning: Skipping invalid bbox item: {bbox}")
                 continue
-            
+
             x1, y1, x2, y2 = map(int, bbox)
             x1_exp = x1 - dilation
             y1_exp = y1 - dilation
@@ -919,33 +919,33 @@ class bbox_to_mask:
             y2_exp = y2 + dilation
             crop_w = x2_exp - x1_exp
             crop_h = y2_exp - y1_exp
-            
+
             if crop_h <= 0 or crop_w <= 0:
                 continue
-            
+
             local_mask_np = np.zeros((crop_h, crop_w), dtype=np.float32)
             local_x1 = dilation
             local_y1 = dilation
             local_x2 = local_x1 + (x2 - x1)
             local_y2 = local_y1 + (y2 - y1)
             local_mask_np[local_y1:local_y2, local_x1:local_x2] = 1.0
-            
+
             if feather > 0:
                 local_mask_np = gaussian_filter(local_mask_np, sigma=feather)
-                
+
             current_full_mask_np = np.zeros(mask_shape, dtype=np.float32)
             x1_c, y1_c = max(0, x1_exp), max(0, y1_exp)
             x2_c, y2_c = min(width, x2_exp), min(height, y2_exp)
-            
+
             if x2_c > x1_c and y2_c > y1_c:
                 current_full_mask_np[y1_c:y2_c, x1_c:x2_c] = 1.0
-                
+
             if feather > 0:
                 current_full_mask_np = gaussian_filter(current_full_mask_np, sigma=feather)
-                
+
             current_full_mask_tensor = torch.from_numpy(current_full_mask_np).to(image.device)
             combined_full_mask = torch.maximum(combined_full_mask, current_full_mask_tensor)
-            
+
         masks.append(combined_full_mask.unsqueeze(0))
         return (torch.cat(masks, dim=0),)
 
@@ -965,12 +965,12 @@ class bboxes_to_bbox:
                 }),
             }
         }
-    
+
     RETURN_TYPES = ("BBOX",)
     RETURN_NAMES = ("bbox",)
     FUNCTION = "process"
-    CATEGORY = "llama-cpp-vlm"
-    
+    CATEGORY = "llama-cpp-vulkan"
+
     def process(self, bboxes, image_index, bbox_index):
         if bbox_index != 999:
             return ([bboxes[image_index][bbox_index]],)
@@ -989,16 +989,16 @@ class parse_json_node:
                 "default": ("STRING",),
             },
         }
-    
+
     RETURN_TYPES = (any_type, "STRING", "INT", "FLOAT", "BOOLEAN")
     RETURN_NAMES = ("any", "string", "int", "float", "boolean")
     FUNCTION = "process"
-    CATEGORY = "llama-cpp-vlm"
-    
+    CATEGORY = "llama-cpp-vulkan"
+
     def process(self, input, key=None, default=None):
         if isinstance(input, str):
             input = [input]
-            
+
         result = {}
         for i, json in enumerate(input):
             val = ""
@@ -1006,35 +1006,35 @@ class parse_json_node:
                 val = get_nested_value(json.strip().removeprefix("```json").removesuffix("```"), key, default)
             else:
                 raise ValueError("Key cannot be empty!")
-            
+
             result["any"][i] = val
             try:
                 result["string"][i] = str(val)
             except Exception as e:
                 result["string"][i] = val
-            
+
             try:
                 result["int"][i] = int(val)
             except Exception as e:
                 result["int"][i] = val
-            
+
             try:
                 result["float"][i] = float(val)
             except Exception as e:
                 result["float"][i] = val
-            
+
             try:
                 result["boolean"][i] = val.lower() == "true"
             except Exception as e:
                 result["boolean"][i] = val
-                
+
         if len(result["any"]) == 1:
             result["any"] = result["any"][0]
             result["string"] = result["string"][0]
             result["int"] = result["int"][0]
             result["float"] = result["float"][0]
             result["boolean"] = result["boolean"][0]
-        
+
         return (result["any"], result["string"], result["int"], result["float"], result["boolean"])
 
 def get_nested_value(data, dotted_key, default=None):
@@ -1059,16 +1059,16 @@ class remove_code_block:
                 "label": ("STRING",),
             },
         }
-    
+
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("output",)
     FUNCTION = "process"
-    CATEGORY = "llama-cpp-vlm"
-    
+    CATEGORY = "llama-cpp-vulkan"
+
     def process(self, input, label):
         if isinstance(input, str):
             input = [input]
-        
+
         output = []
         for value in input:
             output.append(value.strip().removeprefix(f"```{label}").removesuffix("```"))
@@ -1084,12 +1084,12 @@ class PromptEnhancerPreset:
                 "preset": (["Qwen-Image [EN]", "Qwen-Image [ZH]", "Qwen-Image 2512 [EN]", "Qwen-Image 2512 [ZH]", "Qwen-Image-Edit", "Qwen-Image-Edit 2509", "Qwen-Image-Edit 2511", "Z-Image Turbo", "Flux.2 T2I", "Flux.2 I2I", "Wan T2V [EN]", "Wan T2V [ZH]", "Wan I2V [EN]", "Wan I2V [ZH]", "Wan I2V Full-Auto [EN]", "Wan I2V Full-Auto [ZH]", "Wan FLF2V [EN]", "Wan FLF2V [ZH]"], )
             }
         }
-    
+
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("system_prompt",)
     FUNCTION = "main"
-    CATEGORY = "llama-cpp-vlm"
-    
+    CATEGORY = "llama-cpp-vulkan"
+
     def main(self, preset):
         match preset:
             case "Qwen-Image [EN]":
@@ -1130,7 +1130,7 @@ class PromptEnhancerPreset:
                 return (WAN_FLF2V_ZH,)
             case _:
                 raise ValueError(f'Unknow preset: "{preset}"')
-        
+
 NODE_CLASS_MAPPINGS = {
     "llama_cpp_model_loader": llama_cpp_model_loader,
     "llama_cpp_instruct_adv": llama_cpp_instruct_adv,
