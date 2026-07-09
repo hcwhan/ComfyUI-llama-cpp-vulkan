@@ -271,7 +271,7 @@ class LLAMA_CPP_STORAGE:
 
         print(f"[llama-cpp-vulkan] Loading model: {model}")
         print(f"[llama-cpp-vulkan] n_gpu_layers = {n_gpu_layers}")
-        cls.llm = Llama(model_path, chat_handler=cls.chat_handler, n_gpu_layers=n_gpu_layers, n_ctx=n_ctx, verbose=False)
+        cls.llm = Llama(model_path, chat_handler=cls.chat_handler, n_gpu_layers=n_gpu_layers, n_ctx=n_ctx, verbose=True)
 
 any_type = AnyType("*")
 

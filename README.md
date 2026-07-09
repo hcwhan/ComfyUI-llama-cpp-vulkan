@@ -19,6 +19,33 @@ Run LLM/VLM models natively in ComfyUI based on llama.cpp with **Vulkan** GPU ac
 
 Vulkan provides near-native GPU performance without requiring CUDA or ROCm toolkits. If your system can run games, it can run LLMs with Vulkan.
 
+## Supported Models
+
+### VLM (Vision-Language) Handlers
+
+| Handler | Thinking Mode |
+|---------|:------------:|
+| Qwen3.5 / Qwen3.6 | Yes |
+| Qwen3-VL | Yes |
+| Qwen2.5-VL | - |
+| Gemma3 / Gemma4 | - |
+| GLM-4.6V / GLM-4.1V | Yes |
+| LFM2-VL / LFM2.5-VL | - |
+| MiniCPM-v4.5 / v4.6 | Yes |
+| Step3-VL | - |
+
+### Specialized Handlers
+
+| Handler | Type |
+|---------|------|
+| DeepSeek-OCR | OCR |
+| Granite-Docling | Document |
+| PaddleOCR-VL-1.5 | OCR |
+| MinerU2.5-Pro | Document |
+| Qwen3-ASR | Speech |
+
+> Any GGUF model without a specific handler will run in generic text mode.
+
 ## Installation
 
 #### 1. Install the node:
@@ -28,16 +55,19 @@ cd ComfyUI/custom_nodes
 git clone https://github.com/hcwhan/ComfyUI-llama-cpp-vulkan.git
 ```
 
-#### 2. Install llama-cpp-python with Vulkan support:
-
-**Pre-built wheel (recommended):**
+#### 2. Install dependencies (includes pre-built Vulkan wheels):
 
 ```bash
-pip install llama-cpp-python \
-  --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/vulkan
+pip install -r ComfyUI-llama-cpp-vulkan/requirements.txt
 ```
 
-**Or build from source:**
+Pre-built Vulkan wheels are available for:
+- Windows x86_64: Python 3.10 ~ 3.13
+- Linux x86_64 (manylinux2014): Python 3.10 ~ 3.13
+
+Download from [Releases](https://github.com/hcwhan/ComfyUI-llama-cpp-vulkan/releases).
+
+#### Alternative: Build from source
 
 ```powershell
 # Windows PowerShell
@@ -46,21 +76,16 @@ pip install llama-cpp-python --no-cache-dir --force-reinstall
 ```
 
 ```bash
-# Linux / macOS
+# Linux
 CMAKE_ARGS="-DGGML_VULKAN=on" pip install llama-cpp-python --no-cache-dir --force-reinstall
 ```
 
-> Requires [Vulkan SDK](https://vulkan.lunarg.com/sdk/home) to be installed on your system.
+> Requires [Vulkan SDK](https://vulkan.lunarg.com/sdk/home) when building from source.
 
-#### 3. Install other dependencies:
-
-```bash
-pip install -r ComfyUI-llama-cpp-vulkan/requirements.txt
-```
-
-#### 4. Download models:
+#### 3. Download models:
 
 - Place your `.gguf` model files in the `ComfyUI/models/LLM` folder.
+- Custom paths via `extra_model_paths.yaml` are also supported.
 
   > If you need a VLM model to process image input, don't forget to download the `mmproj` weights.
 
@@ -68,4 +93,3 @@ pip install -r ComfyUI-llama-cpp-vulkan/requirements.txt
 
 - [llama-cpp-python](https://github.com/JamePeng/llama-cpp-python) @JamePeng
 - [ComfyUI-llama-cpp](https://github.com/kijai/ComfyUI-llama-cpp) @kijai
-- [ComfyUI](https://github.com/comfyanonymous/ComfyUI) @comfyanonymous

@@ -19,6 +19,33 @@
 
 Vulkan 无需 CUDA 或 ROCm 工具链即可实现接近原生的 GPU 加速性能。只要你的系统能运行游戏, 就能用 Vulkan 加速 LLM 推理。
 
+## 支持的模型
+
+### VLM (视觉语言模型) Handlers
+
+| Handler | 思维模式 |
+|---------|:------:|
+| Qwen3.5 / Qwen3.6 | 支持 |
+| Qwen3-VL | 支持 |
+| Qwen2.5-VL | - |
+| Gemma3 / Gemma4 | - |
+| GLM-4.6V / GLM-4.1V | 支持 |
+| LFM2-VL / LFM2.5-VL | - |
+| MiniCPM-v4.5 / v4.6 | 支持 |
+| Step3-VL | - |
+
+### 专用 Handlers
+
+| Handler | 类型 |
+|---------|------|
+| DeepSeek-OCR | OCR 文字识别 |
+| Granite-Docling | 文档解析 |
+| PaddleOCR-VL-1.5 | OCR 文字识别 |
+| MinerU2.5-Pro | 文档解析 |
+| Qwen3-ASR | 语音识别 |
+
+> 没有专用 Handler 的 GGUF 模型会以通用文本模式运行。
+
 ## 安装步骤
 
 #### 1. 安装节点:
@@ -28,16 +55,19 @@ cd ComfyUI/custom_nodes
 git clone https://github.com/hcwhan/ComfyUI-llama-cpp-vulkan.git
 ```
 
-#### 2. 安装 Vulkan 版 llama-cpp-python:
-
-**预编译包 (推荐):**
+#### 2. 安装依赖 (包含预编译的 Vulkan wheel):
 
 ```bash
-pip install llama-cpp-python \
-  --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/vulkan
+pip install -r ComfyUI-llama-cpp-vulkan/requirements.txt
 ```
 
-**或从源码编译:**
+预编译的 Vulkan wheel 支持以下平台:
+- Windows x86_64: Python 3.10 ~ 3.13
+- Linux x86_64 (manylinux2014): Python 3.10 ~ 3.13
+
+可从 [Releases](https://github.com/hcwhan/ComfyUI-llama-cpp-vulkan/releases) 页面下载。
+
+#### 备选: 从源码编译
 
 ```powershell
 # Windows PowerShell
@@ -46,21 +76,16 @@ pip install llama-cpp-python --no-cache-dir --force-reinstall
 ```
 
 ```bash
-# Linux / macOS
+# Linux
 CMAKE_ARGS="-DGGML_VULKAN=on" pip install llama-cpp-python --no-cache-dir --force-reinstall
 ```
 
-> 需要先安装 [Vulkan SDK](https://vulkan.lunarg.com/sdk/home)。
+> 从源码编译需要先安装 [Vulkan SDK](https://vulkan.lunarg.com/sdk/home)。
 
-#### 3. 安装其他依赖:
-
-```bash
-pip install -r ComfyUI-llama-cpp-vulkan/requirements.txt
-```
-
-#### 4. 模型路径:
+#### 3. 模型路径:
 
 - 请将下载的 `.gguf` 模型放置在 `ComfyUI/models/LLM` 目录中。
+- 也支持通过 `extra_model_paths.yaml` 配置自定义路径。
 
   > 在使用 VLM 模型进行图像推理之前, 请确保已经下载并选择了主模型对应的 `mmproj` 权重文件。
 
@@ -68,4 +93,3 @@ pip install -r ComfyUI-llama-cpp-vulkan/requirements.txt
 
 - [llama-cpp-python](https://github.com/JamePeng/llama-cpp-python) @JamePeng
 - [ComfyUI-llama-cpp](https://github.com/kijai/ComfyUI-llama-cpp) @kijai
-- [ComfyUI](https://github.com/comfyanonymous/ComfyUI) @comfyanonymous
