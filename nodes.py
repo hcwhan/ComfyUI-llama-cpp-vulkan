@@ -17,7 +17,39 @@ import folder_paths
 import comfy.model_management as mm
 import comfy.utils
 
+import ctypes
 from llama_cpp import Llama
+from llama_cpp._ggml import (
+    libggml_base,
+    ggml_backend_dev_count,
+    ggml_backend_dev_get,
+)
+
+libggml_base.ggml_backend_dev_name.argtypes = [ctypes.c_void_p]
+libggml_base.ggml_backend_dev_name.restype = ctypes.c_char_p
+libggml_base.ggml_backend_dev_description.argtypes = [ctypes.c_void_p]
+libggml_base.ggml_backend_dev_description.restype = ctypes.c_char_p
+libggml_base.ggml_backend_dev_type.argtypes = [ctypes.c_void_p]
+libggml_base.ggml_backend_dev_type.restype = ctypes.c_int32
+
+_GGML_BACKEND_DEVICE_TYPE_GPU = 1
+
+def _print_backend_summary():
+    try:
+        count = ggml_backend_dev_count()
+        gpu_devices = []
+        for i in range(count):
+            dev = ggml_backend_dev_get(i)
+            if libggml_base.ggml_backend_dev_type(dev) == _GGML_BACKEND_DEVICE_TYPE_GPU:
+                name = libggml_base.ggml_backend_dev_name(dev).decode("utf-8", errors="replace")
+                desc = libggml_base.ggml_backend_dev_description(dev).decode("utf-8", errors="replace")
+                gpu_devices.append(f"{name} ({desc})")
+        if gpu_devices:
+            print(f"[llama-cpp-vulkan] GPU backend: {', '.join(gpu_devices)}")
+        else:
+            print("[llama-cpp-vulkan] WARNING: No GPU backend detected, running on CPU only")
+    except Exception:
+        pass
 from llama_cpp.llama_chat_format import (
     Llava15ChatHandler, Llava16ChatHandler, MoondreamChatHandler,
     NanoLlavaChatHandler, Llama3VisionAlphaChatHandler, MiniCPMv26ChatHandler
@@ -271,7 +303,8 @@ class LLAMA_CPP_STORAGE:
 
         print(f"[llama-cpp-vulkan] Loading model: {model}")
         print(f"[llama-cpp-vulkan] n_gpu_layers = {n_gpu_layers}")
-        cls.llm = Llama(model_path, chat_handler=cls.chat_handler, n_gpu_layers=n_gpu_layers, n_ctx=n_ctx, verbose=True)
+        cls.llm = Llama(model_path, chat_handler=cls.chat_handler, n_gpu_layers=n_gpu_layers, n_ctx=n_ctx, verbose=False)
+        _print_backend_summary()
 
 any_type = AnyType("*")
 
