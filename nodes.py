@@ -255,7 +255,7 @@ class LLAMA_CPP_STORAGE:
             try:
                 cls.chat_handler = handler(**kwargs)
             except Exception as e:
-                raise RuntimeError(f"{e}\nPlease update llama-cpp-python from 'https://github.com/JamePeng/llama-cpp-python/releases'")
+                raise RuntimeError(f"{e}\nChatHandler initialization failed. Please update llama-cpp-python to the latest version with Vulkan support.")
 
         else:
             if vram_limit != -1:
