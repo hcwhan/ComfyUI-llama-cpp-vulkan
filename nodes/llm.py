@@ -235,7 +235,9 @@ class LLAMA_CPP_STORAGE:
             pass
 
         try:
-            cls.chat_handler._exit_stack.close()
+            # 公开的 close() 幂等且完整（mtmd_free + exit_stack）；
+            # 直接调 _exit_stack.close() 会跳过 mtmd 视觉编码器的释放
+            cls.chat_handler.close()
         except Exception:
             pass
 
@@ -246,7 +248,6 @@ class LLAMA_CPP_STORAGE:
             cls.clean_state()
 
         gc.collect()
-        mm.soft_empty_cache()
 
     @classmethod
     def load_model(cls, config):
@@ -302,7 +303,6 @@ class LLAMA_CPP_STORAGE:
                     raise ValueError(f'Unknown model type: "{chat_handler}"')
 
         cls.clean(all=True)
-        cls.current_config = config.copy()
         model = config["model"]
         mmproj = config["mmproj"]
         chat_handler = config["chat_handler"]
@@ -371,6 +371,8 @@ class LLAMA_CPP_STORAGE:
         print(f"[llama-cpp-vulkan] Loading model: {model}")
         print(f"[llama-cpp-vulkan] n_gpu_layers = {n_gpu_layers}, main_gpu = {main_gpu}")
         cls.llm = Llama(model_path, chat_handler=cls.chat_handler, n_gpu_layers=n_gpu_layers, main_gpu=main_gpu, n_ctx=n_ctx, verbose=False)
+        # 加载成功后才记录配置，避免加载失败时残留新配置导致后续误判"无需重载"
+        cls.current_config = config.copy()
         _print_backend_summary(main_gpu)
 
 
@@ -521,19 +523,19 @@ class llama_cpp_instruct_adv:
         return clean_messages
 
     def process(self, llama_model, preset_prompt, custom_prompt, system_prompt, inference_mode, max_frames, max_size, seed, force_offload, save_states, unique_id, parameters=None, images=None, queue_handler=None):
-        if not LLAMA_CPP_STORAGE.llm:
+        # 校验当前已加载的模型确实是本节点连线的配置：
+        # 多组 loader+instruct 交错执行时，全局单例可能已被切换成其他模型
+        if not LLAMA_CPP_STORAGE.llm or LLAMA_CPP_STORAGE.current_config != llama_model:
             LLAMA_CPP_STORAGE.load_model(llama_model)
             #raise RuntimeError("The model has been unloaded or failed to load!")
 
         if parameters is None:
             parameters = {}
 
-        if _MTMD:
-            parameters.pop("present_penalty", None)
-
-        _uid = parameters.get("state_uid", None)
+        # 先复制再修改，避免污染 ComfyUI 缓存的共享参数 dict；
+        # present_penalty 在当前 llama-cpp-python (>=0.3.41) 中受支持，不再丢弃
         _parameters = parameters.copy()
-        _parameters.pop("state_uid", None)
+        _uid = _parameters.pop("state_uid", None)
         uid = unique_id.rpartition('.')[-1] if _uid in (None, -1) else _uid
 
         last_sys_prompt = LLAMA_CPP_STORAGE.sys_prompts.get(f"{uid}", None)
