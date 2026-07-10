@@ -62,9 +62,11 @@ preset_tags = list(preset_prompts.keys())
 
 
 def image2base64(image):
+    # PNG 无损：JPEG q85 的压缩伪影会影响 OCR 类模型的小字识别，
+    # 且 JPEG 不支持 RGBA 输入
     img = Image.fromarray(image)
     buffered = io.BytesIO()
-    img.save(buffered, format="JPEG", quality=85)
+    img.save(buffered, format="PNG")
     img_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
     return img_base64
 

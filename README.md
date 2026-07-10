@@ -89,6 +89,10 @@ CMAKE_ARGS="-DGGML_VULKAN=on" pip install llama-cpp-python --no-cache-dir --forc
 
   > If you need a VLM model to process image input, don't forget to download the `mmproj` weights.
 
+## Notes
+
+- **`save_states` multi-turn conversations with images**: to save memory, images in the saved conversation history are replaced with a 1x1 placeholder. The model cannot "look back" at previous images in later turns, so follow-up questions about earlier images may get inaccurate answers. To keep asking about the same image, feed it again in each turn.
+
 ## Credits
 
 - [llama-cpp-python](https://github.com/JamePeng/llama-cpp-python) @JamePeng

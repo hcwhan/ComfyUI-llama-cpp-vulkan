@@ -89,6 +89,10 @@ CMAKE_ARGS="-DGGML_VULKAN=on" pip install llama-cpp-python --no-cache-dir --forc
 
   > 在使用 VLM 模型进行图像推理之前, 请确保已经下载并选择了主模型对应的 `mmproj` 权重文件。
 
+## 注意事项
+
+- **`save_states` 多轮对话与图片**: 为节省内存, 保存会话历史时图片会被替换为 1x1 占位图。后续轮次中模型无法"回看"之前的图片内容, 针对历史图片的追问可能得到不准确的回答。如需围绕同一张图片多轮追问, 请在每轮都重新输入该图片。
+
 ## 致谢
 
 - [llama-cpp-python](https://github.com/JamePeng/llama-cpp-python) @JamePeng
