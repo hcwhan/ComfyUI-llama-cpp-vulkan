@@ -141,54 +141,45 @@ class bbox_to_segs:
                 continue
 
             x1, y1, x2, y2 = map(int, bbox)
-            x1_exp = x1 - dilation
-            y1_exp = y1 - dilation
-            x2_exp = x2 + dilation
-            y2_exp = y2 + dilation
+            # LLM 输出的坐标不可信，先裁剪到图像范围
+            x1 = max(0, min(x1, width))
+            x2 = max(0, min(x2, width))
+            y1 = max(0, min(y1, height))
+            y2 = max(0, min(y2, height))
+            if x2 <= x1 or y2 <= y1:
+                print(f"Warning: Skipping bbox outside image bounds: {bbox}")
+                continue
+
+            # 扩张区域同样限制在图像内，保证 crop_region 不含负坐标（Impact Pack 约定）
+            x1_exp = max(0, x1 - dilation)
+            y1_exp = max(0, y1 - dilation)
+            x2_exp = min(width, x2 + dilation)
+            y2_exp = min(height, y2 + dilation)
 
             crop_region = [x1_exp, y1_exp, x2_exp, y2_exp]
             crop_w = x2_exp - x1_exp
             crop_h = y2_exp - y1_exp
 
-            if crop_h <= 0 or crop_w <= 0:
-                print(f"Warning: Skipping bbox with invalid expanded size: {crop_region}")
-                continue
-
             local_mask_np = np.zeros((crop_h, crop_w), dtype=np.float32)
-            local_x1 = dilation
-            local_y1 = dilation
-            local_x2 = local_x1 + (x2 - x1)
-            local_y2 = local_y1 + (y2 - y1)
+            local_x1 = x1 - x1_exp
+            local_y1 = y1 - y1_exp
+            local_x2 = x2 - x1_exp
+            local_y2 = y2 - y1_exp
             local_mask_np[local_y1:local_y2, local_x1:local_x2] = 1.0
 
             if feather > 0:
                 local_mask_np = gaussian_filter(local_mask_np, sigma=feather)
 
             cropped_mask_np = local_mask_np
-            cropped_img_padded = torch.zeros((crop_h, crop_w, 3), dtype=image.dtype, device=image.device)
-
-            src_x_start = max(0, x1_exp)
-            src_y_start = max(0, y1_exp)
-            src_x_end = min(width, x2_exp)
-            src_y_end = min(height, y2_exp)
-
-            dst_x_start = src_x_start - x1_exp
-            dst_y_start = src_y_start - y1_exp
-            dst_x_end = src_x_end - x1_exp
-            dst_y_end = src_y_end - y1_exp
-
-            if src_x_end > src_x_start and src_y_end > src_y_start:
-                source_crop = image_for_cropping[src_y_start:src_y_end, src_x_start:src_x_end, :]
-                cropped_img_padded[dst_y_start:dst_y_end, dst_x_start:dst_x_end, :] = source_crop
-
-            cropped_image_tensor = cropped_img_padded.permute(2, 0, 1).unsqueeze(0)
+            # Impact Pack 的 SEG 约定 cropped_image 为 [1, H, W, C]
+            cropped_image_tensor = image_for_cropping[y1_exp:y2_exp, x1_exp:x2_exp, :].unsqueeze(0)
 
             seg = SEG(
                 cropped_image=cropped_image_tensor,
                 cropped_mask=cropped_mask_np,
                 confidence=np.array([0.9], dtype=np.float32),
                 crop_region=crop_region,
-                bbox=np.array(bbox, dtype=np.float32),
+                bbox=np.array([x1, y1, x2, y2], dtype=np.float32),
                 label="bbox"
             )
 

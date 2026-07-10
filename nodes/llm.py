@@ -485,7 +485,7 @@ class llama_cpp_instruct_adv:
                     "step": 64,
                     "tooltip": 'Max size of input images in "images" and "video" modes.'
                 }),
-                "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff, "step": 1}),
+                "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffff, "step": 1, "tooltip": "llama.cpp uses 32-bit seeds; larger values would be truncated."}),
                 "force_offload": ("BOOLEAN", {
                     "default": False,
                     "tooltip": "Unload the model after inference."
@@ -591,7 +591,7 @@ class llama_cpp_instruct_adv:
                     data = image2base64(np.clip(255.0 * image.cpu().numpy().squeeze(), 0, 255).astype(np.uint8))
                     for item in user_content:
                         if item.get("type") == "image_url":
-                            item["image_url"]["url"] = f"data:image/jpeg;base64,{data}"
+                            item["image_url"]["url"] = f"data:image/png;base64,{data}"
                             break
                     output = LLAMA_CPP_STORAGE.llm.create_chat_completion(messages=messages, seed=seed, **_parameters)
                     text = output['choices'][0]['message']['content'].removeprefix(": ").lstrip()
@@ -609,7 +609,7 @@ class llama_cpp_instruct_adv:
                         data = image2base64(np.clip(255.0 * image.cpu().numpy().squeeze(), 0, 255).astype(np.uint8))
                     image_content = {
                         "type": "image_url",
-                        "image_url": {"url": f"data:image/jpeg;base64,{data}"}
+                        "image_url": {"url": f"data:image/png;base64,{data}"}
                     }
                     user_content.append(image_content)
 
@@ -643,7 +643,6 @@ class llama_cpp_instruct_adv:
                     LLAMA_CPP_STORAGE.llm._hybrid_cache_mgr.clear()
 
         del messages
-        gc.collect()
         return (out1, out2, uid)
 
 
