@@ -75,8 +75,11 @@ else:
     print("[llama-cpp-vulkan] WARNING: No GPU devices detected, running on CPU only")
 
 
+_AUTO_LABEL = "Auto (独显优先)"
+
+
 def _build_gpu_device_choices():
-    choices = ["Auto"]
+    choices = [_AUTO_LABEL]
     gpu_first = sorted(_gpu_devices, key=lambda d: (d["type"] != "GPU", d["name"]))
     for dev in gpu_first:
         choices.append(f"{dev['name']} - {dev['desc']} [{dev['type']}]")
@@ -84,7 +87,7 @@ def _build_gpu_device_choices():
 
 
 def _resolve_main_gpu(gpu_device):
-    if gpu_device == "Auto":
+    if gpu_device == _AUTO_LABEL:
         for i, dev in enumerate(_gpu_devices):
             if dev["type"] == "GPU":
                 return i
@@ -303,7 +306,7 @@ class LLAMA_CPP_STORAGE:
         model = config["model"]
         mmproj = config["mmproj"]
         chat_handler = config["chat_handler"]
-        gpu_device = config.get("gpu_device", "Auto")
+        gpu_device = config.get("gpu_device", _AUTO_LABEL)
         n_ctx = config["n_ctx"]
         vram_limit = config["vram_limit"]
         image_max_tokens = config["image_max_tokens"]
@@ -390,7 +393,7 @@ class llama_cpp_model_loader:
 
         return {"required": {
             "gpu_device": (_gpu_device_choices, {
-                "default": "Auto",
+                "default": _AUTO_LABEL,
                 "tooltip": "Select GPU device for LLM inference.\nAuto = prefer dedicated GPU over integrated GPU."
             }),
             "model": (model_list,),
