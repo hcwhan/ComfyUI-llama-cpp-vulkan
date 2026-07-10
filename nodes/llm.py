@@ -3,15 +3,18 @@ import gc
 import copy
 import json
 import ctypes
+from pathlib import Path
 
 import numpy as np
 import torch
 
 from llama_cpp import Llama
+import llama_cpp.llama_cpp as _llama_cpp_lib
 from llama_cpp._ggml import (
     libggml_base,
     ggml_backend_dev_count,
     ggml_backend_dev_get,
+    ggml_backend_load_all_from_path,
 )
 
 from ..support.cqdm import cqdm
@@ -37,20 +40,70 @@ libggml_base.ggml_backend_dev_type.argtypes = [ctypes.c_void_p]
 libggml_base.ggml_backend_dev_type.restype = ctypes.c_int32
 
 _GGML_BACKEND_DEVICE_TYPE_GPU = 1
+_GGML_BACKEND_DEVICE_TYPE_IGPU = 2
+_DEV_TYPE_NAMES = {1: "GPU", 2: "IGPU"}
 
 
-def _print_backend_summary():
+def _detect_gpu_devices():
     try:
-        count = ggml_backend_dev_count()
-        gpu_devices = []
-        for i in range(count):
+        lib_dir = Path(_llama_cpp_lib.__file__).resolve().parent / "lib"
+        if not lib_dir.exists():
+            return []
+        ggml_backend_load_all_from_path(ctypes.c_char_p(str(lib_dir).encode("utf-8")))
+
+        devices = []
+        for i in range(ggml_backend_dev_count()):
             dev = ggml_backend_dev_get(i)
-            if libggml_base.ggml_backend_dev_type(dev) == _GGML_BACKEND_DEVICE_TYPE_GPU:
+            dev_type = libggml_base.ggml_backend_dev_type(dev)
+            if dev_type in (_GGML_BACKEND_DEVICE_TYPE_GPU, _GGML_BACKEND_DEVICE_TYPE_IGPU):
                 name = libggml_base.ggml_backend_dev_name(dev).decode("utf-8", errors="replace")
-                desc = libggml_base.ggml_backend_dev_description(dev).decode("utf-8", errors="replace")
-                gpu_devices.append(f"{name} ({desc})")
-        if gpu_devices:
-            print(f"[llama-cpp-vulkan] GPU backend: {', '.join(gpu_devices)}")
+                desc = libggml_base.ggml_backend_dev_description(dev).decode("utf-8", errors="replace").strip()
+                type_name = _DEV_TYPE_NAMES.get(dev_type, "GPU")
+                devices.append({"name": name, "desc": desc, "type": type_name})
+        return devices
+    except Exception as e:
+        print(f"[llama-cpp-vulkan] WARNING: GPU detection failed: {e}")
+        return []
+
+
+_gpu_devices = _detect_gpu_devices()
+
+if _gpu_devices:
+    _summary = ", ".join(f"{d['name']} ({d['desc']}) [{d['type']}]" for d in _gpu_devices)
+    print(f"[llama-cpp-vulkan] Detected {len(_gpu_devices)} GPU device(s): {_summary}")
+else:
+    print("[llama-cpp-vulkan] WARNING: No GPU devices detected, running on CPU only")
+
+
+def _build_gpu_device_choices():
+    choices = ["Auto"]
+    gpu_first = sorted(_gpu_devices, key=lambda d: (d["type"] != "GPU", d["name"]))
+    for dev in gpu_first:
+        choices.append(f"{dev['name']} - {dev['desc']} [{dev['type']}]")
+    return choices
+
+
+def _resolve_main_gpu(gpu_device):
+    if gpu_device == "Auto":
+        for i, dev in enumerate(_gpu_devices):
+            if dev["type"] == "GPU":
+                return i
+        return 0
+    for i, dev in enumerate(_gpu_devices):
+        label = f"{dev['name']} - {dev['desc']} [{dev['type']}]"
+        if label == gpu_device:
+            return i
+    return 0
+
+
+_gpu_device_choices = _build_gpu_device_choices()
+
+
+def _print_backend_summary(main_gpu=0):
+    try:
+        if _gpu_devices:
+            active = _gpu_devices[main_gpu] if main_gpu < len(_gpu_devices) else _gpu_devices[0]
+            print(f"[llama-cpp-vulkan] Active GPU: {active['name']} ({active['desc']}) [{active['type']}]")
         else:
             print("[llama-cpp-vulkan] WARNING: No GPU backend detected, running on CPU only")
     except Exception:
@@ -250,10 +303,12 @@ class LLAMA_CPP_STORAGE:
         model = config["model"]
         mmproj = config["mmproj"]
         chat_handler = config["chat_handler"]
+        gpu_device = config.get("gpu_device", "Auto")
         n_ctx = config["n_ctx"]
         vram_limit = config["vram_limit"]
         image_max_tokens = config["image_max_tokens"]
         image_min_tokens = config["image_min_tokens"]
+        main_gpu = _resolve_main_gpu(gpu_device)
         n_gpu_layers = -1
 
         model_path = get_llm_full_path(model)
@@ -311,9 +366,9 @@ class LLAMA_CPP_STORAGE:
                 cls.chat_handler = None
 
         print(f"[llama-cpp-vulkan] Loading model: {model}")
-        print(f"[llama-cpp-vulkan] n_gpu_layers = {n_gpu_layers}")
-        cls.llm = Llama(model_path, chat_handler=cls.chat_handler, n_gpu_layers=n_gpu_layers, n_ctx=n_ctx, verbose=False)
-        _print_backend_summary()
+        print(f"[llama-cpp-vulkan] n_gpu_layers = {n_gpu_layers}, main_gpu = {main_gpu}")
+        cls.llm = Llama(model_path, chat_handler=cls.chat_handler, n_gpu_layers=n_gpu_layers, main_gpu=main_gpu, n_ctx=n_ctx, verbose=False)
+        _print_backend_summary(main_gpu)
 
 
 if not hasattr(mm, "unload_all_models_backup"):
@@ -334,6 +389,10 @@ class llama_cpp_model_loader:
         mmproj_list = ["None"] + [f for f in all_llms if "mmproj" in f.lower()]
 
         return {"required": {
+            "gpu_device": (_gpu_device_choices, {
+                "default": "Auto",
+                "tooltip": "Select GPU device for LLM inference.\nAuto = prefer dedicated GPU over integrated GPU."
+            }),
             "model": (model_list,),
             "mmproj": (mmproj_list, {"default": "None"}),
             "chat_handler": (chat_handlers, {"default": "None"}),
@@ -375,13 +434,14 @@ class llama_cpp_model_loader:
         config_str = json.dumps(custom_config, sort_keys=True, ensure_ascii=False)
         return config_str
     '''
-    def loadmodel(self, model, mmproj, chat_handler, n_ctx, vram_limit, image_min_tokens, image_max_tokens):
+    def loadmodel(self, model, mmproj, chat_handler, gpu_device, n_ctx, vram_limit, image_min_tokens, image_max_tokens):
         if model == "None":
             raise ValueError("Please select a gguf model.")
         custom_config = {
             "model": model,
             "mmproj": mmproj,
-            "chat_handler":chat_handler,
+            "chat_handler": chat_handler,
+            "gpu_device": gpu_device,
             "n_ctx": n_ctx,
             "vram_limit": vram_limit,
             "image_min_tokens": image_min_tokens,
