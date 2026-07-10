@@ -1,0 +1,243 @@
+name: Build llama-cpp-python Vulkan Wheels (ABI3 Universal)
+
+on:
+  workflow_dispatch:
+    inputs:
+      jamepeng_ref:
+        description: "Branch/tag/commit of JamePeng/llama-cpp-python to build"
+        required: true
+        default: "main"
+
+permissions:
+  contents: write
+
+env:
+  VULKAN_SDK_VERSION: "1.4.341.0"
+  VULKAN_SDK_LINUX_SHA256: "ed66477d587a5587dc3601b1c2cdcc1fab5529c505f53a00171876cecd9b4fbe"
+  # ABI3 minimum Python version - wheel supports CPython 3.10+
+  # llama-cpp-python uses ctypes (no C extension), so the wheel binary
+  # content is truly Python-version-independent.
+  ABI3_MIN_CPYTHON: "cp310"
+
+jobs:
+  # ────────────────────────────────────────────────────────────────
+  #  Windows build (single universal wheel)
+  # ────────────────────────────────────────────────────────────────
+  build_windows:
+    name: Build Vulkan wheel (Windows abi3)
+    runs-on: windows-2022
+
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Checkout JamePeng/llama-cpp-python
+        uses: actions/checkout@v6
+        with:
+          repository: JamePeng/llama-cpp-python
+          ref: ${{ inputs.jamepeng_ref }}
+          submodules: recursive
+
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Install uv and Python 3.12
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+          activate-environment: true
+          enable-cache: true
+
+      - name: Install Vulkan SDK
+        run: |
+          choco install vulkan-sdk --version="$env:VULKAN_SDK_VERSION" --no-progress -y
+          $vulkanSdk = "C:\VulkanSDK\$env:VULKAN_SDK_VERSION"
+          if (-not (Test-Path $vulkanSdk)) { throw "Vulkan SDK not found at $vulkanSdk" }
+          "VULKAN_SDK=$vulkanSdk" >> $env:GITHUB_ENV
+          "$vulkanSdk\Bin" >> $env:GITHUB_PATH
+          & "$vulkanSdk\Bin\glslc.exe" --version
+
+      - name: Install build dependencies
+        run: uv pip install --upgrade build setuptools wheel packaging ninja
+
+      - name: Build Vulkan wheel (abi3)
+        env:
+          SKBUILD_WHEEL_PY_API: ${{ env.ABI3_MIN_CPYTHON }}
+        run: |
+          $env:CMAKE_GENERATOR = 'Ninja'
+          $env:CMAKE_ARGS = @(
+            '-DGGML_VULKAN=ON'
+            '-DGGML_NATIVE=OFF'
+            '-DGGML_BACKEND_DL=ON'
+            '-DGGML_CPU_ALL_VARIANTS=ON'
+          ) -join ' '
+
+          Write-Output "CMAKE_ARGS=$($env:CMAKE_ARGS)"
+          Write-Output "SKBUILD_WHEEL_PY_API=$($env:SKBUILD_WHEEL_PY_API)"
+          python -m build --wheel
+
+          if (!(Test-Path '.\dist\*.whl')) {
+            Write-Error "No wheel found in dist/"
+            exit 1
+          }
+
+          $wheelFile = Get-Item '.\dist\*.whl' | Select-Object -First 1
+          Write-Output "Built wheel: $($wheelFile.Name)"
+
+          $parts = $wheelFile.Name.Split('-')
+          $version = $parts[1]
+          $newVersion = "$version+vulkan"
+          $newName = "$($parts[0])-$newVersion-$($parts[2])-$($parts[3])-$($parts[4])"
+
+          Rename-Item -Path $wheelFile.FullName -NewName $newName
+          Write-Output "Renamed to: $newName"
+
+          "TAG_VERSION=$version" >> $env:GITHUB_ENV
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: wheel-vulkan-abi3-windows
+          path: ./dist/*.whl
+
+  # ────────────────────────────────────────────────────────────────
+  #  Linux build (single universal wheel via cibuildwheel)
+  # ────────────────────────────────────────────────────────────────
+  build_linux:
+    name: Build Vulkan wheel (Linux abi3)
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout JamePeng/llama-cpp-python
+        uses: actions/checkout@v6
+        with:
+          repository: JamePeng/llama-cpp-python
+          ref: ${{ inputs.jamepeng_ref }}
+          submodules: recursive
+
+      - name: Build wheel with cibuildwheel
+        uses: pypa/cibuildwheel@v3.4.1
+        env:
+          # Build only one Python version; abi3 wheel covers all 3.10+
+          CIBW_BUILD: "cp312-manylinux_x86_64"
+          CIBW_ARCHS: "auto64"
+          CIBW_MANYLINUX_X86_64_IMAGE: "manylinux2014"
+          CIBW_BEFORE_ALL_LINUX: >
+            yum install -y xz &&
+            curl -L https://micro.mamba.pm/api/micromamba/linux-64/latest
+            -o /tmp/micromamba.tar.bz2 &&
+            mkdir -p /tmp/micromamba &&
+            tar -xjf /tmp/micromamba.tar.bz2 -C /tmp/micromamba bin/micromamba &&
+            /tmp/micromamba/bin/micromamba create -y -p /opt/vulkan
+            -c conda-forge shaderc libvulkan-loader spirv-headers &&
+            /opt/vulkan/bin/glslc --version &&
+            curl -fL "https://sdk.lunarg.com/sdk/download/${{ env.VULKAN_SDK_VERSION }}/linux/vulkansdk-linux-x86_64-${{ env.VULKAN_SDK_VERSION }}.tar.xz"
+            -o /tmp/vulkan-sdk.tar.xz &&
+            echo "${{ env.VULKAN_SDK_LINUX_SHA256 }}  /tmp/vulkan-sdk.tar.xz" | sha256sum -c - &&
+            mkdir -p /opt/vulkan-sdk &&
+            tar -xf /tmp/vulkan-sdk.tar.xz -C /opt/vulkan-sdk
+          CIBW_ENVIRONMENT_LINUX: >
+            SKBUILD_WHEEL_PY_API=${{ env.ABI3_MIN_CPYTHON }}
+            CMAKE_ARGS="-DGGML_NATIVE=OFF
+            -DGGML_METAL=OFF
+            -DGGML_OPENMP=OFF
+            -DGGML_VULKAN=ON
+            -DCMAKE_PREFIX_PATH=/opt/vulkan
+            -DVulkan_INCLUDE_DIR=/opt/vulkan-sdk/${{ env.VULKAN_SDK_VERSION }}/x86_64/include
+            -DVulkan_LIBRARY=/opt/vulkan/lib/libvulkan.so
+            -DVulkan_GLSLC_EXECUTABLE=/opt/vulkan/bin/glslc"
+          CIBW_REPAIR_WHEEL_COMMAND_LINUX: >
+            LD_LIBRARY_PATH=/project/llama_cpp/lib:/opt/vulkan/lib
+            auditwheel repair --exclude libvulkan.so.1 -w {dest_dir} {wheel}
+        with:
+          package-dir: .
+          output-dir: wheelhouse
+
+      - name: Rename wheels with +vulkan tag
+        run: |
+          for whl in wheelhouse/*.whl; do
+            filename=$(basename "$whl")
+            new_name=$(echo "$filename" | sed 's/\(-[0-9]\+\.[0-9]\+\.[0-9]\+\)-/\1+vulkan-/')
+            if [ "$filename" != "$new_name" ]; then
+              mv "$whl" "wheelhouse/$new_name"
+              echo "Renamed: $filename -> $new_name"
+            fi
+          done
+          ls -la wheelhouse/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: wheel-vulkan-abi3-linux
+          path: ./wheelhouse/*.whl
+
+  # ────────────────────────────────────────────────────────────────
+  #  Release (collects all wheels)
+  # ────────────────────────────────────────────────────────────────
+  release:
+    name: Create Release
+    needs: [build_windows, build_linux]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          merge-multiple: true
+          path: dist
+
+      - name: Prepare release
+        run: |
+          BUILD_DATE=$(date +%Y%m%d)
+          echo "BUILD_DATE=$BUILD_DATE" >> $GITHUB_ENV
+
+          VERSION=$(ls dist/*.whl | head -1 | grep -oP '\d+\.\d+\.\d+')
+          echo "TAG_VERSION=$VERSION" >> $GITHUB_ENV
+
+          echo "=== Wheels to release ==="
+          ls -la dist/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          files: dist/*
+          tag_name: v${{ env.TAG_VERSION }}-vulkan-abi3-${{ env.BUILD_DATE }}
+          name: "llama-cpp-python v${{ env.TAG_VERSION }} Vulkan (ABI3)"
+          body: |
+            Pre-built `llama-cpp-python` wheels with **Vulkan** GPU backend.
+            **ABI3 universal build** — one wheel per platform, compatible with CPython 3.10+.
+
+            Source: [JamePeng/llama-cpp-python](https://github.com/JamePeng/llama-cpp-python) @ `${{ inputs.jamepeng_ref }}`
+
+            ## Platforms
+
+            | Platform | Wheel tag | Compatible Python |
+            |----------|-----------|-------------------|
+            | Windows x86_64 | `cp310-abi3-win_amd64` | CPython 3.10+ |
+            | Linux x86_64 | `cp310-abi3-manylinux2014_x86_64` | CPython 3.10+ |
+
+            ## Install
+
+            ```bash
+            pip install <wheel-filename>.whl
+            ```
+
+            ## Build flags
+
+            **Windows:**
+            - `GGML_VULKAN=ON` / `GGML_NATIVE=OFF`
+            - `GGML_BACKEND_DL=ON` / `GGML_CPU_ALL_VARIANTS=ON`
+
+            **Linux (manylinux2014):**
+            - `GGML_VULKAN=ON` / `GGML_NATIVE=OFF`
+            - `GGML_METAL=OFF` / `GGML_OPENMP=OFF`
+
+            ## Note
+
+            This build uses the CPython Stable ABI (abi3) tag. Since `llama-cpp-python`
+            uses ctypes for its Python bindings (no compiled C extension), the native
+            libraries are truly Python-version-independent.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
