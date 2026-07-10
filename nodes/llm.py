@@ -330,7 +330,7 @@ class llama_cpp_model_loader:
     @classmethod
     def INPUT_TYPES(s):
         all_llms = get_llm_filename_list()
-        model_list = [f for f in all_llms if "mmproj" not in f.lower()]
+        model_list = ["None"] + [f for f in all_llms if "mmproj" not in f.lower()]
         mmproj_list = ["None"] + [f for f in all_llms if "mmproj" in f.lower()]
 
         return {"required": {
@@ -376,6 +376,8 @@ class llama_cpp_model_loader:
         return config_str
     '''
     def loadmodel(self, model, mmproj, chat_handler, n_ctx, vram_limit, image_min_tokens, image_max_tokens):
+        if model == "None":
+            raise ValueError("Please select a gguf model.")
         custom_config = {
             "model": model,
             "mmproj": mmproj,
