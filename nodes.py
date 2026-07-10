@@ -1,6 +1,7 @@
 import os
 import io
 import gc
+import copy
 import json
 import base64
 import random
@@ -50,10 +51,13 @@ def _print_backend_summary():
             print("[llama-cpp-vulkan] WARNING: No GPU backend detected, running on CPU only")
     except Exception:
         pass
+
 from llama_cpp.llama_chat_format import (
     Llava15ChatHandler, Llava16ChatHandler, MoondreamChatHandler,
     NanoLlavaChatHandler, Llama3VisionAlphaChatHandler, MiniCPMv26ChatHandler
 )
+
+chat_handlers = ["None", "LLaVA-1.5", "LLaVA-1.6", "Moondream2", "nanoLLaVA", "llama3-Vision-Alpha", "MiniCPM-v2.6"]
 
 try:
     from llama_cpp.llama_chat_format import MTMDChatHandler
@@ -61,8 +65,6 @@ try:
     _MTMD = True
 except:
     _MTMD = False
-
-chat_handlers = ["None", "LLaVA-1.5", "LLaVA-1.6", "Moondream2", "nanoLLaVA", "llama3-Vision-Alpha", "MiniCPM-v2.6"]
 
 try:
     from llama_cpp.llama_chat_format import Gemma3ChatHandler
@@ -74,7 +76,7 @@ try:
     from llama_cpp.llama_chat_format import Gemma4ChatHandler
     chat_handlers += ["Gemma4"]
 except:
-    Gemma3ChatHandler = None
+    Gemma4ChatHandler = None
 
 try:
     from llama_cpp.llama_chat_format import Qwen25VLChatHandler
@@ -239,7 +241,7 @@ class LLAMA_CPP_STORAGE:
                 case "None":
                     return None
                 case _:
-                    raise ValueError(f'Unknow model type: "{chat_handler}"')
+                    raise ValueError(f'Unknown model type: "{chat_handler}"')
 
         cls.clean(all=True)
         cls.current_config = config.copy()
@@ -281,7 +283,12 @@ class LLAMA_CPP_STORAGE:
                 kwargs["force_reasoning"] = think_mode
                 kwargs["image_max_tokens"] = image_max_tokens
                 kwargs["image_min_tokens"] = image_min_tokens
-            elif chat_handler in ["MiniCPM-v4.5", "GLM-4.6V", "Qwen3.5"]:
+            elif chat_handler in [
+                "MiniCPM-v4.5", "MiniCPM-v4.5-Thinking",
+                "MiniCPM-v4.6", "MiniCPM-v4.6-Thinking",
+                "GLM-4.6V", "GLM-4.6V-Thinking", "GLM-4.1V-Thinking",
+                "Qwen3.5", "Qwen3.5-Thinking", "Qwen3.6", "Qwen3.6-Thinking",
+            ]:
                 kwargs["enable_thinking"] = think_mode
 
             if _MTMD:
@@ -318,7 +325,10 @@ if not hasattr(mm, "unload_all_models_backup"):
     print("[llama-cpp-vulkan] Model cleanup hook applied!")
 
 llm_extensions = {'.ckpt', '.pt', '.bin', '.pth', '.safetensors', '.gguf'}
-folder_paths.add_model_folder_path("LLM", os.path.join(folder_paths.models_dir, "LLM"))
+for _folder_name in ("LLM", "llm"):
+    _llm_dir = os.path.join(folder_paths.models_dir, _folder_name)
+    if os.path.isdir(_llm_dir):
+        folder_paths.add_model_folder_path("LLM", _llm_dir)
 if "LLM" in folder_paths.folder_names_and_paths:
     folder_paths.folder_names_and_paths["LLM"][1].update(llm_extensions)
 preset_prompts = {
@@ -353,7 +363,6 @@ def parse_json(json_str):
     return parsed
 
 def scale_image(image: torch.Tensor, max_size: int = 128):
-    resized_frames = []
     img_np = np.clip(255.0 * image.cpu().numpy().squeeze(), 0, 255).astype(np.uint8)
     img_pil = Image.fromarray(img_np)
 
@@ -528,7 +537,7 @@ class llama_cpp_instruct_adv:
     CATEGORY = "llama-cpp-vulkan"
 
     def sanitize_messages(self, messages):
-        clean_messages = messages.copy()
+        clean_messages = copy.deepcopy(messages)
         for msg in clean_messages:
             content = msg.get("content")
             if isinstance(content, list):
@@ -651,7 +660,7 @@ class llama_cpp_instruct_adv:
         if force_offload:
             LLAMA_CPP_STORAGE.clean()
         else:
-            if LLAMA_CPP_STORAGE.current_config["chat_handler"] in ["Qwen3.5", "Qwen3.5-Thinking"]:
+            if LLAMA_CPP_STORAGE.current_config["chat_handler"] in ["Qwen3.5", "Qwen3.5-Thinking", "Qwen3.6", "Qwen3.6-Thinking"]:
                 LLAMA_CPP_STORAGE.llm.n_tokens = 0
                 LLAMA_CPP_STORAGE.llm._ctx.memory_clear(True)
                 if LLAMA_CPP_STORAGE.llm.is_hybrid and LLAMA_CPP_STORAGE.llm._hybrid_cache_mgr is not None:
@@ -1038,7 +1047,7 @@ class parse_json_node:
         if isinstance(input, str):
             input = [input]
 
-        result = {}
+        result = {"any": {}, "string": {}, "int": {}, "float": {}, "boolean": {}}
         for i, json in enumerate(input):
             val = ""
             if key is not None and key != "":
@@ -1080,7 +1089,7 @@ def get_nested_value(data, dotted_key, default=None):
     keys = dotted_key.split('.')
     for key in keys:
         if isinstance(data, str):
-                data = json.loads(data)
+            data = json.loads(data)
         if isinstance(data, dict) and key in data:
             data = data[key]
         else:
@@ -1168,7 +1177,7 @@ class PromptEnhancerPreset:
             case "Wan FLF2V [ZH]":
                 return (WAN_FLF2V_ZH,)
             case _:
-                raise ValueError(f'Unknow preset: "{preset}"')
+                raise ValueError(f'Unknown preset: "{preset}"')
 
 NODE_CLASS_MAPPINGS = {
     "llama_cpp_model_loader": llama_cpp_model_loader,
@@ -1186,11 +1195,11 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "llama_cpp_model_loader": "Llama-cpp Model Loader",
-    "llama_cpp_instruct_adv": "Llama-cpp Instruct",
-    "llama_cpp_parameters": "Llama-cpp Parameters",
-    "llama_cpp_unload_model": "Llama-cpp Unload Model",
-    "llama_cpp_clean_states": "Llama-cpp Clean States",
+    "llama_cpp_model_loader": "llama.cpp Model Loader",
+    "llama_cpp_instruct_adv": "llama.cpp Instruct",
+    "llama_cpp_parameters": "llama.cpp Parameters",
+    "llama_cpp_unload_model": "llama.cpp Unload Model",
+    "llama_cpp_clean_states": "llama.cpp Clean States",
     "parse_json_node": "Parse JSON",
     "json_to_bbox": "JSON to BBoxes",
     "bbox_to_segs": "BBoxes to SEGS",
