@@ -254,9 +254,9 @@ class LLAMA_CPP_STORAGE:
         image_min_tokens = config["image_min_tokens"]
         n_gpu_layers = -1
 
-        model_path = folder_paths.get_full_path("llm", model)
+        model_path = _get_llm_full_path(model)
         if model_path is None:
-            raise FileNotFoundError(f"Model '{model}' not found in any LLM folder")
+            raise FileNotFoundError(f"Model '{model}' not found in any llm/LLM folder")
         handler = get_chat_handler(chat_handler)
 
         if vram_limit != -1:
@@ -265,9 +265,9 @@ class LLAMA_CPP_STORAGE:
             gguf_layer_size = gguf_size / gguf_layers
 
         if mmproj and mmproj != "None":
-            mmproj_path = folder_paths.get_full_path("llm", mmproj)
+            mmproj_path = _get_llm_full_path(mmproj)
             if mmproj_path is None:
-                raise FileNotFoundError(f"mmproj '{mmproj}' not found in any LLM folder")
+                raise FileNotFoundError(f"mmproj '{mmproj}' not found in any llm/LLM folder")
             if chat_handler == "None":
                 raise ValueError('"chat_handler" cannot be None!')
 
@@ -324,15 +324,31 @@ if not hasattr(mm, "unload_all_models_backup"):
     mm.unload_all_models = patched_unload_all_models
     print("[llama-cpp-vulkan] Model cleanup hook applied!")
 
-llm_extensions = {'.ckpt', '.pt', '.bin', '.pth', '.safetensors', '.gguf'}
-folder_paths.add_model_folder_path("llm", os.path.join(folder_paths.models_dir, "llm"))
-_llm_upper_dir = os.path.join(folder_paths.models_dir, "LLM")
-if os.path.isdir(_llm_upper_dir):
-    folder_paths.add_model_folder_path("llm", _llm_upper_dir)
-if "LLM" in folder_paths.folder_names_and_paths:
-    for _path in folder_paths.folder_names_and_paths["LLM"][0]:
-        folder_paths.add_model_folder_path("llm", _path)
-folder_paths.folder_names_and_paths["llm"][1].update(llm_extensions)
+llm_extensions = {'.gguf'}
+_LLM_FOLDER_KEYS = ("llm", "LLM")
+for _key in _LLM_FOLDER_KEYS:
+    folder_paths.add_model_folder_path(_key, os.path.join(folder_paths.models_dir, _key))
+    folder_paths.folder_names_and_paths[_key][1].update(llm_extensions)
+
+def _get_llm_filename_list():
+    seen = set()
+    result = []
+    for key in _LLM_FOLDER_KEYS:
+        if key in folder_paths.folder_names_and_paths:
+            for f in folder_paths.get_filename_list(key):
+                if f not in seen:
+                    seen.add(f)
+                    result.append(f)
+    return result
+
+def _get_llm_full_path(filename):
+    for key in _LLM_FOLDER_KEYS:
+        if key in folder_paths.folder_names_and_paths:
+            path = folder_paths.get_full_path(key, filename)
+            if path is not None:
+                return path
+    return None
+
 preset_prompts = {
     "Empty - Nothing": "",
     "Normal - Describe": "Describe this @.",
@@ -423,7 +439,7 @@ def draw_bbox(image, json, mode):
 class llama_cpp_model_loader:
     @classmethod
     def INPUT_TYPES(s):
-        all_llms = [f for f in folder_paths.get_filename_list("llm") if f.lower().endswith(".gguf")]
+        all_llms = _get_llm_filename_list()
         model_list = [f for f in all_llms if "mmproj" not in f.lower()]
         mmproj_list = ["None"] + [f for f in all_llms if "mmproj" in f.lower()]
 
