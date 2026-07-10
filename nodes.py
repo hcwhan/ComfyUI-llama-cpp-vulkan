@@ -421,9 +421,9 @@ def draw_bbox(image, json, mode):
 class llama_cpp_model_loader:
     @classmethod
     def INPUT_TYPES(s):
-        all_llms = folder_paths.get_filename_list("LLM")
+        all_llms = [f for f in folder_paths.get_filename_list("LLM") if f.lower().endswith(".gguf")]
         model_list = [f for f in all_llms if "mmproj" not in f.lower()]
-        mmproj_list = ["None"]+[f for f in all_llms if "mmproj" in f.lower()]
+        mmproj_list = ["None"] + [f for f in all_llms if "mmproj" in f.lower()]
 
         return {"required": {
             "model": (model_list,),
