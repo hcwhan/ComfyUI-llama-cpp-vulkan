@@ -326,7 +326,7 @@ class LLAMA_CPP_STORAGE:
             if mmproj_path is None:
                 raise FileNotFoundError(f"mmproj '{mmproj}' not found in any llm/LLM folder")
             if chat_handler == "None":
-                raise ValueError('"chat_handler" cannot be None!')
+                raise ValueError("Please select a chat handler for vision model.")
 
             if vram_limit != -1:
                 mmproj_size = os.path.getsize(mmproj_path)  * 1.55 / (1024 ** 3)
