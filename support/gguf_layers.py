@@ -83,8 +83,8 @@ def get_layer_count(path):
         if f.read(4) != b"GGUF":
             raise ValueError("This is not a GGUF file!")
             
-        version = read_u32(f)
-        tensor_count = read_u64(f)
+        _version = read_u32(f)
+        _tensor_count = read_u64(f)
         kv_count = read_u64(f)
         meta = {}
         
@@ -97,8 +97,7 @@ def get_layer_count(path):
         if k.lower().endswith(".block_count"):
             return v
     
-    print(f"Failed to read metadata: {e}")
-    print(f"Try reading the entire GGUF...")
+    print(f"[gguf_layers] block_count not found in metadata, trying GGUFReader fallback...")
     
     from gguf import GGUFReader
     reader = GGUFReader(path)
