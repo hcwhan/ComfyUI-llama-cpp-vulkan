@@ -209,13 +209,11 @@ class bbox_to_mask:
     CATEGORY = "llama-cpp-vulkan"
 
     def process(self, bboxes, image, dilation, feather):
-        masks = []
         _batch_size, height, width, _channels = image.shape
         mask_shape = (height, width)
         combined_full_mask = torch.zeros(mask_shape, dtype=torch.float32, device=image.device)
 
-        for i, bbox in enumerate(bboxes):
-
+        for bbox in bboxes:
             if not isinstance(bbox, (list, tuple)) or len(bbox) < 4:
                 print(f"Warning: Skipping invalid bbox item: {bbox}")
                 continue
@@ -244,8 +242,7 @@ class bbox_to_mask:
             current_full_mask_tensor = torch.from_numpy(current_full_mask_np).to(image.device)
             combined_full_mask = torch.maximum(combined_full_mask, current_full_mask_tensor)
 
-        masks.append(combined_full_mask.unsqueeze(0))
-        return (torch.cat(masks, dim=0),)
+        return (combined_full_mask.unsqueeze(0),)
 
 
 class bboxes_to_bbox:

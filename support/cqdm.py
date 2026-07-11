@@ -1,62 +1,27 @@
-import comfy.utils
-from tqdm import tqdm
 import sys
 
-class cqdm:
-    def __init__(self, iterable=None, total=None, desc="Processing", disable=False, **kwargs):
-        self.iterable = iterable
-        self.total = total
-        self.desc = desc
-        
-        if iterable is not None and total is None:
-            try:
-                self.total = len(iterable)
-            except (TypeError, AttributeError):
-                self.total = None
+import comfy.utils
+from tqdm import tqdm
 
-        self.pbar = comfy.utils.ProgressBar(self.total) if self.total is not None else None
-        
+
+class cqdm:
+    """迭代器封装：同时驱动 ComfyUI 前端的 ProgressBar 和终端的 tqdm。"""
+
+    def __init__(self, iterable, desc="Processing"):
+        self.total = len(iterable)
+        self.pbar = comfy.utils.ProgressBar(self.total)
         self.tqdm = tqdm(
-            iterable=self.iterable, 
-            total=self.total, 
-            desc=self.desc, 
-            disable=disable,
+            iterable=iterable,
+            total=self.total,
+            desc=desc,
             dynamic_ncols=True,
             file=sys.stdout,
-            **kwargs 
         )
 
     def __iter__(self):
-        if self.tqdm is None:
-            return
         for item in self.tqdm:
-            if self.pbar:
-                self.pbar.update(1)
+            self.pbar.update(1)
             yield item
 
-    def update(self, n=1):
-        if self.tqdm:
-            self.tqdm.update(n)
-        if self.pbar:
-            self.pbar.update(n)
-
-    def set_description(self, desc):
-        if self.tqdm:
-            self.tqdm.set_description(desc)
-        
-    def set_postfix(self, *args, **kwargs):
-        if self.tqdm:
-            self.tqdm.set_postfix(*args, **kwargs)
-
-    def close(self):
-        if self.tqdm is not None:
-            self.tqdm.close()
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.close()
-
     def __len__(self):
-        return self.total if self.total is not None else 0
+        return self.total
