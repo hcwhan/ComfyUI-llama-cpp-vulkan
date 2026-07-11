@@ -111,10 +111,6 @@ def audio2base64(audio):
     return _encode_wav_base64(pcm.tobytes(), int(audio["sample_rate"]))
 
 
-# 1 帧静音 WAV,会话历史脱敏时替换音频数据(与 1x1 占位图同理)
-SILENT_WAV_BASE64 = _encode_wav_base64(b"\x00\x00", 16000)
-
-
 # 开头的 ```label(标签限单词类字符,可无,如 json/python/c++);结尾的 ```。
 # 两端独立匹配,生成被截断导致围栏未闭合时,开头的标记仍能剥离。
 # 标签不能用 [^\s`]* 之类的宽匹配:围栏后无换行直接跟正文时会把正文吞掉

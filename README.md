@@ -92,7 +92,7 @@ CMAKE_ARGS="-DGGML_VULKAN=on" pip install llama-cpp-python --no-cache-dir --forc
 ## Notes
 
 - **Audio input (ASR)**: connect a ComfyUI `AUDIO` output to the instruct node's optional `audio` input and select an audio-capable handler (e.g. Qwen3-ASR) with its matching mmproj. Audio is sent as 16-bit mono WAV; resampling is handled by llama.cpp.
-- **`save_states` multi-turn conversations with images/audio**: to save memory, images in the saved conversation history are replaced with a 1x1 placeholder (audio with a silent placeholder). The model cannot "look back" at previous media in later turns, so follow-up questions about earlier images may get inaccurate answers. To keep asking about the same image, feed it again in each turn.
+- **Stateless inference**: every run is an independent one-shot request (system prompt + current prompt). No conversation history is kept between runs.
 
 ## Credits
 

@@ -1,7 +1,6 @@
 import os
 import re
 import gc
-import copy
 import threading
 
 import numpy as np
@@ -30,7 +29,6 @@ from .shared import (
     tensor_to_uint8,
     preset_prompts,
     preset_tags,
-    SILENT_WAV_BASE64,
 )
 
 # GGUF 文件体积 -> 运行时显存占用的经验放大系数(权重 + KV/计算缓冲)
@@ -96,20 +94,9 @@ class LLAMA_CPP_STORAGE:
     llm = None
     chat_handler = None
     current_config = None
-    messages = {}
-    sys_prompts = {}
 
     @classmethod
-    def clean_state(cls, id=-1):
-        if id == -1:
-            cls.messages.clear()
-            cls.sys_prompts.clear()
-        else:
-            cls.messages.pop(id, None)
-            cls.sys_prompts.pop(id, None)
-
-    @classmethod
-    def clean(cls, all=False):
+    def clean(cls):
         try:
             cls.llm.close()
         except Exception:
@@ -125,17 +112,15 @@ class LLAMA_CPP_STORAGE:
         cls.llm = None
         cls.chat_handler = None
         cls.current_config = None
-        if all:
-            cls.clean_state()
 
         gc.collect()
 
     @classmethod
     def load_model(cls, config):
-        # 先校验再卸载旧模型:无效配置不影响当前已加载的模型和会话
+        # 先校验再卸载旧模型:无效配置不影响当前已加载的模型
         model_path, mmproj_path, handler_cls, think_param = _resolve_config(config)
 
-        cls.clean(all=True)
+        cls.clean()
         model = config["model"]
         mmproj = config["mmproj"]
         chat_handler = config["chat_handler"]
@@ -176,7 +161,6 @@ class LLAMA_CPP_STORAGE:
 if not hasattr(mm, "unload_all_models_backup"):
     mm.unload_all_models_backup = mm.unload_all_models
     def patched_unload_all_models(*args, **kwargs):
-        # 只卸载模型,保留会话历史(清历史用 llama_cpp_clean_states 节点)
         LLAMA_CPP_STORAGE.clean()
         result = mm.unload_all_models_backup(*args, **kwargs)
         return result
@@ -334,17 +318,10 @@ class llama_cpp_instruct_adv:
                     "default": False,
                     "tooltip": "Unload the model after inference."
                 }),
-                "save_states": ("BOOLEAN", {
-                    "default": False,
-                    "tooltip": "Preserve the context of this conversation in RAM."
-                }),
                 "strip_thinking": ("BOOLEAN", {
                     "default": True,
                     "tooltip": "Remove <think>...</think> reasoning blocks from the output.\n(for Thinking models)"
                 }),
-            },
-            "hidden": {
-                "unique_id": "UNIQUE_ID",
             },
             "optional": {
                 "parameters": ("LLAMACPPARAMS",),
@@ -355,56 +332,11 @@ class llama_cpp_instruct_adv:
 
         }
 
-    RETURN_TYPES = ("STRING", "STRING", "INT")
-    RETURN_NAMES = ("output", "output_list", "state_uid")
-    OUTPUT_IS_LIST = (False, True, False)
+    RETURN_TYPES = ("STRING", "STRING")
+    RETURN_NAMES = ("output", "output_list")
+    OUTPUT_IS_LIST = (False, True)
     FUNCTION = "process"
     CATEGORY = "llama-cpp-vulkan"
-
-    def sanitize_messages(self, messages):
-        """保存会话历史前把媒体数据换成最小占位符(1x1 图 / 1 帧静音),节省内存。"""
-        clean_messages = copy.deepcopy(messages)
-        for msg in clean_messages:
-            content = msg.get("content")
-            if not isinstance(content, list):
-                continue
-            for item in content:
-                if not isinstance(item, dict):
-                    continue
-                if item.get("type") == "image_url":
-                    item["image_url"]["url"] = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAACXBIWXMAAAsTAAALEwEAmpwYAAAADElEQVQImWP4//8/AAX+Av5Y8msOAAAAAElFTkSuQmCC"
-                elif item.get("type") == "input_audio":
-                    item["input_audio"]["data"] = SILENT_WAV_BASE64
-        return clean_messages
-
-    @classmethod
-    def IS_CHANGED(cls, save_states=False, **kwargs):
-        # save_states 会话依赖节点真实执行来追加历史,输入不变时也不能命中
-        # ComfyUI 输出缓存,否则重复提交同一问题不会真的推理
-        return float("NaN") if save_states else False
-
-    def _prepare_messages(self, uid, system_prompts, save_states):
-        """按 system prompt 变化与 save_states 决定本次请求的初始消息列表。
-
-        返回的是浅拷贝:后续 append 不直接写入存储,推理中断/异常时历史保持一致。
-        sys_prompts 只为保存会话的 uid 记录,save_states=False 的请求不留簿记。
-        """
-        if LLAMA_CPP_STORAGE.sys_prompts.get(uid) != system_prompts:
-            # system prompt 变化只清除当前会话,避免误伤其他 state_uid 的历史
-            LLAMA_CPP_STORAGE.clean_state(uid)
-            if save_states:
-                LLAMA_CPP_STORAGE.sys_prompts[uid] = system_prompts
-            messages = []
-        elif save_states:
-            print(f"[llama-cpp-vulkan] Loading state and history id={uid}...")
-            messages = list(LLAMA_CPP_STORAGE.messages.get(uid, []))
-        else:
-            messages = []
-
-        # 历史为空时(重)建 system 消息(覆盖 save_states 从 True 切到 False 的场景)
-        if not messages and system_prompts.strip():
-            messages.append({"role": "system", "content": system_prompts})
-        return messages
 
     def _build_prompt_text(self, preset_prompt, custom_prompt, video_input):
         if custom_prompt.strip() and "*" not in preset_prompt:
@@ -492,7 +424,7 @@ class llama_cpp_instruct_adv:
         out1 = extract_text(llm.create_chat_completion(messages=messages, seed=seed, **params))
         return out1, [out1]
 
-    def process(self, llama_model, preset_prompt, custom_prompt, system_prompt, inference_mode, max_frames, max_size, seed, force_offload, save_states, unique_id, strip_thinking=True, parameters=None, images=None, audio=None, queue_handler=None):
+    def process(self, llama_model, preset_prompt, custom_prompt, system_prompt, inference_mode, max_frames, max_size, seed, force_offload, strip_thinking=True, parameters=None, images=None, audio=None, queue_handler=None):
         # 校验当前已加载的模型确实是本节点连线的配置:
         # 多组 loader+instruct 交错执行时,全局单例可能已被切换成其他模型
         if not LLAMA_CPP_STORAGE.llm or LLAMA_CPP_STORAGE.current_config != llama_model:
@@ -501,15 +433,14 @@ class llama_cpp_instruct_adv:
         # 先复制再修改,避免污染 ComfyUI 缓存的共享参数 dict;
         # present_penalty 在当前 llama-cpp-python (>=0.3.41) 中受支持,不再丢弃
         _parameters = (parameters or {}).copy()
-        _uid = _parameters.pop("state_uid", None)
-        # 转 int 保证 state_uid 输出与声明的 INT 类型一致(unique_id 是数字字符串)
-        uid = int(unique_id.rpartition('.')[-1]) if _uid in (None, -1) else _uid
 
         video_input = inference_mode == "video"
         # 英文指令对多语言模型的跟随更稳定
         system_prompts = "Treat the input image sequence as a continuous video rather than independent still frames. " + system_prompt if video_input else system_prompt
 
-        messages = self._prepare_messages(uid, system_prompts, save_states)
+        messages = []
+        if system_prompts.strip():
+            messages.append({"role": "system", "content": system_prompts})
         user_content = [self._build_prompt_text(preset_prompt, custom_prompt, video_input)]
         if audio is not None:
             self._append_audio(user_content, audio)
@@ -529,11 +460,6 @@ class llama_cpp_instruct_adv:
             # abort_event 使生成提前返回了截断结果,丢弃并走标准中断流程
             raise mm.InterruptProcessingException()
 
-        if save_states:
-            print(f"[llama-cpp-vulkan] Saving state id={uid}...")
-            messages.append({"role": "assistant", "content": out1})
-            LLAMA_CPP_STORAGE.messages[uid] = self.sanitize_messages(messages)
-
         if force_offload:
             LLAMA_CPP_STORAGE.clean()
         elif _is_hybrid_arch(LLAMA_CPP_STORAGE.llm):
@@ -546,7 +472,7 @@ class llama_cpp_instruct_adv:
             if llm._hybrid_cache_mgr is not None:
                 llm._hybrid_cache_mgr.clear()
 
-        return (out1, out2, uid)
+        return (out1, out2)
 
 
 class llama_cpp_parameters:
@@ -566,10 +492,6 @@ class llama_cpp_parameters:
                 "mirostat_mode": ("INT", {"default": 0, "min": 0, "max": 2, "step": 1}),
                 "mirostat_eta": ("FLOAT", {"default": 0.1, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "mirostat_tau": ("FLOAT", {"default": 5.0, "min": 0.0, "max": 10.0, "step": 0.01}),
-                "state_uid": ("INT", {
-                    "default": -1, "min": -1, "max": 999999, "step": 1,
-                    "tooltip": "Use a specific ID to save the conversation state.\n(-1 = use node's unique_id)"
-                }),
             }
         }
     RETURN_TYPES = ("LLAMACPPARAMS",)
@@ -578,30 +500,6 @@ class llama_cpp_parameters:
     CATEGORY = "llama-cpp-vulkan"
     def process(self, **kwargs):
         return (kwargs,)
-
-
-class llama_cpp_clean_states:
-    @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": {
-                "any": (any_type,),
-                "state_uid": ("INT", {
-                    "default": -1, "min": -1, "max": 999999, "step": 1,
-                    "tooltip": "Clear the saved state for a specific ID (-1 = clear all)"
-                }),
-            },
-        }
-
-    RETURN_TYPES = (any_type,)
-    RETURN_NAMES = ("any",)
-    FUNCTION = "process"
-    CATEGORY = "llama-cpp-vulkan"
-
-    def process(self, any, state_uid):
-        print(f"[llama-cpp-vulkan] Cleaning up saved states {state_uid}...")
-        LLAMA_CPP_STORAGE.clean_state(state_uid)
-        return (any,)
 
 
 class llama_cpp_unload_model:

@@ -2,7 +2,6 @@ from .llm import (
     llama_cpp_model_loader,
     llama_cpp_instruct_adv,
     llama_cpp_parameters,
-    llama_cpp_clean_states,
     llama_cpp_unload_model,
 )
 from .bbox import (
@@ -22,7 +21,6 @@ NODE_CLASS_MAPPINGS = {
     "llama_cpp_instruct_adv": llama_cpp_instruct_adv,
     "llama_cpp_parameters": llama_cpp_parameters,
     "llama_cpp_unload_model": llama_cpp_unload_model,
-    "llama_cpp_clean_states": llama_cpp_clean_states,
     "parse_json_node": parse_json_node,
     "json_to_bbox": json_to_bbox,
     "bbox_to_segs": bbox_to_segs,
@@ -37,7 +35,6 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "llama_cpp_instruct_adv": "llama.cpp Instruct",
     "llama_cpp_parameters": "llama.cpp Parameters",
     "llama_cpp_unload_model": "llama.cpp Unload Model",
-    "llama_cpp_clean_states": "llama.cpp Clean States",
     "parse_json_node": "Parse JSON",
     "json_to_bbox": "JSON to BBoxes",
     "bbox_to_segs": "BBoxes to SEGS",

@@ -4,7 +4,7 @@
 
 ## 项目概况
 
-- **版本**: 1.4.0
+- **版本**: 1.5.0
 - **核心依赖**: llama-cpp-python (自编译 Vulkan ABI3 wheel, v0.3.41)
 - **GPU 后端**: Vulkan (非 CUDA/ROCm，独立于 PyTorch 的 GPU 推理路径)
 - **支持平台**: Windows / Linux（预编译 Vulkan wheel 仅覆盖这两个平台；Linux 为 manylinux_2_31，要求 glibc >= 2.31）
@@ -20,8 +20,8 @@ ComfyUI-llama-cpp-vulkan/
   .github/workflows/
     build-vulkan-wheels-abi3.yml  # CI：构建/发布双平台 Vulkan ABI3 wheel
   nodes/
-    __init__.py               # 节点注册表（12 个节点的映射）
-    llm.py                    # 核心：模型加载、推理、会话管理 (~620 行)
+    __init__.py               # 节点注册表（11 个节点的映射）
+    llm.py                    # 核心：模型加载、推理 (~520 行)
     devices.py                # Vulkan GPU 设备检测与选择（ggml C API / ctypes）
     handlers.py               # Chat handler 注册表（30 种 VLM 格式）
     shared.py                 # 公共工具：模型路径、图片/音频编码、预设 prompt、BBox 坐标换算与绘制
@@ -40,10 +40,9 @@ ComfyUI-llama-cpp-vulkan/
 | 节点 ID | 显示名 | 用途 |
 |---------|--------|------|
 | `llama_cpp_model_loader` | llama.cpp Model Loader | 加载 GGUF 模型，配置 GPU 设备/上下文长度/显存限制 |
-| `llama_cpp_instruct_adv` | llama.cpp Instruct | 文本/图片/音频/视频推理，支持预设 prompt、会话状态、thinking 剥离、生成中途取消 |
+| `llama_cpp_instruct_adv` | llama.cpp Instruct | 文本/图片/音频/视频推理，支持预设 prompt、thinking 剥离、生成中途取消 |
 | `llama_cpp_parameters` | llama.cpp Parameters | 采样参数配置（temperature/top_k/top_p 等） |
 | `llama_cpp_unload_model` | llama.cpp Unload Model | 手动卸载模型释放资源 |
-| `llama_cpp_clean_states` | llama.cpp Clean States | 清除保存的会话状态 |
 | `parse_json_node` | Parse JSON | 解析 JSON 字符串，按 key 提取值 |
 | `json_to_bbox` | JSON to BBoxes | 将 LLM 输出的 JSON 转为 BBox 坐标 |
 | `bbox_to_segs` | BBoxes to SEGS | BBox 转 SEGS 格式（兼容 Impact Pack） |
@@ -69,9 +68,9 @@ ComfyUI-llama-cpp-vulkan/
 
 `LLAMA_CPP_STORAGE` 类管理全局单例模型状态：
 - 懒加载：`llama_cpp_model_loader` 只调用 `_resolve_config()` 做快速失败校验（模型/mmproj 路径存在、mmproj 与 chat_handler 配对合法）并返回 config，实际加载由 `llama_cpp_instruct_adv` 按需触发；多组 loader+instruct 交错时避免全局单例被 loader 反复挤占
-- `load_model()`: 先 `_resolve_config()` 校验再卸载旧模型（无效配置不影响已加载的模型和会话），随后加载 GGUF 模型 + 可选的 mmproj（视觉编码器）
-- `clean()`: 释放模型和 chat_handler 资源（不清会话历史）；`clean(all=True)` 额外清除全部会话
-- 通过 monkey-patch `mm.unload_all_models` 实现 ComfyUI 模型卸载（前端 Free 按钮 / OOM 处理）时自动清理，只卸模型、保留会话历史
+- `load_model()`: 先 `_resolve_config()` 校验再卸载旧模型（无效配置不影响已加载的模型），随后加载 GGUF 模型 + 可选的 mmproj（视觉编码器）
+- `clean()`: 释放模型和 chat_handler 资源
+- 通过 monkey-patch `mm.unload_all_models` 实现 ComfyUI 模型卸载（前端 Free 按钮 / OOM 处理）时自动清理
 - `vram_limit` 折算 `n_gpu_layers` 集中在 `_estimate_n_gpu_layers()`：按 GGUF 层数（`support/gguf_layers.py` 手写解析 `block_count`，命中即返回避免解析 tokenizer 元数据）均摊文件体积，乘经验系数 `_VRAM_OVERHEAD_FACTOR`(1.55) 估算每层显存，mmproj 体积先从预算中扣除
 
 ### Chat Handler 注册表
@@ -85,23 +84,12 @@ Handler 模块优先取 `llama_cpp.llama_multimodal`（JamePeng 分支，require
 - 图片：`images` 输入按 `inference_mode`（one by one / images / video）构造 `image_url` 内容项；images/video 模式多帧时缩放到 `max_size`，单帧保持原分辨率
 - 音频：`audio` 可选输入（ComfyUI `AUDIO` dict）由 `shared.audio2base64()` 均值混为单声道 16-bit WAV，以 `input_audio` 内容项注入（重采样由 llama.cpp 的 mtmd 解码端完成），服务 Qwen3-ASR 等音频 handler；仅 MTMD 构建可用——官方构建的旧式 handler 会静默忽略音频项，`_append_audio()` 在节点层直接报错拦截
 
-### 会话状态管理
-
-`llama_cpp_instruct_adv` 节点通过 `save_states` 参数控制多轮对话。会话历史按 `state_uid` 存储在 `LLAMA_CPP_STORAGE.messages` 中，媒体数据在保存时替换为最小占位符（图片换 1x1 占位图、音频换 1 帧静音 WAV）以节省内存。
-
-实现要点：
-- `messages`/`sys_prompts` 以 int 型 `state_uid` 为键；`clean_state(-1)` 清全部
-- `sys_prompts` 只为 `save_states=True` 的 uid 记录，一次性请求不留簿记
-- system prompt 变化只清当前 `state_uid` 的会话（`clean_state(uid)`），不影响其他会话
-- 读取历史时做浅拷贝，推理中断/异常不会把残缺消息写入存储
-- 历史为空时自动重建 system 消息（覆盖 `save_states` 从 True 切到 False 的场景）
-- `IS_CHANGED` 在 `save_states=True` 时返回 NaN 强制节点重执行：多轮会话依赖真实执行来追加历史，不能命中 ComfyUI 输出缓存；`save_states=False` 时维持正常缓存
-- 每次请求结束后按 `_is_hybrid_arch()`（`_model.is_hybrid()`/`is_recurrent()` C API）判断是否整体重置 KV cache：hybrid/recurrent 架构（Qwen3.5、LFM2 系等）的线性注意力状态无法跨请求前缀复用；纯 SWA 模型（Gemma3）不受影响
-
 ### 推理输出与中断
 
+- 无会话状态：每次执行都是全新的一次性请求（system prompt + 本次提问），不保留任何跨执行的对话历史
 - `strip_thinking` 开关（默认开）：用 `_strip_thinking()` 剥离 `<think>...</think>` 推理块；兼容 generation prompt 已注入 `<think>` 导致输出只含闭合标签的情况，未闭合（生成截断）时保持原样
 - `_InterruptWatcher`：推理期间守护线程每 200ms 轮询 `mm.processing_interrupted()`，命中后调用 `Llama.abort()` 使生成立即停止；llama-cpp-python 在每次请求开始会 clear abort 事件，因此监视线程命中后持续重复 set 以抗竞态
+- 每次请求结束后按 `_is_hybrid_arch()`（`_model.is_hybrid()`/`is_recurrent()` C API）判断是否整体重置 KV cache：hybrid/recurrent 架构（Qwen3.5、LFM2 系等）的线性注意力状态无法跨请求前缀复用；纯 SWA 模型（Gemma3）不受影响
 
 ## 数据流
 
@@ -112,9 +100,9 @@ llama_cpp_parameters  -->  LLAMACPPARAMS (kwargs dict)
                                   |
                                   v
                      llama_cpp_instruct_adv
-                       |         |         |
-                    STRING    STRING[]    INT
-                   (output)  (output_list) (state_uid)
+                       |         |
+                    STRING    STRING[]
+                   (output)  (output_list)
                        |
                        v
               parse_json_node / json_to_bbox / remove_code_block

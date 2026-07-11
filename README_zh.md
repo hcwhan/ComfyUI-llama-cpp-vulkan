@@ -92,7 +92,7 @@ CMAKE_ARGS="-DGGML_VULKAN=on" pip install llama-cpp-python --no-cache-dir --forc
 ## 注意事项
 
 - **音频输入 (语音识别)**: 将 ComfyUI 的 `AUDIO` 输出连接到 Instruct 节点的可选 `audio` 输入, 并选择支持音频的 handler (如 Qwen3-ASR) 及其配套 mmproj。音频以 16-bit 单声道 WAV 发送, 重采样由 llama.cpp 完成。
-- **`save_states` 多轮对话与图片/音频**: 为节省内存, 保存会话历史时图片会被替换为 1x1 占位图 (音频替换为静音占位符)。后续轮次中模型无法"回看"之前的媒体内容, 针对历史图片的追问可能得到不准确的回答。如需围绕同一张图片多轮追问, 请在每轮都重新输入该图片。
+- **无状态推理**: 每次运行都是独立的一次性请求 (system prompt + 本次提问), 不保留任何跨运行的对话历史。
 
 ## 致谢
 
