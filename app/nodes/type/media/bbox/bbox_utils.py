@@ -63,11 +63,19 @@ def draw_bbox(image, pixel_bboxes, labels):
 
 
 def valid_int_bbox(bbox):
-    """校验 bbox 结构并取整为 (x1, y1, x2, y2),非法时打 warning 返回 None。"""
+    """校验 bbox 结构并取整为 (x1, y1, x2, y2),非法时打 warning 返回 None。
+
+    Qwen 归一化坐标换算后是浮点数,四舍五入比截断更贴近原框;
+    坐标值来自 LLM 输出,非数字时按无效项跳过。
+    """
     if not isinstance(bbox, (list, tuple)) or len(bbox) < 4:
         print(f"Warning: Skipping invalid bbox item: {bbox}")
         return None
-    return tuple(int(v) for v in bbox[:4])
+    try:
+        return tuple(int(round(float(v))) for v in bbox[:4])
+    except (TypeError, ValueError):
+        print(f"Warning: Skipping bbox with non-numeric coordinates: {bbox}")
+        return None
 
 
 def feathered_rect_mask(window_h, window_w, inner_rect, feather):
