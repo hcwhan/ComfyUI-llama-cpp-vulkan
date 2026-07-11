@@ -83,7 +83,7 @@ class remove_code_block:
     FUNCTION = "process"
     CATEGORY = "llama-cpp-vulkan"
 
-    def process(self, input, label):
+    def process(self, input, label=""):
         if isinstance(input, str):
             input = [input]
 

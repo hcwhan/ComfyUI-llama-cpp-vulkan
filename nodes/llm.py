@@ -560,7 +560,8 @@ class llama_cpp_instruct_adv:
         # present_penalty 在当前 llama-cpp-python (>=0.3.41) 中受支持，不再丢弃
         _parameters = parameters.copy()
         _uid = _parameters.pop("state_uid", None)
-        uid = unique_id.rpartition('.')[-1] if _uid in (None, -1) else _uid
+        # 转 int 保证 state_uid 输出与声明的 INT 类型一致（unique_id 是数字字符串）
+        uid = int(unique_id.rpartition('.')[-1]) if _uid in (None, -1) else _uid
 
         last_sys_prompt = LLAMA_CPP_STORAGE.sys_prompts.get(f"{uid}", None)
         video_input = inference_mode == "video"
@@ -589,7 +590,8 @@ class llama_cpp_instruct_adv:
         if custom_prompt.strip() and "*" not in preset_prompt:
             user_content.append({"type": "text", "text": custom_prompt})
         else:
-            p = preset_prompts[preset_prompt].replace("#", custom_prompt.strip()).replace("@", "video" if video_input else "image")
+            # 先替换 @ 再注入用户文本，避免 custom_prompt 中的 @ 被误替换
+            p = preset_prompts[preset_prompt].replace("@", "video" if video_input else "image").replace("#", custom_prompt.strip())
             user_content.append({"type": "text", "text": p})
 
         if images is not None:

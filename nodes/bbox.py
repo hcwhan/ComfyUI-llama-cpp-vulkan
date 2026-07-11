@@ -230,16 +230,6 @@ class bbox_to_mask:
             if crop_h <= 0 or crop_w <= 0:
                 continue
 
-            local_mask_np = np.zeros((crop_h, crop_w), dtype=np.float32)
-            local_x1 = dilation
-            local_y1 = dilation
-            local_x2 = local_x1 + (x2 - x1)
-            local_y2 = local_y1 + (y2 - y1)
-            local_mask_np[local_y1:local_y2, local_x1:local_x2] = 1.0
-
-            if feather > 0:
-                local_mask_np = gaussian_filter(local_mask_np, sigma=feather)
-
             current_full_mask_np = np.zeros(mask_shape, dtype=np.float32)
             x1_c, y1_c = max(0, x1_exp), max(0, y1_exp)
             x2_c, y2_c = min(width, x2_exp), min(height, y2_exp)
