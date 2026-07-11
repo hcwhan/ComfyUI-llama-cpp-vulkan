@@ -77,40 +77,60 @@ else:
 
 _AUTO_LABEL = "Auto (独显优先)"
 
+_SPLIT_MODE_NONE = _llama_cpp_lib.llama_split_mode.LLAMA_SPLIT_MODE_NONE
+_SPLIT_MODE_LAYER = _llama_cpp_lib.llama_split_mode.LLAMA_SPLIT_MODE_LAYER
+
+
+def _selectable_devices():
+    """按 llama.cpp 收集 model->devices 的规则，返回 main_gpu 实际可选的设备。
+
+    llama.cpp 只把独显 (type==GPU) 按枚举顺序加入设备列表；
+    仅当系统没有任何独显时，才加入第一个核显 (IGPU)。
+    其余设备无法通过 main_gpu 参数选中，因此不在下拉框中展示。
+    """
+    dgpus = [d for d in _gpu_devices if d["type"] == "GPU"]
+    if dgpus:
+        return dgpus
+    return [d for d in _gpu_devices if d["type"] == "IGPU"][:1]
+
+
+def _device_label(dev):
+    return f"{dev['name']} - {dev['desc']} [{dev['type']}]"
+
 
 def _build_gpu_device_choices():
-    choices = [_AUTO_LABEL]
-    gpu_first = sorted(_gpu_devices, key=lambda d: (d["type"] != "GPU", d["name"]))
-    for dev in gpu_first:
-        choices.append(f"{dev['name']} - {dev['desc']} [{dev['type']}]")
-    return choices
+    return [_AUTO_LABEL] + [_device_label(d) for d in _selectable_devices()]
 
 
-def _resolve_main_gpu(gpu_device):
-    if gpu_device == _AUTO_LABEL:
-        for i, dev in enumerate(_gpu_devices):
-            if dev["type"] == "GPU":
-                return i
-        return 0
-    for i, dev in enumerate(_gpu_devices):
-        label = f"{dev['name']} - {dev['desc']} [{dev['type']}]"
-        if label == gpu_device:
-            return i
-    return 0
+def _resolve_device_selection(gpu_device):
+    """把下拉框选项翻译为 (main_gpu, split_mode)。
+
+    main_gpu 仅在 split_mode=NONE 时生效，且索引是相对 llama.cpp 的
+    model->devices 列表（即 _selectable_devices 的顺序），不是 ggml 全局设备序号。
+    Auto 保持 llama.cpp 默认行为：LAYER 模式，独显优先，多独显按层切分。
+    """
+    if gpu_device != _AUTO_LABEL:
+        for i, dev in enumerate(_selectable_devices()):
+            if _device_label(dev) == gpu_device:
+                return i, _SPLIT_MODE_NONE
+        print(f"[llama-cpp-vulkan] WARNING: device '{gpu_device}' is not selectable, falling back to Auto")
+    return 0, _SPLIT_MODE_LAYER
 
 
 _gpu_device_choices = _build_gpu_device_choices()
 
 
-def _print_backend_summary(main_gpu=0):
-    try:
-        if _gpu_devices:
-            active = _gpu_devices[main_gpu] if main_gpu < len(_gpu_devices) else _gpu_devices[0]
-            print(f"[llama-cpp-vulkan] Active GPU: {active['name']} ({active['desc']}) [{active['type']}]")
-        else:
-            print("[llama-cpp-vulkan] WARNING: No GPU backend detected, running on CPU only")
-    except Exception:
-        pass
+def _print_backend_summary(main_gpu, split_mode):
+    selectable = _selectable_devices()
+    if not selectable:
+        print("[llama-cpp-vulkan] WARNING: No GPU backend detected, running on CPU only")
+        return
+    if split_mode == _SPLIT_MODE_LAYER and len(selectable) > 1:
+        names = ", ".join(d["name"] for d in selectable)
+        print(f"[llama-cpp-vulkan] Active GPUs (layer split): {names}")
+    else:
+        active = selectable[main_gpu] if main_gpu < len(selectable) else selectable[0]
+        print(f"[llama-cpp-vulkan] Active GPU: {active['name']} ({active['desc']}) [{active['type']}]")
 
 
 from llama_cpp.llama_chat_format import (
@@ -311,7 +331,7 @@ class LLAMA_CPP_STORAGE:
         vram_limit = config["vram_limit"]
         image_max_tokens = config["image_max_tokens"]
         image_min_tokens = config["image_min_tokens"]
-        main_gpu = _resolve_main_gpu(gpu_device)
+        main_gpu, split_mode = _resolve_device_selection(gpu_device)
         n_gpu_layers = -1
 
         model_path = get_llm_full_path(model)
@@ -369,11 +389,11 @@ class LLAMA_CPP_STORAGE:
                 cls.chat_handler = None
 
         print(f"[llama-cpp-vulkan] Loading model: {model}")
-        print(f"[llama-cpp-vulkan] n_gpu_layers = {n_gpu_layers}, main_gpu = {main_gpu}")
-        cls.llm = Llama(model_path, chat_handler=cls.chat_handler, n_gpu_layers=n_gpu_layers, main_gpu=main_gpu, n_ctx=n_ctx, verbose=False)
+        print(f"[llama-cpp-vulkan] n_gpu_layers = {n_gpu_layers}, main_gpu = {main_gpu}, split_mode = {split_mode}")
+        cls.llm = Llama(model_path, chat_handler=cls.chat_handler, n_gpu_layers=n_gpu_layers, main_gpu=main_gpu, split_mode=split_mode, n_ctx=n_ctx, verbose=False)
         # 加载成功后才记录配置，避免加载失败时残留新配置导致后续误判"无需重载"
         cls.current_config = config.copy()
-        _print_backend_summary(main_gpu)
+        _print_backend_summary(main_gpu, split_mode)
 
 
 if not hasattr(mm, "unload_all_models_backup"):
@@ -396,7 +416,7 @@ class llama_cpp_model_loader:
         return {"required": {
             "gpu_device": (_gpu_device_choices, {
                 "default": _AUTO_LABEL,
-                "tooltip": "Select GPU device for LLM inference.\nAuto = prefer dedicated GPU over integrated GPU."
+                "tooltip": "Select GPU device for LLM inference.\nAuto = llama.cpp default: prefer dedicated GPU, layer-split across multiple dGPUs.\nSelecting a specific device loads the whole model on that single GPU.\n(iGPU is only selectable when no dGPU exists)"
             }),
             "model": (model_list,),
             "mmproj": (mmproj_list, {"default": "None"}),
@@ -567,8 +587,12 @@ class llama_cpp_instruct_adv:
             user_content.append({"type": "text", "text": p})
 
         if images is not None:
-            if not hasattr(LLAMA_CPP_STORAGE.chat_handler, "clip_model_path") or LLAMA_CPP_STORAGE.chat_handler.clip_model_path is None:
-                 raise ValueError("Image input detected, but the loaded model is not configured with a mmproj module.")
+            # 新版 llama-cpp-python (MTMDChatHandler) 存储 mmproj_path，
+            # clip_model_path 仅为旧版本的属性名，两者都要兼容
+            handler = LLAMA_CPP_STORAGE.chat_handler
+            mmproj_loaded = getattr(handler, "mmproj_path", None) or getattr(handler, "clip_model_path", None)
+            if not mmproj_loaded:
+                raise ValueError("Image input detected, but the loaded model is not configured with a mmproj module.")
 
             frames = images
             if video_input:
