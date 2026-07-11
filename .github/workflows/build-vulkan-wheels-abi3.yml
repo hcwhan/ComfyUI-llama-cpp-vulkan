@@ -228,8 +228,14 @@ jobs:
           BUILD_DATE=$(date +%Y%m%d)
           echo "BUILD_DATE=$BUILD_DATE" >> $GITHUB_ENV
 
-          VERSION=$(ls dist/*.whl | head -1 | grep -oP '\d+\.\d+\.\d+')
-          echo "TAG_VERSION=$VERSION" >> $GITHUB_ENV
+          # 从全部 wheel 文件名提取版本并要求一致, 避免 "取第一个" 的脆弱写法
+          VERSIONS=$(ls dist/*.whl | grep -oP '(?<=-)\d+\.\d+\.\d+(?=\+vulkan)' | sort -u)
+          if [ "$(echo "$VERSIONS" | wc -l)" -ne 1 ]; then
+            echo "Inconsistent wheel versions across platforms:"
+            echo "$VERSIONS"
+            exit 1
+          fi
+          echo "TAG_VERSION=$VERSIONS" >> $GITHUB_ENV
 
           echo "=== Wheels to release ==="
           ls -la dist/
