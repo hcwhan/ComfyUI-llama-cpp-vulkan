@@ -10,7 +10,8 @@ def read_u64(f):
 
 def read_string(f):
     ln = read_u64(f)
-    return f.read(ln).decode("utf-8")
+    # BPE 模型的 tokenizer 元数据可能含非法 UTF-8 字节序列，严格解码会中断整个解析
+    return f.read(ln).decode("utf-8", errors="replace")
 
 
 def read_value(f):
@@ -78,26 +79,34 @@ def read_value_of_type(f, atype):
 
     raise ValueError(f"Unknown array item type {atype}")
 
-def get_layer_count(path):
+def _parse_block_count(path):
     with open(path, "rb") as f:
         if f.read(4) != b"GGUF":
             raise ValueError("This is not a GGUF file!")
-            
+
         _version = read_u32(f)
         _tensor_count = read_u64(f)
         kv_count = read_u64(f)
-        meta = {}
-        
+
+        # block_count 通常排在 tokenizer 数组之前，命中即返回，
+        # 避免解析几十万条 token 元数据（慢且占内存）
         for _ in range(kv_count):
             key = read_string(f)
             value = read_value(f)
-            meta[key] = value
-            
-    for k, v in meta.items():
-        if k.lower().endswith(".block_count"):
-            return v
-    
-    print(f"[gguf_layers] block_count not found in metadata, trying GGUFReader fallback...")
+            if key.lower().endswith(".block_count"):
+                return value
+
+    return None
+
+
+def get_layer_count(path):
+    try:
+        count = _parse_block_count(path)
+        if count is not None:
+            return count
+        print("[gguf_layers] block_count not found in metadata, trying GGUFReader fallback...")
+    except Exception as e:
+        print(f"[gguf_layers] manual GGUF parse failed ({e}), trying GGUFReader fallback...")
 
     try:
         from gguf import GGUFReader
