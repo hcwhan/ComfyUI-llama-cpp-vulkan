@@ -7,7 +7,7 @@
 - **版本**: 1.2.8
 - **核心依赖**: llama-cpp-python (自编译 Vulkan ABI3 wheel, v0.3.41)
 - **GPU 后端**: Vulkan (非 CUDA/ROCm，独立于 PyTorch 的 GPU 推理路径)
-- **支持平台**: Windows / Linux / macOS
+- **支持平台**: Windows / Linux（预编译 Vulkan wheel 仅覆盖这两个平台）
 - **ComfyUI 节点类别**: `llama-cpp-vulkan`
 
 ## 目录结构
