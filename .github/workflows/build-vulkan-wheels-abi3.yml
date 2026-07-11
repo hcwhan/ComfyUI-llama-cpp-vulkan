@@ -182,10 +182,11 @@ jobs:
           # against the system libstdc++ baseline (GCC 8.5), emitting
           # GLIBCXX_3.4.25 references that exceed auditwheel's 2_28 allowlist;
           # 2_31 is the lowest policy that admits them (auditwheel show verdict).
-          # LD_LIBRARY_PATH stays limited to the wheel's own lib dir; the
-          # excluded libvulkan.so.1 is skipped before resolution.
+          # Repair's LD_LIBRARY_PATH stays limited to the wheel's own lib dir
+          # (the excluded libvulkan.so.1 is skipped before resolution); the
+          # diagnostic show call gets the conda path since it lacks --exclude.
           CIBW_REPAIR_WHEEL_COMMAND_LINUX: >
-            (LD_LIBRARY_PATH=/project/llama_cpp/lib auditwheel show {wheel} || true) &&
+            (LD_LIBRARY_PATH=/project/llama_cpp/lib:/opt/vulkan/lib auditwheel show {wheel} || true) &&
             LD_LIBRARY_PATH=/project/llama_cpp/lib
             auditwheel repair --plat manylinux_2_31_x86_64
             --exclude libvulkan.so.1 -w {dest_dir} {wheel}
