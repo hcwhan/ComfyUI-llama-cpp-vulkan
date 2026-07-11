@@ -63,7 +63,7 @@ pip install -r ComfyUI-llama-cpp-vulkan/requirements.txt
 
 预编译的 Vulkan wheel 支持以下平台:
 - Windows x86_64: CPython 3.10+ (ABI3 通用 wheel)
-- Linux x86_64 (manylinux2014): CPython 3.10+ (ABI3 通用 wheel)
+- Linux x86_64 (manylinux_2_31, glibc >= 2.31): CPython 3.10+ (ABI3 通用 wheel)
 
 每个平台只需一个 wheel 即可覆盖所有 Python 版本。可从 [Releases](https://github.com/hcwhan/ComfyUI-llama-cpp-vulkan/releases) 页面下载。
 

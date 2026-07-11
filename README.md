@@ -63,7 +63,7 @@ pip install -r ComfyUI-llama-cpp-vulkan/requirements.txt
 
 Pre-built Vulkan wheels are available for:
 - Windows x86_64: CPython 3.10+ (ABI3 universal wheel)
-- Linux x86_64 (manylinux2014): CPython 3.10+ (ABI3 universal wheel)
+- Linux x86_64 (manylinux_2_31, glibc >= 2.31): CPython 3.10+ (ABI3 universal wheel)
 
 One wheel per platform covers all Python versions. Download from [Releases](https://github.com/hcwhan/ComfyUI-llama-cpp-vulkan/releases).
 
