@@ -6,7 +6,6 @@ license = {file = "LICENSE"}
 classifiers = [
      "Operating System :: Microsoft :: Windows",
      "Operating System :: POSIX :: Linux",
-     "Operating System :: MacOS",
 ]
 
 dependencies = ["diskcache", "scipy", "numpy", "pillow", "gguf", "tqdm"]
