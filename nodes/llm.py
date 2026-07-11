@@ -1,7 +1,9 @@
 import os
+import re
 import gc
 import copy
 import ctypes
+import threading
 from pathlib import Path
 
 import numpy as np
@@ -402,11 +404,63 @@ class LLAMA_CPP_STORAGE:
 if not hasattr(mm, "unload_all_models_backup"):
     mm.unload_all_models_backup = mm.unload_all_models
     def patched_unload_all_models(*args, **kwargs):
-        LLAMA_CPP_STORAGE.clean(all=True)
+        # 只卸载模型，保留会话历史（清历史用 llama_cpp_clean_states 节点）
+        LLAMA_CPP_STORAGE.clean()
         result = mm.unload_all_models_backup(*args, **kwargs)
         return result
     mm.unload_all_models = patched_unload_all_models
     print("[llama-cpp-vulkan] Model cleanup hook applied!")
+
+
+_THINK_BLOCK_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
+
+
+def _strip_thinking(text):
+    """移除 <think>...</think> 推理块。
+
+    Thinking 模型的 generation prompt 通常已注入开头的 <think>，
+    此时输出只含闭合标签，需要取最后一个 </think> 之后的内容。
+    """
+    if "</think>" not in text:
+        return text
+    cleaned = _THINK_BLOCK_RE.sub("", text)
+    if "</think>" in cleaned:
+        cleaned = cleaned.rsplit("</think>", 1)[-1]
+    return cleaned.lstrip()
+
+
+class _InterruptWatcher:
+    """推理期间轮询 ComfyUI 的中断标志，命中时触发 llama 的 abort_event。
+
+    create_completion 在每次请求开始时会 clear abort_event，
+    因此命中后持续重复 set 而不是设置一次就退出，避免竞态丢失中断。
+    """
+
+    def __init__(self, llm, poll_interval=0.2):
+        self.llm = llm
+        self.poll_interval = poll_interval
+        self.interrupted = False
+        self._stop = threading.Event()
+        self._thread = None
+
+    def _watch(self):
+        while not self._stop.wait(self.poll_interval):
+            if mm.processing_interrupted():
+                self.interrupted = True
+                try:
+                    self.llm.abort()
+                except Exception:
+                    pass
+
+    def __enter__(self):
+        self._thread = threading.Thread(target=self._watch, daemon=True)
+        self._thread.start()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._stop.set()
+        self._thread.join()
+        return False
 
 
 class llama_cpp_model_loader:
@@ -517,6 +571,10 @@ class llama_cpp_instruct_adv:
                     "default": False,
                     "tooltip": "Preserve the context of this conversation in RAM."
                 }),
+                "strip_thinking": ("BOOLEAN", {
+                    "default": True,
+                    "tooltip": "Remove <think>...</think> reasoning blocks from the output.\n(for Thinking models)"
+                }),
             },
             "hidden": {
                 "unique_id": "UNIQUE_ID",
@@ -545,7 +603,7 @@ class llama_cpp_instruct_adv:
                         item["image_url"]["url"] = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAACXBIWXMAAAsTAAALEwEAmpwYAAAADElEQVQImWP4//8/AAX+Av5Y8msOAAAAAElFTkSuQmCC"
         return clean_messages
 
-    def process(self, llama_model, preset_prompt, custom_prompt, system_prompt, inference_mode, max_frames, max_size, seed, force_offload, save_states, unique_id, parameters=None, images=None, queue_handler=None):
+    def process(self, llama_model, preset_prompt, custom_prompt, system_prompt, inference_mode, max_frames, max_size, seed, force_offload, save_states, unique_id, strip_thinking=True, parameters=None, images=None, queue_handler=None):
         # 校验当前已加载的模型确实是本节点连线的配置：
         # 多组 loader+instruct 交错执行时，全局单例可能已被切换成其他模型
         if not LLAMA_CPP_STORAGE.llm or LLAMA_CPP_STORAGE.current_config != llama_model:
@@ -595,66 +653,76 @@ class llama_cpp_instruct_adv:
             p = preset_prompts[preset_prompt].replace("@", "video" if video_input else "image").replace("#", custom_prompt.strip())
             user_content.append({"type": "text", "text": p})
 
-        if images is not None:
-            # 新版 llama-cpp-python (MTMDChatHandler) 存储 mmproj_path，
-            # clip_model_path 仅为旧版本的属性名，两者都要兼容
-            handler = LLAMA_CPP_STORAGE.chat_handler
-            mmproj_loaded = getattr(handler, "mmproj_path", None) or getattr(handler, "clip_model_path", None)
-            if not mmproj_loaded:
-                raise ValueError("Image input detected, but the loaded model is not configured with a mmproj module.")
+        def extract_text(output):
+            text = output['choices'][0]['message']['content'].removeprefix(": ").lstrip()
+            return _strip_thinking(text) if strip_thinking else text
 
-            frames = images
-            if video_input:
-                indices = np.linspace(0, len(images) - 1, max_frames, dtype=int)
-                frames = [images[i] for i in indices]
+        # 监视线程让长时间生成也能响应 ComfyUI 的取消操作
+        with _InterruptWatcher(LLAMA_CPP_STORAGE.llm) as watcher:
+            if images is not None:
+                # 新版 llama-cpp-python (MTMDChatHandler) 存储 mmproj_path，
+                # clip_model_path 仅为旧版本的属性名，两者都要兼容
+                handler = LLAMA_CPP_STORAGE.chat_handler
+                mmproj_loaded = getattr(handler, "mmproj_path", None) or getattr(handler, "clip_model_path", None)
+                if not mmproj_loaded:
+                    raise ValueError("Image input detected, but the loaded model is not configured with a mmproj module.")
 
-            if inference_mode == "one by one":
-                tmp_list = []
-                image_content = {
-                    "type": "image_url",
-                    "image_url": {"url": ""}
-                }
-                user_content.append(image_content)
-                messages.append({"role": "user", "content": user_content})
-                print(f"[llama-cpp-vulkan] Start processing {len(frames)} images")
+                frames = images
+                if video_input:
+                    indices = np.linspace(0, len(images) - 1, max_frames, dtype=int)
+                    frames = [images[i] for i in indices]
 
-                for i, image in enumerate(cqdm(frames)):
-                    if mm.processing_interrupted():
-                        raise mm.InterruptProcessingException()
-                    data = image2base64(tensor_to_uint8(image))
-                    for item in user_content:
-                        if item.get("type") == "image_url":
-                            item["image_url"]["url"] = f"data:image/png;base64,{data}"
-                            break
-                    output = LLAMA_CPP_STORAGE.llm.create_chat_completion(messages=messages, seed=seed, **_parameters)
-                    text = output['choices'][0]['message']['content'].removeprefix(": ").lstrip()
-                    out2.append(text)
-                    if len(frames) > 1:
-                        tmp_list.append(f"====== Image {i+1} ======")
-                    tmp_list.append(text)
-
-                out1 = "\n\n".join(tmp_list)
-            else:
-                for image in frames:
-                    if len(frames) > 1:
-                        data = image2base64(scale_image(image, max_size))
-                    else:
-                        data = image2base64(tensor_to_uint8(image))
+                if inference_mode == "one by one":
+                    tmp_list = []
                     image_content = {
                         "type": "image_url",
-                        "image_url": {"url": f"data:image/png;base64,{data}"}
+                        "image_url": {"url": ""}
                     }
                     user_content.append(image_content)
+                    messages.append({"role": "user", "content": user_content})
+                    print(f"[llama-cpp-vulkan] Start processing {len(frames)} images")
 
+                    for i, image in enumerate(cqdm(frames)):
+                        if watcher.interrupted or mm.processing_interrupted():
+                            raise mm.InterruptProcessingException()
+                        data = image2base64(tensor_to_uint8(image))
+                        for item in user_content:
+                            if item.get("type") == "image_url":
+                                item["image_url"]["url"] = f"data:image/png;base64,{data}"
+                                break
+                        output = LLAMA_CPP_STORAGE.llm.create_chat_completion(messages=messages, seed=seed, **_parameters)
+                        text = extract_text(output)
+                        out2.append(text)
+                        if len(frames) > 1:
+                            tmp_list.append(f"====== Image {i+1} ======")
+                        tmp_list.append(text)
+
+                    out1 = "\n\n".join(tmp_list)
+                else:
+                    for image in frames:
+                        if len(frames) > 1:
+                            data = image2base64(scale_image(image, max_size))
+                        else:
+                            data = image2base64(tensor_to_uint8(image))
+                        image_content = {
+                            "type": "image_url",
+                            "image_url": {"url": f"data:image/png;base64,{data}"}
+                        }
+                        user_content.append(image_content)
+
+                    messages.append({"role": "user", "content": user_content})
+                    output = LLAMA_CPP_STORAGE.llm.create_chat_completion(messages=messages, seed=seed, **_parameters)
+                    out1 = extract_text(output)
+                    out2 = [out1]
+            else:
                 messages.append({"role": "user", "content": user_content})
                 output = LLAMA_CPP_STORAGE.llm.create_chat_completion(messages=messages, seed=seed, **_parameters)
-                out1 = output['choices'][0]['message']['content'].removeprefix(": ").lstrip()
+                out1 = extract_text(output)
                 out2 = [out1]
-        else:
-            messages.append({"role": "user", "content": user_content})
-            output = LLAMA_CPP_STORAGE.llm.create_chat_completion(messages=messages, seed=seed, **_parameters)
-            out1 = output['choices'][0]['message']['content'].removeprefix(": ").lstrip()
-            out2 = [out1]
+
+        if watcher.interrupted:
+            # abort_event 使生成提前返回了截断结果，丢弃并走标准中断流程
+            raise mm.InterruptProcessingException()
 
         if save_states:
             print(f"[llama-cpp-vulkan] Saving state id={uid}...")
