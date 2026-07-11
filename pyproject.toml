@@ -8,7 +8,7 @@ classifiers = [
      "Operating System :: POSIX :: Linux",
 ]
 
-dependencies = ["scipy", "numpy", "pillow", "gguf", "tqdm"]
+dependencies = ["scipy", "numpy", "pillow", "tqdm"]
 
 [project.urls]
 Repository = "https://github.com/hcwhan/ComfyUI-llama-cpp-vulkan"

@@ -2,7 +2,7 @@ import torch
 import numpy as np
 from scipy.ndimage import gaussian_filter
 
-from .shared import parse_json, draw_bbox, qwen3bbox
+from .shared import parse_json, draw_bbox, bbox_label, json_to_pixel_bboxes, QWEN_BBOX_MODES
 
 
 class SEG:
@@ -66,21 +66,30 @@ class json_to_bbox:
         output_bboxes = []
         processed_flat_results = []
 
+        if mode in QWEN_BBOX_MODES and total_images == 0:
+            raise ValueError("Image required for Qwen mode")
+
         for i, j in enumerate(json):
-            bboxes = parse_json(j)
+            items = parse_json(j)
 
             if label != "":
-                try:
-                    bboxes = [item for item in bboxes if item["label"] == label]
-                except Exception:
-                    bboxes = [item for item in bboxes if item.get("text_content") == label]
+                # 兼容 label / text_content 混用的输出,任一字段匹配即保留
+                items = [b for b in items if label in (b.get("label"), b.get("text_content"))]
 
+            curr_img = None
             if total_images > 0:
                 curr_idx = i if i < total_images else (total_images - 1)
                 curr_img = flat_images_list[curr_idx]
 
+            if curr_img is not None:
+                _batch, height, width, _ch = curr_img.shape
+                pixel_bboxes = json_to_pixel_bboxes(items, mode, width, height)
+            else:
+                pixel_bboxes = json_to_pixel_bboxes(items, mode)
+
+            if curr_img is not None:
                 try:
-                    res_img = draw_bbox(curr_img[0], bboxes, mode)
+                    res_img = draw_bbox(curr_img[0], pixel_bboxes, [bbox_label(b) for b in items])
                     if res_img.ndim == 3:
                         res_img = res_img.unsqueeze(0)
                     elif res_img.ndim == 4 and res_img.shape[0] > 1:
@@ -91,15 +100,7 @@ class json_to_bbox:
                     print(f"Error drawing on image {curr_idx}: {e}")
                     processed_flat_results.append(curr_img)
 
-            if mode in ["Qwen3-VL", "Qwen2.5-VL"]:
-                if total_images == 0:
-                    raise ValueError("Image required for Qwen mode")
-                curr_idx = i if i < total_images else (total_images - 1)
-                bbox = qwen3bbox(flat_images_list[curr_idx][0], bboxes)
-            else:
-                bbox = [tuple(item["bbox_2d"]) for item in bboxes]
-
-            output_bboxes.append(bbox)
+            output_bboxes.append(pixel_bboxes)
 
         restructured_images_list = []
         cursor = 0
@@ -212,6 +213,9 @@ class bbox_to_mask:
         _batch_size, height, width, _channels = image.shape
         mask_shape = (height, width)
         combined_full_mask = torch.zeros(mask_shape, dtype=torch.float32, device=image.device)
+        # gaussian_filter 默认 truncate=4.0,窗口向外留 4 sigma 即可覆盖全部有效衰减,
+        # 在局部窗口内做羽化,避免每个 bbox 都在全图尺寸上跑一次 filter
+        margin = int(4 * feather) + 1 if feather > 0 else 0
 
         for bbox in bboxes:
             if not isinstance(bbox, (list, tuple)) or len(bbox) < 4:
@@ -223,24 +227,30 @@ class bbox_to_mask:
             y1_exp = y1 - dilation
             x2_exp = x2 + dilation
             y2_exp = y2 + dilation
-            crop_w = x2_exp - x1_exp
-            crop_h = y2_exp - y1_exp
 
-            if crop_h <= 0 or crop_w <= 0:
+            if x2_exp - x1_exp <= 0 or y2_exp - y1_exp <= 0:
                 continue
 
-            current_full_mask_np = np.zeros(mask_shape, dtype=np.float32)
-            x1_c, y1_c = max(0, x1_exp), max(0, y1_exp)
-            x2_c, y2_c = min(width, x2_exp), min(height, y2_exp)
+            # 局部窗口(含羽化边界),裁剪到图像范围
+            wx1, wy1 = max(0, x1_exp - margin), max(0, y1_exp - margin)
+            wx2, wy2 = min(width, x2_exp + margin), min(height, y2_exp + margin)
+            if wx2 <= wx1 or wy2 <= wy1:
+                continue
 
-            if x2_c > x1_c and y2_c > y1_c:
-                current_full_mask_np[y1_c:y2_c, x1_c:x2_c] = 1.0
+            local_mask_np = np.zeros((wy2 - wy1, wx2 - wx1), dtype=np.float32)
+            # 扩张框在窗口坐标系中的位置
+            lx1, ly1 = max(0, x1_exp) - wx1, max(0, y1_exp) - wy1
+            lx2, ly2 = min(width, x2_exp) - wx1, min(height, y2_exp) - wy1
+
+            if lx2 > lx1 and ly2 > ly1:
+                local_mask_np[ly1:ly2, lx1:lx2] = 1.0
 
             if feather > 0:
-                current_full_mask_np = gaussian_filter(current_full_mask_np, sigma=feather)
+                local_mask_np = gaussian_filter(local_mask_np, sigma=feather)
 
-            current_full_mask_tensor = torch.from_numpy(current_full_mask_np).to(image.device)
-            combined_full_mask = torch.maximum(combined_full_mask, current_full_mask_tensor)
+            local_mask_tensor = torch.from_numpy(local_mask_np).to(image.device)
+            region = combined_full_mask[wy1:wy2, wx1:wx2]
+            combined_full_mask[wy1:wy2, wx1:wx2] = torch.maximum(region, local_mask_tensor)
 
         return (combined_full_mask.unsqueeze(0),)
 
