@@ -160,7 +160,8 @@ llama_cpp_parameters --> LLAMACPPARAMS --------+-> llama_cpp_audio_instruct
 
 ### 文件顶部注释规范
 
-- 每个 .py 文件顶部必须有描述整个文件用途的模块 docstring, docstring 之后空一行再写代码(空包的 `__init__.py` 只保留 docstring)
+- 每个 .py 文件顶部必须有描述整个文件用途的模块 docstring, docstring 之后空一行再写代码
+- 无实际代码的包不创建 `__init__.py`（子包走 Python 隐式命名空间包），全项目只有根入口与 `app/nodes/__init__.py` 注册表两个 `__init__.py`
 - docstring 内的标点: 逗号使用英文逗号加一个空格 ", ", 句号使用英文句号 "."
 
 ### INPUT_TYPES 字段顺序
