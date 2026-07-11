@@ -12,7 +12,7 @@ from PIL import Image
 def tensor_to_uint8(image: torch.Tensor):
     """ComfyUI IMAGE 张量 ([H,W,C] 或 [1,H,W,C]) 转 uint8 数组。
 
-    只剥离 batch 维，不用 squeeze()：squeeze 会把 H=1/W=1 的边缘尺寸也压掉，
+    只剥离批次维，不用 squeeze()：squeeze 会把 H=1/W=1 的边缘尺寸也压掉，
     导致 PIL 把 [W,C] 误解析为灰度图。
     """
     arr = image.cpu().numpy()

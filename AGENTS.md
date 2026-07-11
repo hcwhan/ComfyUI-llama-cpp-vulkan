@@ -70,7 +70,7 @@ ComfyUI-llama-cpp-vulkan/
 | `llama_cpp_llm_model_loader` | llama.cpp llm Model Loader | 加载纯文本 GGUF 模型（无 mmproj/handler 字段），输出 `LLAMACPPLLM` |
 | `llama_cpp_vlm_model_loader` | llama.cpp vlm Model Loader | 加载 VLM 模型（mmproj 与 chat_handler 必选），输出 `LLAMACPPVLM` |
 | `llama_cpp_text_instruct` | llama.cpp text Instruct | 纯文本推理（prompt 改写等），只接受 `LLAMACPPLLM` |
-| `llama_cpp_image_instruct` | llama.cpp image Instruct | 图片推理：逐张 / batch 两种模式，只接受 `LLAMACPPVLM` |
+| `llama_cpp_image_instruct` | llama.cpp image Instruct | 图片推理：逐张 / 批量两种模式，只接受 `LLAMACPPVLM` |
 | `llama_cpp_video_instruct` | llama.cpp video Instruct | 视频帧序列推理：均匀抽帧 + 连续视频语义提示，输入端口名 `frames` |
 | `llama_cpp_audio_instruct` | llama.cpp audio Instruct | 音频推理（ASR/omni，如 Qwen3-ASR） |
 | `llama_cpp_parameters` | llama.cpp Parameters | 采样参数配置（temperature/top_k/top_p 等） |
@@ -122,7 +122,7 @@ ComfyUI-llama-cpp-vulkan/
 
 ### 多模态输入
 
-- image Instruct：`batch_images` 开关切换逐张推理（每张一条结果）与合并单请求；batch 多图时缩放到 `max_size`，单图保持原分辨率
+- image Instruct：`batch_images` 开关切换逐张推理（每张一条结果）与批量单请求；批量多图时缩放到 `max_size`，单图保持原分辨率
 - video Instruct：`frames` 输入为 IMAGE 帧批次（ComfyUI 生态的视频通行形态），按 `max_frames` linspace 均匀抽帧后缩放，并在 system prompt 前注入"连续视频"语义提示
 - audio Instruct：ComfyUI `AUDIO` dict 由 `media/encoding.py` 的 `audio2base64()` 均值混为单声道 16-bit WAV，以 `input_audio` 内容项注入（重采样由 llama.cpp 的 mtmd 解码端完成），服务 Qwen3-ASR 等音频 handler；音频是否被 mmproj 支持由 llama-cpp-python 侧校验
 

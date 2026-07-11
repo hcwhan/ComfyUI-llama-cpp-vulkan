@@ -58,7 +58,7 @@ class json_to_bboxes:
         mode = mode[0]
         label = label[0]
 
-        # 拆平为 [1,H,W,C] 单帧列表,记录每个输入元素的 batch 大小以便还原结构
+        # 拆平为 [1,H,W,C] 单帧列表,记录每个输入元素的批次大小以便还原结构
         flat_images = []
         batch_sizes = []
         for img_batch in image or []:
@@ -96,7 +96,7 @@ class json_to_bboxes:
 
             output_bboxes.append(pixel_bboxes)
 
-        # 画框结果与 JSON 条目一一对应,按输入图像的 batch 结构重新分组
+        # 画框结果与 JSON 条目一一对应,按输入图像的批次结构重新分组
         restructured_images = []
         cursor = 0
         for count in batch_sizes:

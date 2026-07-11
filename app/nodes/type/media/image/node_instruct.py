@@ -1,7 +1,7 @@
 """llama.cpp image Instruct 节点, 图片推理.
 
-- one by one 模式: 逐张推理, 每张各得一条结果(output_list 供下游列表节点消费)
-- batch 模式: 全部图片并入同一条 user 消息, 一次推理; 多图时缩放到 max_size
+- 逐张模式: 逐张推理, 每张各得一条结果(output_list 供下游列表节点消费)
+- 批量模式: 全部图片并入同一条 user 消息, 一次推理; 多图时缩放到 max_size
 """
 
 import comfy.model_management as mm
@@ -44,7 +44,7 @@ class llama_cpp_image_instruct(llama_cpp_media_instruct_base):
                     "min": 128,
                     "max": 16384,
                     "step": 64,
-                    "tooltip": "batch 模式下输入图片的最大边长.\n仅在发送多张图片时生效, 单张图片保持原分辨率."
+                    "tooltip": "批量模式下输入图片的最大边长.\n仅在发送多张图片时生效, 单张图片保持原分辨率."
                 }),
                 **cls.runtime_inputs(),
             },
