@@ -7,7 +7,7 @@
 - **版本**: 1.3.0
 - **核心依赖**: llama-cpp-python (自编译 Vulkan ABI3 wheel, v0.3.41)
 - **GPU 后端**: Vulkan (非 CUDA/ROCm，独立于 PyTorch 的 GPU 推理路径)
-- **支持平台**: Windows / Linux（预编译 Vulkan wheel 仅覆盖这两个平台）
+- **支持平台**: Windows / Linux（预编译 Vulkan wheel 仅覆盖这两个平台；Linux 为 manylinux_2_31，要求 glibc >= 2.31）
 - **ComfyUI 节点类别**: `llama-cpp-vulkan`
 
 ## 目录结构
@@ -17,6 +17,8 @@ ComfyUI-llama-cpp-vulkan/
   __init__.py                 # 入口：导出 NODE_CLASS_MAPPINGS
   pyproject.toml              # 项目元数据、依赖声明
   requirements.txt            # pip 依赖（含平台条件 llama-cpp-python wheel URL）
+  .github/workflows/
+    build-vulkan-wheels-abi3.yml  # CI：构建/发布双平台 Vulkan ABI3 wheel
   nodes/
     __init__.py               # 节点注册表（12 个节点的映射）
     llm.py                    # 核心：模型加载、推理、会话管理 (~590 行)
@@ -138,6 +140,17 @@ ComfyUI 的 widget 值按 `INPUT_TYPES` 中字段的声明顺序序列化。
 ### Prompt 增强预设
 
 在 `support/prompt_enhancer_preset.py` 中添加新常量，并在文件末尾的 `PRESETS` dict 中加一行（dict 顺序即 UI 下拉框顺序）。
+
+### Wheel 构建与发布 (CI)
+
+`.github/workflows/build-vulkan-wheels-abi3.yml` 手动触发（workflow_dispatch，输入 JamePeng/llama-cpp-python 的 ref），并行构建 Windows + Linux 两个 ABI3 wheel 并自动发布 GitHub Release。要点：
+
+- `+vulkan` 本地版本在构建前注入 `llama_cpp/__init__.py` 的 `__version__`，wheel 文件名与 METADATA 天然一致（不做构建后重命名）
+- 两平台均开启 `GGML_BACKEND_DL + GGML_CPU_ALL_VARIANTS`（CPU 后端按指令集运行时分发）
+- Windows：Vulkan SDK 走 action 缓存（stripdown 后缓存），编译走 sccache；冷缓存约 25 分钟，热缓存约 5 分钟
+- Linux：Vulkan 头文件/glslc/loader 来自 conda-forge（不下载 LunarG SDK tarball）；`CMAKE_PREFIX_PATH=/opt/vulkan` 是 `find_package(SPIRV-Headers)` 的必需项，不能删
+- Linux repair 目标为 `manylinux_2_31`（gcc-toolset-14 产物引用 GLIBCXX_3.4.25，超出 2_28 白名单），且 repair 的 `LD_LIBRARY_PATH` 不能包含 `/opt/vulkan/lib`（避免 auditwheel 解析到 conda 的新版 libstdc++）
+- 发布新 wheel 后需同步更新 `requirements.txt` 的两个 URL 和两个 README 的平台说明
 
 ## 依赖
 
