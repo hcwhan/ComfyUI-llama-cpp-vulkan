@@ -5,6 +5,29 @@ from scipy.ndimage import gaussian_filter
 from .shared import parse_json, draw_bbox, bbox_label, json_to_pixel_bboxes, QWEN_BBOX_MODES
 
 
+def _valid_int_bbox(bbox):
+    """校验 bbox 结构并取整为 (x1, y1, x2, y2),非法时打 warning 返回 None。"""
+    if not isinstance(bbox, (list, tuple)) or len(bbox) < 4:
+        print(f"Warning: Skipping invalid bbox item: {bbox}")
+        return None
+    return tuple(int(v) for v in bbox[:4])
+
+
+def _feathered_rect_mask(window_h, window_w, inner_rect, feather):
+    """在 (window_h, window_w) 局部窗口内构建矩形 mask,feather > 0 时做高斯羽化。
+
+    inner_rect 是窗口坐标系下的 (x1, y1, x2, y2)。
+    在局部窗口而非全图上跑 gaussian_filter,避免每个 bbox 的羽化代价随图像尺寸增长。
+    """
+    mask = np.zeros((window_h, window_w), dtype=np.float32)
+    x1, y1, x2, y2 = inner_rect
+    if x2 > x1 and y2 > y1:
+        mask[y1:y2, x1:x2] = 1.0
+    if feather > 0:
+        mask = gaussian_filter(mask, sigma=feather)
+    return mask
+
+
 class SEG:
     def __init__(self, cropped_image, cropped_mask, confidence, crop_region, bbox, label, control_net_wrapper=None):
         self.cropped_image = cropped_image
@@ -45,72 +68,58 @@ class json_to_bbox:
     CATEGORY = "llama-cpp-vulkan"
 
     def process(self, json, mode, label, image=None):
+        # INPUT_IS_LIST 下 widget 参数也会被包成列表
         mode = mode[0]
         label = label[0]
 
-        flat_images_list = []
-        original_structure = []
+        # 拆平为 [1,H,W,C] 单帧列表,记录每个输入元素的 batch 大小以便还原结构
+        flat_images = []
+        batch_sizes = []
+        for img_batch in image or []:
+            if img_batch.ndim == 3:
+                img_batch = img_batch.unsqueeze(0)
+            batch_sizes.append(img_batch.shape[0])
+            flat_images.extend(img_batch[n:n + 1] for n in range(img_batch.shape[0]))
 
-        if image is not None:
-            for img_batch in image:
-                if img_batch.ndim == 3:
-                    flat_images_list.append(img_batch.unsqueeze(0))
-                    original_structure.append(1)
-                else:
-                    count = img_batch.shape[0]
-                    original_structure.append(count)
-                    for n in range(count):
-                        flat_images_list.append(img_batch[n:n+1])
-
-        total_images = len(flat_images_list)
-        output_bboxes = []
-        processed_flat_results = []
-
-        if mode in QWEN_BBOX_MODES and total_images == 0:
+        if mode in QWEN_BBOX_MODES and not flat_images:
             raise ValueError("Image required for Qwen mode")
+        if flat_images and len(json) != len(flat_images):
+            print(f"[llama-cpp-vulkan] Warning: {len(json)} JSON result(s) but {len(flat_images)} image frame(s); pairing by index, extra entries reuse the last frame")
 
-        for i, j in enumerate(json):
-            items = parse_json(j)
+        output_bboxes = []
+        drawn_images = []
 
+        for i, json_str in enumerate(json):
+            items = parse_json(json_str)
             if label != "":
                 # 兼容 label / text_content 混用的输出,任一字段匹配即保留
                 items = [b for b in items if label in (b.get("label"), b.get("text_content"))]
 
-            curr_img = None
-            if total_images > 0:
-                curr_idx = i if i < total_images else (total_images - 1)
-                curr_img = flat_images_list[curr_idx]
-
-            if curr_img is not None:
+            if flat_images:
+                curr_img = flat_images[min(i, len(flat_images) - 1)]
                 _batch, height, width, _ch = curr_img.shape
                 pixel_bboxes = json_to_pixel_bboxes(items, mode, width, height)
+                try:
+                    # draw_bbox 返回 [1,H,W,C]
+                    drawn_images.append(draw_bbox(curr_img[0], pixel_bboxes, [bbox_label(b) for b in items]))
+                except Exception as e:
+                    print(f"Error drawing bboxes for JSON #{i}: {e}")
+                    drawn_images.append(curr_img)
             else:
                 pixel_bboxes = json_to_pixel_bboxes(items, mode)
 
-            if curr_img is not None:
-                try:
-                    res_img = draw_bbox(curr_img[0], pixel_bboxes, [bbox_label(b) for b in items])
-                    if res_img.ndim == 3:
-                        res_img = res_img.unsqueeze(0)
-                    elif res_img.ndim == 4 and res_img.shape[0] > 1:
-                        res_img = res_img[0:1]
-
-                    processed_flat_results.append(res_img)
-                except Exception as e:
-                    print(f"Error drawing on image {curr_idx}: {e}")
-                    processed_flat_results.append(curr_img)
-
             output_bboxes.append(pixel_bboxes)
 
-        restructured_images_list = []
+        # 画框结果与 JSON 条目一一对应,按输入图像的 batch 结构重新分组
+        restructured_images = []
         cursor = 0
-        for count in original_structure:
-            chunk = processed_flat_results[cursor : cursor + count]
+        for count in batch_sizes:
+            chunk = drawn_images[cursor:cursor + count]
             if chunk:
-                restructured_images_list.append(torch.cat(chunk, dim=0))
+                restructured_images.append(torch.cat(chunk, dim=0))
             cursor += count
 
-        return (output_bboxes, restructured_images_list)
+        return (output_bboxes, restructured_images)
 
 
 class bbox_to_segs:
@@ -137,11 +146,10 @@ class bbox_to_segs:
         image_for_cropping = image[0]
 
         for bbox in bboxes:
-            if not isinstance(bbox, (list, tuple)) or len(bbox) < 4:
-                print(f"Warning: Skipping invalid bbox item: {bbox}")
+            coords = _valid_int_bbox(bbox)
+            if coords is None:
                 continue
-
-            x1, y1, x2, y2 = map(int, bbox)
+            x1, y1, x2, y2 = coords
             # LLM 输出的坐标不可信，先裁剪到图像范围
             x1 = max(0, min(x1, width))
             x2 = max(0, min(x2, width))
@@ -161,17 +169,9 @@ class bbox_to_segs:
             crop_w = x2_exp - x1_exp
             crop_h = y2_exp - y1_exp
 
-            local_mask_np = np.zeros((crop_h, crop_w), dtype=np.float32)
-            local_x1 = x1 - x1_exp
-            local_y1 = y1 - y1_exp
-            local_x2 = x2 - x1_exp
-            local_y2 = y2 - y1_exp
-            local_mask_np[local_y1:local_y2, local_x1:local_x2] = 1.0
-
-            if feather > 0:
-                local_mask_np = gaussian_filter(local_mask_np, sigma=feather)
-
-            cropped_mask_np = local_mask_np
+            # 原始 bbox 在扩张窗口坐标系中的位置
+            inner_rect = (x1 - x1_exp, y1 - y1_exp, x2 - x1_exp, y2 - y1_exp)
+            cropped_mask_np = _feathered_rect_mask(crop_h, crop_w, inner_rect, feather)
             # Impact Pack 的 SEG 约定 cropped_image 为 [1, H, W, C]
             cropped_image_tensor = image_for_cropping[y1_exp:y2_exp, x1_exp:x2_exp, :].unsqueeze(0)
 
@@ -218,11 +218,10 @@ class bbox_to_mask:
         margin = int(4 * feather) + 1 if feather > 0 else 0
 
         for bbox in bboxes:
-            if not isinstance(bbox, (list, tuple)) or len(bbox) < 4:
-                print(f"Warning: Skipping invalid bbox item: {bbox}")
+            coords = _valid_int_bbox(bbox)
+            if coords is None:
                 continue
-
-            x1, y1, x2, y2 = map(int, bbox)
+            x1, y1, x2, y2 = coords
             x1_exp = x1 - dilation
             y1_exp = y1 - dilation
             x2_exp = x2 + dilation
@@ -237,17 +236,12 @@ class bbox_to_mask:
             if wx2 <= wx1 or wy2 <= wy1:
                 continue
 
-            local_mask_np = np.zeros((wy2 - wy1, wx2 - wx1), dtype=np.float32)
-            # 扩张框在窗口坐标系中的位置
-            lx1, ly1 = max(0, x1_exp) - wx1, max(0, y1_exp) - wy1
-            lx2, ly2 = min(width, x2_exp) - wx1, min(height, y2_exp) - wy1
-
-            if lx2 > lx1 and ly2 > ly1:
-                local_mask_np[ly1:ly2, lx1:lx2] = 1.0
-
-            if feather > 0:
-                local_mask_np = gaussian_filter(local_mask_np, sigma=feather)
-
+            # 扩张框(裁剪到图像内)在窗口坐标系中的位置
+            inner_rect = (
+                max(0, x1_exp) - wx1, max(0, y1_exp) - wy1,
+                min(width, x2_exp) - wx1, min(height, y2_exp) - wy1,
+            )
+            local_mask_np = _feathered_rect_mask(wy2 - wy1, wx2 - wx1, inner_rect, feather)
             local_mask_tensor = torch.from_numpy(local_mask_np).to(image.device)
             region = combined_full_mask[wy1:wy2, wx1:wx2]
             combined_full_mask[wy1:wy2, wx1:wx2] = torch.maximum(region, local_mask_tensor)

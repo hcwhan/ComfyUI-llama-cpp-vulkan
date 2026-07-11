@@ -50,6 +50,46 @@ def _estimate_n_gpu_layers(model_path, mmproj_path, vram_limit):
     return max(1, int(usable / layer_size))
 
 
+def _resolve_config(config):
+    """校验 loader 配置并解析出 (model_path, mmproj_path, handler_cls, think_param)。
+
+    loader 节点用它做快速失败校验(不实际加载模型),
+    load_model 用它取得路径与 handler 类,两处共享同一套报错。
+    """
+    model = config["model"]
+    mmproj = config["mmproj"]
+    chat_handler = config["chat_handler"]
+
+    model_path = get_llm_full_path(model)
+    if model_path is None:
+        raise FileNotFoundError(f"Model '{model}' not found in any llm/LLM folder")
+
+    if chat_handler == "None":
+        handler_cls = think_param = None
+    else:
+        try:
+            handler_cls, think_param = HANDLERS[chat_handler]
+        except KeyError:
+            raise ValueError(f'Unknown chat handler: "{chat_handler}"') from None
+
+    mmproj_path = None
+    if mmproj and mmproj != "None":
+        mmproj_path = get_llm_full_path(mmproj)
+        if mmproj_path is None:
+            raise FileNotFoundError(f"mmproj '{mmproj}' not found in any llm/LLM folder")
+        if handler_cls is None:
+            raise ValueError("Please select a chat handler for vision model.")
+    elif handler_cls is not None:
+        # 当前所有 chat handler 均为 VLM handler,实例化时强制要求 mmproj;
+        # 提前拦截,避免抛出含糊的 "mmproj_path is required"
+        raise ValueError(
+            f'Chat handler "{chat_handler}" requires a mmproj model. '
+            'Select the matching mmproj file, or set chat_handler to "None" for text-only models.'
+        )
+
+    return model_path, mmproj_path, handler_cls, think_param
+
+
 class LLAMA_CPP_STORAGE:
     llm = None
     chat_handler = None
@@ -90,39 +130,15 @@ class LLAMA_CPP_STORAGE:
 
     @classmethod
     def load_model(cls, config):
+        # 先校验再卸载旧模型:无效配置不影响当前已加载的模型和会话
+        model_path, mmproj_path, handler_cls, think_param = _resolve_config(config)
+
         cls.clean(all=True)
         model = config["model"]
         mmproj = config["mmproj"]
         chat_handler = config["chat_handler"]
         gpu_device = config.get("gpu_device", AUTO_LABEL)
         main_gpu, split_mode = resolve_device_selection(gpu_device)
-
-        model_path = get_llm_full_path(model)
-        if model_path is None:
-            raise FileNotFoundError(f"Model '{model}' not found in any llm/LLM folder")
-
-        if chat_handler == "None":
-            handler_cls = think_param = None
-        else:
-            try:
-                handler_cls, think_param = HANDLERS[chat_handler]
-            except KeyError:
-                raise ValueError(f'Unknown chat handler: "{chat_handler}"') from None
-
-        mmproj_path = None
-        if mmproj and mmproj != "None":
-            mmproj_path = get_llm_full_path(mmproj)
-            if mmproj_path is None:
-                raise FileNotFoundError(f"mmproj '{mmproj}' not found in any llm/LLM folder")
-            if handler_cls is None:
-                raise ValueError("Please select a chat handler for vision model.")
-        elif handler_cls is not None:
-            # 当前所有 chat handler 均为 VLM handler,实例化时强制要求 mmproj;
-            # 提前拦截,避免抛出含糊的 "mmproj_path is required"
-            raise ValueError(
-                f'Chat handler "{chat_handler}" requires a mmproj model. '
-                'Select the matching mmproj file, or set chat_handler to "None" for text-only models.'
-            )
 
         n_gpu_layers = _estimate_n_gpu_layers(model_path, mmproj_path, config["vram_limit"])
 
@@ -278,8 +294,9 @@ class llama_cpp_model_loader:
             "image_min_tokens": image_min_tokens,
             "image_max_tokens": image_max_tokens
         }
-        if not LLAMA_CPP_STORAGE.llm or LLAMA_CPP_STORAGE.current_config != custom_config:
-            LLAMA_CPP_STORAGE.load_model(custom_config)
+        # 只做快速失败校验,实际加载推迟到 instruct 节点按需触发:
+        # 多组 loader+instruct 交错时,loader 即时加载会让全局单例被反复挤占
+        _resolve_config(custom_config)
         return (custom_config,)
 
 
@@ -509,7 +526,7 @@ class llama_cpp_parameters:
     def INPUT_TYPES(s):
         return {
             "required": {
-                "max_tokens": ("INT", {"default": 1024, "min": 0, "max": 4096, "step": 1, "tooltip": "Max tokens to generate (0 = unlimited, bounded by n_ctx)."}),
+                "max_tokens": ("INT", {"default": 1024, "min": 0, "max": 65536, "step": 1, "tooltip": "Max tokens to generate (0 = unlimited, bounded by n_ctx)."}),
                 "top_k": ("INT", {"default": 30, "min": 0, "max": 1000, "step": 1}),
                 "top_p": ("FLOAT", {"default": 0.9, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "min_p": ("FLOAT", {"default": 0.05, "min": 0.0, "max": 1.0, "step": 0.01}),

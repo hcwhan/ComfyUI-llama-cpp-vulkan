@@ -19,9 +19,13 @@ class cqdm:
         )
 
     def __iter__(self):
-        for item in self.tqdm:
-            self.pbar.update(1)
-            yield item
+        # 中断/异常时确保 tqdm 收尾,避免终端残留未完成的进度条
+        try:
+            for item in self.tqdm:
+                self.pbar.update(1)
+                yield item
+        finally:
+            self.tqdm.close()
 
     def __len__(self):
         return self.total

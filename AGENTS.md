@@ -19,7 +19,7 @@ ComfyUI-llama-cpp-vulkan/
   requirements.txt            # pip 依赖（含平台条件 llama-cpp-python wheel URL）
   nodes/
     __init__.py               # 节点注册表（12 个节点的映射）
-    llm.py                    # 核心：模型加载、推理、会话管理 (~540 行)
+    llm.py                    # 核心：模型加载、推理、会话管理 (~590 行)
     devices.py                # Vulkan GPU 设备检测与选择（ggml C API / ctypes）
     handlers.py               # Chat handler 注册表（30 种 VLM 格式）
     shared.py                 # 公共工具：模型路径、图片编码、预设 prompt、BBox 坐标换算与绘制
@@ -66,7 +66,8 @@ ComfyUI-llama-cpp-vulkan/
 ### 模型生命周期
 
 `LLAMA_CPP_STORAGE` 类管理全局单例模型状态：
-- `load_model()`: 加载 GGUF 模型 + 可选的 mmproj（视觉编码器）；纯文本模型（无 mmproj）选择 chat_handler 会在此阶段直接报错
+- 懒加载：`llama_cpp_model_loader` 只调用 `_resolve_config()` 做快速失败校验（模型/mmproj 路径存在、mmproj 与 chat_handler 配对合法）并返回 config，实际加载由 `llama_cpp_instruct_adv` 按需触发；多组 loader+instruct 交错时避免全局单例被 loader 反复挤占
+- `load_model()`: 先 `_resolve_config()` 校验再卸载旧模型（无效配置不影响已加载的模型和会话），随后加载 GGUF 模型 + 可选的 mmproj（视觉编码器）
 - `clean()`: 释放模型和 chat_handler 资源（不清会话历史）；`clean(all=True)` 额外清除全部会话
 - 通过 monkey-patch `mm.unload_all_models` 实现 ComfyUI 模型卸载（前端 Free 按钮 / OOM 处理）时自动清理，只卸模型、保留会话历史
 - `vram_limit` 折算 `n_gpu_layers` 集中在 `_estimate_n_gpu_layers()`：按 GGUF 层数（`support/gguf_layers.py` 手写解析 `block_count`，命中即返回避免解析 tokenizer 元数据）均摊文件体积，乘经验系数 `_VRAM_OVERHEAD_FACTOR`(1.55) 估算每层显存，mmproj 体积先从预算中扣除
