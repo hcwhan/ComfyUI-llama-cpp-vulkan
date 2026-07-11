@@ -170,25 +170,26 @@ class llama_cpp_instruct_base:
         params = (parameters or {}).copy()
         extract_text = self._make_extract(strip_thinking)
 
-        # 监视线程让长时间生成也能响应 ComfyUI 的取消操作
-        with InterruptWatcher(LLAMA_CPP_STORAGE.llm) as watcher:
-            out1, out2 = runner(messages, user_content, seed, params, extract_text, watcher)
-
-        if watcher.interrupted:
-            # abort_event 使生成提前返回了截断结果,丢弃并走标准中断流程
-            raise mm.InterruptProcessingException()
-
-        if force_offload:
-            LLAMA_CPP_STORAGE.clean()
-        elif is_hybrid_arch(LLAMA_CPP_STORAGE.llm):
-            # 真 hybrid/recurrent 架构(Qwen3.5、LFM2 系等)的线性注意力状态无法
-            # 跨请求做前缀复用,不重置会导致后续请求输出错乱;按架构判断而非
-            # handler 名单,避免每加一个 hybrid 模型都要维护名单
-            llm = LLAMA_CPP_STORAGE.llm
-            llm.n_tokens = 0
-            llm._ctx.memory_clear(True)
-            if llm._hybrid_cache_mgr is not None:
-                llm._hybrid_cache_mgr.clear()
+        # 监视线程让长时间生成也能响应 ComfyUI 的取消操作;
+        # 收尾放 finally:中断/异常路径同样需要 force_offload 释放显存与 hybrid 重置
+        try:
+            with InterruptWatcher(LLAMA_CPP_STORAGE.llm) as watcher:
+                out1, out2 = runner(messages, user_content, seed, params, extract_text, watcher)
+            if watcher.interrupted:
+                # abort_event 使生成提前返回了截断结果,丢弃并走标准中断流程
+                raise mm.InterruptProcessingException()
+        finally:
+            if force_offload:
+                LLAMA_CPP_STORAGE.clean()
+            elif LLAMA_CPP_STORAGE.llm is not None and is_hybrid_arch(LLAMA_CPP_STORAGE.llm):
+                # 真 hybrid/recurrent 架构(Qwen3.5、LFM2 系等)的线性注意力状态无法
+                # 跨请求做前缀复用,不重置会导致后续请求输出错乱;按架构判断而非
+                # handler 名单,避免每加一个 hybrid 模型都要维护名单
+                llm = LLAMA_CPP_STORAGE.llm
+                llm.n_tokens = 0
+                llm._ctx.memory_clear(True)
+                if llm._hybrid_cache_mgr is not None:
+                    llm._hybrid_cache_mgr.clear()
 
         return (out1, out2)
 
