@@ -126,10 +126,12 @@ class bboxes_to_segs:
     CATEGORY = "llama-cpp-vulkan"
 
     def process(self, bboxes, image, dilation, feather):
-        _batch_size, height, width, _channels = image.shape
+        batch_size, height, width, _channels = image.shape
         mask_shape = (height, width)
 
         seg_list = []
+        if batch_size > 1:
+            print(f"[llama-cpp-vulkan] Warning: BBoxes to SEGS received a batch of {batch_size} images; cropped images are taken from the first frame only")
         image_for_cropping = image[0]
 
         for bbox in bboxes:
