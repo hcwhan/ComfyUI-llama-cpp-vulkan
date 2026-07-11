@@ -205,7 +205,7 @@ except:
     MiniCPMv45ChatHandler = None
 
 try:
-    from llama_cpp.llama_chat_format import MiniCPMv46ChatHandler
+    from llama_cpp.llama_chat_format import MiniCPMV46ChatHandler as MiniCPMv46ChatHandler
     chat_handlers += ["MiniCPM-v4.6", "MiniCPM-v4.6-Thinking"]
 except:
     MiniCPMv46ChatHandler = None
@@ -367,7 +367,7 @@ class LLAMA_CPP_STORAGE:
             elif chat_handler in [
                 "MiniCPM-v4.5", "MiniCPM-v4.5-Thinking",
                 "MiniCPM-v4.6", "MiniCPM-v4.6-Thinking",
-                "GLM-4.6V", "GLM-4.6V-Thinking", "GLM-4.1V-Thinking",
+                "GLM-4.6V", "GLM-4.6V-Thinking",
                 "Qwen3.5", "Qwen3.5-Thinking", "Qwen3.6", "Qwen3.6-Thinking",
             ]:
                 kwargs["enable_thinking"] = think_mode
@@ -651,7 +651,9 @@ class llama_cpp_instruct_adv:
 
                 frames = images
                 if video_input:
-                    indices = np.linspace(0, len(images) - 1, max_frames, dtype=int)
+                    # clamp 到实际帧数，避免 linspace 重复采样同一帧浪费上下文
+                    n_frames = min(max_frames, len(images))
+                    indices = np.linspace(0, len(images) - 1, n_frames, dtype=int)
                     frames = [images[i] for i in indices]
 
                 if inference_mode == "one by one":
