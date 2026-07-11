@@ -60,4 +60,3 @@ def _resolve_handlers():
 
 
 HANDLERS = _resolve_handlers()
-chat_handler_choices = ["None"] + list(HANDLERS)
