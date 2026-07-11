@@ -9,11 +9,15 @@ on:
         default: "main"
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ inputs.jamepeng_ref }}
+  cancel-in-progress: true
 
 env:
   VULKAN_SDK_VERSION: "1.4.341.0"
-  VULKAN_SDK_LINUX_SHA256: "ed66477d587a5587dc3601b1c2cdcc1fab5529c505f53a00171876cecd9b4fbe"
+  MICROMAMBA_VERSION: "2.8.1-0"
   # ABI3 minimum Python version - wheel supports CPython 3.10+
   # llama-cpp-python uses ctypes (no C extension), so the wheel binary
   # content is truly Python-version-independent.
@@ -26,6 +30,7 @@ jobs:
   build_windows:
     name: Build Vulkan wheel (Windows abi3)
     runs-on: windows-2022
+    timeout-minutes: 180
 
     defaults:
       run:
@@ -51,21 +56,38 @@ jobs:
           activate-environment: true
           enable-cache: true
 
+      # Cached install; only headers, libs and glslc are needed for the build.
       - name: Install Vulkan SDK
-        run: |
-          choco install vulkan-sdk --version="$env:VULKAN_SDK_VERSION" --no-progress -y
-          $vulkanSdk = "C:\VulkanSDK\$env:VULKAN_SDK_VERSION"
-          if (-not (Test-Path $vulkanSdk)) { throw "Vulkan SDK not found at $vulkanSdk" }
-          "VULKAN_SDK=$vulkanSdk" >> $env:GITHUB_ENV
-          "$vulkanSdk\Bin" >> $env:GITHUB_PATH
-          & "$vulkanSdk\Bin\glslc.exe" --version
+        uses: jakoch/install-vulkan-sdk-action@v1
+        with:
+          vulkan_version: ${{ env.VULKAN_SDK_VERSION }}
+          install_runtime: false
+          cache: true
+          stripdown: true
 
-      - name: Install build dependencies
-        run: uv pip install --upgrade build setuptools wheel packaging ninja
+      - name: Verify Vulkan SDK
+        run: |
+          "$env:VULKAN_SDK\Bin" >> $env:GITHUB_PATH
+          & "$env:VULKAN_SDK\Bin\glslc.exe" --version
+
+      - name: Set up sccache
+        uses: mozilla-actions/sccache-action@v0.0.10
+
+      - name: Install ninja
+        run: uv pip install ninja
+
+      # Patch the version source so wheel filename AND metadata carry +vulkan
+      # (renaming the wheel afterwards would leave METADATA inconsistent).
+      - name: Embed +vulkan local version
+        run: |
+          $initFile = 'llama_cpp/__init__.py'
+          (Get-Content $initFile) -replace '^__version__ = "([^"]+)"$', '__version__ = "$1+vulkan"' | Set-Content $initFile
+          Select-String -Path $initFile -Pattern '__version__'
 
       - name: Build Vulkan wheel (abi3)
         env:
           SKBUILD_WHEEL_PY_API: ${{ env.ABI3_MIN_CPYTHON }}
+          SCCACHE_GHA_ENABLED: "true"
         run: |
           $env:CMAKE_GENERATOR = 'Ninja'
           $env:CMAKE_ARGS = @(
@@ -73,11 +95,13 @@ jobs:
             '-DGGML_NATIVE=OFF'
             '-DGGML_BACKEND_DL=ON'
             '-DGGML_CPU_ALL_VARIANTS=ON'
+            '-DCMAKE_C_COMPILER_LAUNCHER=sccache'
+            '-DCMAKE_CXX_COMPILER_LAUNCHER=sccache'
           ) -join ' '
 
           Write-Output "CMAKE_ARGS=$($env:CMAKE_ARGS)"
           Write-Output "SKBUILD_WHEEL_PY_API=$($env:SKBUILD_WHEEL_PY_API)"
-          python -m build --wheel
+          uv build --wheel
 
           if (!(Test-Path '.\dist\*.whl')) {
             Write-Error "No wheel found in dist/"
@@ -85,23 +109,20 @@ jobs:
           }
 
           $wheelFile = Get-Item '.\dist\*.whl' | Select-Object -First 1
+          if ($wheelFile.Name -notmatch '\+vulkan') {
+            Write-Error "Wheel filename missing +vulkan local version: $($wheelFile.Name)"
+            exit 1
+          }
           Write-Output "Built wheel: $($wheelFile.Name)"
 
-          $parts = $wheelFile.Name.Split('-')
-          $version = $parts[1]
-          $newVersion = "$version+vulkan"
-          $newName = "$($parts[0])-$newVersion-$($parts[2])-$($parts[3])-$($parts[4])"
-
-          Rename-Item -Path $wheelFile.FullName -NewName $newName
-          Write-Output "Renamed to: $newName"
-
-          "TAG_VERSION=$version" >> $env:GITHUB_ENV
+          sccache --show-stats
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
           name: wheel-vulkan-abi3-windows
           path: ./dist/*.whl
+          compression-level: 0
 
   # ────────────────────────────────────────────────────────────────
   #  Linux build (single universal wheel via cibuildwheel)
@@ -109,6 +130,7 @@ jobs:
   build_linux:
     name: Build Vulkan wheel (Linux abi3)
     runs-on: ubuntu-22.04
+    timeout-minutes: 120
 
     steps:
       - name: Checkout JamePeng/llama-cpp-python
@@ -118,35 +140,40 @@ jobs:
           ref: ${{ inputs.jamepeng_ref }}
           submodules: recursive
 
+      # See the Windows job for why the version source is patched.
+      - name: Embed +vulkan local version
+        run: |
+          sed -i -E 's/^__version__ = "([^"]+)"$/__version__ = "\1+vulkan"/' llama_cpp/__init__.py
+          grep '__version__' llama_cpp/__init__.py
+
       - name: Build wheel with cibuildwheel
         uses: pypa/cibuildwheel@v3.4.1
         env:
           # Build only one Python version; abi3 wheel covers all 3.10+
           CIBW_BUILD: "cp312-manylinux_x86_64"
           CIBW_ARCHS: "auto64"
-          CIBW_MANYLINUX_X86_64_IMAGE: "manylinux2014"
+          # manylinux_2_28: GGML_CPU_ALL_VARIANTS needs GCC >= 11 (AMX/AVX-VNNI flags)
+          CIBW_MANYLINUX_X86_64_IMAGE: "manylinux_2_28"
+          # Vulkan headers/loader/glslc come from conda-forge instead of the
+          # full LunarG SDK tarball (~700MB download saved).
           CIBW_BEFORE_ALL_LINUX: >
-            yum install -y xz &&
-            curl -L https://micro.mamba.pm/api/micromamba/linux-64/latest
-            -o /tmp/micromamba.tar.bz2 &&
-            mkdir -p /tmp/micromamba &&
-            tar -xjf /tmp/micromamba.tar.bz2 -C /tmp/micromamba bin/micromamba &&
-            /tmp/micromamba/bin/micromamba create -y -p /opt/vulkan
-            -c conda-forge shaderc libvulkan-loader spirv-headers &&
-            /opt/vulkan/bin/glslc --version &&
-            curl -fL "https://sdk.lunarg.com/sdk/download/${{ env.VULKAN_SDK_VERSION }}/linux/vulkansdk-linux-x86_64-${{ env.VULKAN_SDK_VERSION }}.tar.xz"
-            -o /tmp/vulkan-sdk.tar.xz &&
-            echo "${{ env.VULKAN_SDK_LINUX_SHA256 }}  /tmp/vulkan-sdk.tar.xz" | sha256sum -c - &&
-            mkdir -p /opt/vulkan-sdk &&
-            tar -xf /tmp/vulkan-sdk.tar.xz -C /opt/vulkan-sdk
+            curl -fL "https://github.com/mamba-org/micromamba-releases/releases/download/${{ env.MICROMAMBA_VERSION }}/micromamba-linux-64"
+            -o /usr/local/bin/micromamba &&
+            chmod +x /usr/local/bin/micromamba &&
+            micromamba create -y -p /opt/vulkan
+            -c conda-forge shaderc libvulkan-loader spirv-headers
+            libvulkan-headers=${{ env.VULKAN_SDK_VERSION }} &&
+            /opt/vulkan/bin/glslc --version
           CIBW_ENVIRONMENT_LINUX: >
             SKBUILD_WHEEL_PY_API=${{ env.ABI3_MIN_CPYTHON }}
             CMAKE_ARGS="-DGGML_NATIVE=OFF
             -DGGML_METAL=OFF
             -DGGML_OPENMP=OFF
             -DGGML_VULKAN=ON
+            -DGGML_BACKEND_DL=ON
+            -DGGML_CPU_ALL_VARIANTS=ON
             -DCMAKE_PREFIX_PATH=/opt/vulkan
-            -DVulkan_INCLUDE_DIR=/opt/vulkan-sdk/${{ env.VULKAN_SDK_VERSION }}/x86_64/include
+            -DVulkan_INCLUDE_DIR=/opt/vulkan/include
             -DVulkan_LIBRARY=/opt/vulkan/lib/libvulkan.so
             -DVulkan_GLSLC_EXECUTABLE=/opt/vulkan/bin/glslc"
           CIBW_REPAIR_WHEEL_COMMAND_LINUX: >
@@ -156,23 +183,17 @@ jobs:
           package-dir: .
           output-dir: wheelhouse
 
-      - name: Rename wheels with +vulkan tag
+      - name: Verify wheels
         run: |
-          for whl in wheelhouse/*.whl; do
-            filename=$(basename "$whl")
-            new_name=$(echo "$filename" | sed 's/\(-[0-9]\+\.[0-9]\+\.[0-9]\+\)-/\1+vulkan-/')
-            if [ "$filename" != "$new_name" ]; then
-              mv "$whl" "wheelhouse/$new_name"
-              echo "Renamed: $filename -> $new_name"
-            fi
-          done
           ls -la wheelhouse/
+          ls wheelhouse/*+vulkan*.whl
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
           name: wheel-vulkan-abi3-linux
           path: ./wheelhouse/*.whl
+          compression-level: 0
 
   # ────────────────────────────────────────────────────────────────
   #  Release (collects all wheels)
@@ -181,6 +202,9 @@ jobs:
     name: Create Release
     needs: [build_windows, build_linux]
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
 
     steps:
       - uses: actions/download-artifact@v8
@@ -216,7 +240,7 @@ jobs:
             | Platform | Wheel tag | Compatible Python |
             |----------|-----------|-------------------|
             | Windows x86_64 | `cp310-abi3-win_amd64` | CPython 3.10+ |
-            | Linux x86_64 | `cp310-abi3-manylinux2014_x86_64` | CPython 3.10+ |
+            | Linux x86_64 (glibc >= 2.28) | `cp310-abi3-manylinux_2_28_x86_64` | CPython 3.10+ |
 
             ## Install
 
@@ -226,12 +250,11 @@ jobs:
 
             ## Build flags
 
-            **Windows:**
+            **Windows & Linux:**
             - `GGML_VULKAN=ON` / `GGML_NATIVE=OFF`
             - `GGML_BACKEND_DL=ON` / `GGML_CPU_ALL_VARIANTS=ON`
 
-            **Linux (manylinux2014):**
-            - `GGML_VULKAN=ON` / `GGML_NATIVE=OFF`
+            **Linux (manylinux_2_28) additionally:**
             - `GGML_METAL=OFF` / `GGML_OPENMP=OFF`
 
             ## Note
