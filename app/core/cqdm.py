@@ -24,8 +24,9 @@ class cqdm:
         # 中断/异常时确保 tqdm 收尾,避免终端残留未完成的进度条
         try:
             for item in self.tqdm:
-                self.pbar.update(1)
                 yield item
+                # 放在 yield 之后:第 N 项处理完才前进到 N,与 tqdm 的计数语义一致
+                self.pbar.update(1)
         finally:
             self.tqdm.close()
 
