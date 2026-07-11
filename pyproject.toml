@@ -1,7 +1,7 @@
 [project]
 name = "comfyui-llama-cpp-vulkan"
 description = "Run LLM/VLM models natively in ComfyUI based on llama.cpp with Vulkan GPU acceleration"
-version = "1.3.0"
+version = "1.4.0"
 license = {file = "LICENSE"}
 classifiers = [
      "Operating System :: Microsoft :: Windows",

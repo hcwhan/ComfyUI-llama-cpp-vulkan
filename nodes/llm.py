@@ -22,6 +22,7 @@ from .devices import (
 from .handlers import HAS_MTMD, HANDLERS, chat_handler_choices
 from .shared import (
     any_type,
+    audio2base64,
     get_llm_filename_list,
     get_llm_full_path,
     image2base64,
@@ -29,6 +30,7 @@ from .shared import (
     tensor_to_uint8,
     preset_prompts,
     preset_tags,
+    SILENT_WAV_BASE64,
 )
 
 # GGUF 文件体积 -> 运行时显存占用的经验放大系数(权重 + KV/计算缓冲)
@@ -325,7 +327,7 @@ class llama_cpp_instruct_adv:
                     "min": 128,
                     "max": 16384,
                     "step": 64,
-                    "tooltip": 'Max size of input images in "images" and "video" modes.'
+                    "tooltip": 'Max size of input images in "images" and "video" modes.\nOnly applied when more than one frame is sent; a single image keeps full resolution.'
                 }),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffff, "step": 1, "tooltip": "llama.cpp uses 32-bit seeds; larger values would be truncated."}),
                 "force_offload": ("BOOLEAN", {
@@ -347,6 +349,7 @@ class llama_cpp_instruct_adv:
             "optional": {
                 "parameters": ("LLAMACPPARAMS",),
                 "images": ("IMAGE",),
+                "audio": ("AUDIO", {"tooltip": "Audio clip for ASR/omni models.\nRequires an audio-capable mmproj (e.g. Qwen3-ASR)."}),
                 "queue_handler": (any_type, {"tooltip": "Used to control the execution order of instruct nodes."}),
             },
 
@@ -359,13 +362,19 @@ class llama_cpp_instruct_adv:
     CATEGORY = "llama-cpp-vulkan"
 
     def sanitize_messages(self, messages):
+        """保存会话历史前把媒体数据换成最小占位符(1x1 图 / 1 帧静音),节省内存。"""
         clean_messages = copy.deepcopy(messages)
         for msg in clean_messages:
             content = msg.get("content")
-            if isinstance(content, list):
-                for item in content:
-                    if isinstance(item, dict) and item.get("type") == "image_url":
-                        item["image_url"]["url"] = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAACXBIWXMAAAsTAAALEwEAmpwYAAAADElEQVQImWP4//8/AAX+Av5Y8msOAAAAAElFTkSuQmCC"
+            if not isinstance(content, list):
+                continue
+            for item in content:
+                if not isinstance(item, dict):
+                    continue
+                if item.get("type") == "image_url":
+                    item["image_url"]["url"] = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAACXBIWXMAAAsTAAALEwEAmpwYAAAADElEQVQImWP4//8/AAX+Av5Y8msOAAAAAElFTkSuQmCC"
+                elif item.get("type") == "input_audio":
+                    item["input_audio"]["data"] = SILENT_WAV_BASE64
         return clean_messages
 
     @classmethod
@@ -378,12 +387,13 @@ class llama_cpp_instruct_adv:
         """按 system prompt 变化与 save_states 决定本次请求的初始消息列表。
 
         返回的是浅拷贝:后续 append 不直接写入存储,推理中断/异常时历史保持一致。
+        sys_prompts 只为保存会话的 uid 记录,save_states=False 的请求不留簿记。
         """
-        last_sys_prompt = LLAMA_CPP_STORAGE.sys_prompts.get(uid)
-        if last_sys_prompt != system_prompts:
-            # 只清除当前会话,避免误伤其他 state_uid 的历史
+        if LLAMA_CPP_STORAGE.sys_prompts.get(uid) != system_prompts:
+            # system prompt 变化只清除当前会话,避免误伤其他 state_uid 的历史
             LLAMA_CPP_STORAGE.clean_state(uid)
-            LLAMA_CPP_STORAGE.sys_prompts[uid] = system_prompts
+            if save_states:
+                LLAMA_CPP_STORAGE.sys_prompts[uid] = system_prompts
             messages = []
         elif save_states:
             print(f"[llama-cpp-vulkan] Loading state and history id={uid}...")
@@ -404,6 +414,29 @@ class llama_cpp_instruct_adv:
         # 先替换 @ 再注入用户文本,避免 custom_prompt 中的 @ 被误替换
         p = preset_prompts[preset_prompt].replace("@", "video" if video_input else "image").replace("#", custom_prompt.strip())
         return {"type": "text", "text": p}
+
+    @staticmethod
+    def _require_mmproj(kind):
+        # 新版 llama-cpp-python (MTMDChatHandler) 存储 mmproj_path,
+        # clip_model_path 仅为旧版本的属性名,两者都要兼容
+        handler = LLAMA_CPP_STORAGE.chat_handler
+        mmproj_loaded = getattr(handler, "mmproj_path", None) or getattr(handler, "clip_model_path", None)
+        if not mmproj_loaded:
+            raise ValueError(f"{kind} input detected, but the loaded model is not configured with a mmproj module.")
+
+    def _append_audio(self, user_content, audio):
+        """把 ComfyUI AUDIO 输入编码为 input_audio 内容项。
+
+        音频是否被 mmproj 支持由 llama-cpp-python 侧校验(is_support_audio);
+        官方构建的旧式 handler 会静默忽略 input_audio 项,须在此拦截。
+        """
+        if not HAS_MTMD:
+            raise ValueError("Audio input requires an MTMD-capable llama-cpp-python build (see requirements.txt).")
+        self._require_mmproj("Audio")
+        user_content.append({
+            "type": "input_audio",
+            "input_audio": {"data": audio2base64(audio), "format": "wav"},
+        })
 
     def _infer_one_by_one(self, messages, user_content, frames, seed, params, extract_text, watcher):
         image_content = {"type": "image_url", "image_url": {"url": ""}}
@@ -435,12 +468,7 @@ class llama_cpp_instruct_adv:
             out1 = extract_text(llm.create_chat_completion(messages=messages, seed=seed, **params))
             return out1, [out1]
 
-        # 新版 llama-cpp-python (MTMDChatHandler) 存储 mmproj_path,
-        # clip_model_path 仅为旧版本的属性名,两者都要兼容
-        handler = LLAMA_CPP_STORAGE.chat_handler
-        mmproj_loaded = getattr(handler, "mmproj_path", None) or getattr(handler, "clip_model_path", None)
-        if not mmproj_loaded:
-            raise ValueError("Image input detected, but the loaded model is not configured with a mmproj module.")
+        self._require_mmproj("Image")
 
         frames = images
         if inference_mode == "video":
@@ -464,7 +492,7 @@ class llama_cpp_instruct_adv:
         out1 = extract_text(llm.create_chat_completion(messages=messages, seed=seed, **params))
         return out1, [out1]
 
-    def process(self, llama_model, preset_prompt, custom_prompt, system_prompt, inference_mode, max_frames, max_size, seed, force_offload, save_states, unique_id, strip_thinking=True, parameters=None, images=None, queue_handler=None):
+    def process(self, llama_model, preset_prompt, custom_prompt, system_prompt, inference_mode, max_frames, max_size, seed, force_offload, save_states, unique_id, strip_thinking=True, parameters=None, images=None, audio=None, queue_handler=None):
         # 校验当前已加载的模型确实是本节点连线的配置:
         # 多组 loader+instruct 交错执行时,全局单例可能已被切换成其他模型
         if not LLAMA_CPP_STORAGE.llm or LLAMA_CPP_STORAGE.current_config != llama_model:
@@ -483,6 +511,8 @@ class llama_cpp_instruct_adv:
 
         messages = self._prepare_messages(uid, system_prompts, save_states)
         user_content = [self._build_prompt_text(preset_prompt, custom_prompt, video_input)]
+        if audio is not None:
+            self._append_audio(user_content, audio)
 
         def extract_text(output):
             text = output['choices'][0]['message']['content'].removeprefix(": ").lstrip()
@@ -503,8 +533,6 @@ class llama_cpp_instruct_adv:
             print(f"[llama-cpp-vulkan] Saving state id={uid}...")
             messages.append({"role": "assistant", "content": out1})
             LLAMA_CPP_STORAGE.messages[uid] = self.sanitize_messages(messages)
-        elif not LLAMA_CPP_STORAGE.messages.get(uid):
-            LLAMA_CPP_STORAGE.sys_prompts.pop(uid, None)
 
         if force_offload:
             LLAMA_CPP_STORAGE.clean()

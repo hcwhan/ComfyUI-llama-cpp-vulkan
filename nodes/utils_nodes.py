@@ -1,5 +1,5 @@
 from ..support.prompt_enhancer_preset import PRESETS
-from .shared import any_type, get_nested_value, strip_code_fence
+from .shared import any_type, get_nested_value, parse_json, strip_code_fence
 
 
 # from: https://github.com/crystian/ComfyUI-Crystools
@@ -25,7 +25,8 @@ class parse_json_node:
         if not key:
             raise ValueError("Key cannot be empty!")
 
-        val = get_nested_value(strip_code_fence(input, "json"), key, default)
+        # parse_json 统一顶层报错(含代码围栏剥离),嵌套字符串由 get_nested_value 容错
+        val = get_nested_value(parse_json(input), key, default)
 
         # 转换失败时回退类型零值,保证输出与声明的 INT/FLOAT 类型一致,
         # 不能把原始值(可能是 str/dict)透传给下游节点

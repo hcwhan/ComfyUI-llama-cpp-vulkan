@@ -4,7 +4,7 @@
 
 ## 项目概况
 
-- **版本**: 1.3.0
+- **版本**: 1.4.0
 - **核心依赖**: llama-cpp-python (自编译 Vulkan ABI3 wheel, v0.3.41)
 - **GPU 后端**: Vulkan (非 CUDA/ROCm，独立于 PyTorch 的 GPU 推理路径)
 - **支持平台**: Windows / Linux（预编译 Vulkan wheel 仅覆盖这两个平台；Linux 为 manylinux_2_31，要求 glibc >= 2.31）
@@ -21,10 +21,10 @@ ComfyUI-llama-cpp-vulkan/
     build-vulkan-wheels-abi3.yml  # CI：构建/发布双平台 Vulkan ABI3 wheel
   nodes/
     __init__.py               # 节点注册表（12 个节点的映射）
-    llm.py                    # 核心：模型加载、推理、会话管理 (~590 行)
+    llm.py                    # 核心：模型加载、推理、会话管理 (~620 行)
     devices.py                # Vulkan GPU 设备检测与选择（ggml C API / ctypes）
     handlers.py               # Chat handler 注册表（30 种 VLM 格式）
-    shared.py                 # 公共工具：模型路径、图片编码、预设 prompt、BBox 坐标换算与绘制
+    shared.py                 # 公共工具：模型路径、图片/音频编码、预设 prompt、BBox 坐标换算与绘制
     bbox.py                   # BBox 相关节点：JSON 解析、SEGS/MASK 转换
     utils_nodes.py            # 工具节点：JSON 解析、代码块提取、Prompt 增强预设
   support/
@@ -40,7 +40,7 @@ ComfyUI-llama-cpp-vulkan/
 | 节点 ID | 显示名 | 用途 |
 |---------|--------|------|
 | `llama_cpp_model_loader` | llama.cpp Model Loader | 加载 GGUF 模型，配置 GPU 设备/上下文长度/显存限制 |
-| `llama_cpp_instruct_adv` | llama.cpp Instruct | 文本/图片/视频推理，支持预设 prompt、会话状态、thinking 剥离、生成中途取消 |
+| `llama_cpp_instruct_adv` | llama.cpp Instruct | 文本/图片/音频/视频推理，支持预设 prompt、会话状态、thinking 剥离、生成中途取消 |
 | `llama_cpp_parameters` | llama.cpp Parameters | 采样参数配置（temperature/top_k/top_p 等） |
 | `llama_cpp_unload_model` | llama.cpp Unload Model | 手动卸载模型释放资源 |
 | `llama_cpp_clean_states` | llama.cpp Clean States | 清除保存的会话状态 |
@@ -80,12 +80,18 @@ ComfyUI-llama-cpp-vulkan/
 
 Handler 模块优先取 `llama_cpp.llama_multimodal`（JamePeng 分支，requirements.txt 固定的 wheel），官方构建无此模块时回退 `llama_cpp.llama_chat_format`。mmproj 路径统一用 `clip_model_path` 键传入：官方构建只认这个名字，JamePeng 构建把它作为 `mmproj_path` 的兼容别名接受。
 
+### 多模态输入
+
+- 图片：`images` 输入按 `inference_mode`（one by one / images / video）构造 `image_url` 内容项；images/video 模式多帧时缩放到 `max_size`，单帧保持原分辨率
+- 音频：`audio` 可选输入（ComfyUI `AUDIO` dict）由 `shared.audio2base64()` 均值混为单声道 16-bit WAV，以 `input_audio` 内容项注入（重采样由 llama.cpp 的 mtmd 解码端完成），服务 Qwen3-ASR 等音频 handler；仅 MTMD 构建可用——官方构建的旧式 handler 会静默忽略音频项，`_append_audio()` 在节点层直接报错拦截
+
 ### 会话状态管理
 
-`llama_cpp_instruct_adv` 节点通过 `save_states` 参数控制多轮对话。会话历史按 `state_uid` 存储在 `LLAMA_CPP_STORAGE.messages` 中，图片 base64 数据在保存时替换为 1x1 占位图以节省内存。
+`llama_cpp_instruct_adv` 节点通过 `save_states` 参数控制多轮对话。会话历史按 `state_uid` 存储在 `LLAMA_CPP_STORAGE.messages` 中，媒体数据在保存时替换为最小占位符（图片换 1x1 占位图、音频换 1 帧静音 WAV）以节省内存。
 
 实现要点：
 - `messages`/`sys_prompts` 以 int 型 `state_uid` 为键；`clean_state(-1)` 清全部
+- `sys_prompts` 只为 `save_states=True` 的 uid 记录，一次性请求不留簿记
 - system prompt 变化只清当前 `state_uid` 的会话（`clean_state(uid)`），不影响其他会话
 - 读取历史时做浅拷贝，推理中断/异常不会把残缺消息写入存储
 - 历史为空时自动重建 system 消息（覆盖 `save_states` 从 True 切到 False 的场景）

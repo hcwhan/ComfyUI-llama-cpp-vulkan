@@ -2,6 +2,7 @@ import os
 import io
 import re
 import json
+import wave
 import base64
 import hashlib
 import torch
@@ -82,6 +83,36 @@ def image2base64(image):
     img.save(buffered, format="PNG")
     img_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
     return img_base64
+
+
+def _encode_wav_base64(pcm_bytes, sample_rate):
+    buffered = io.BytesIO()
+    with wave.open(buffered, "wb") as wav:
+        wav.setnchannels(1)
+        wav.setsampwidth(2)
+        wav.setframerate(sample_rate)
+        wav.writeframes(pcm_bytes)
+    return base64.b64encode(buffered.getvalue()).decode("utf-8")
+
+
+def audio2base64(audio):
+    """ComfyUI AUDIO dict ({"waveform": [B,C,T], "sample_rate": int}) 转 WAV base64。
+
+    只负责打包成 16-bit PCM WAV;重采样和声道适配由 llama.cpp 的 mtmd
+    解码端完成,多声道先均值混为单声道以减小 base64 载荷。
+    """
+    waveform = audio["waveform"]
+    if waveform.ndim == 3:
+        waveform = waveform[0]
+    if waveform.ndim == 2:
+        waveform = waveform.mean(dim=0)
+    samples = np.clip(waveform.cpu().numpy(), -1.0, 1.0)
+    pcm = (samples * 32767.0).astype("<i2")
+    return _encode_wav_base64(pcm.tobytes(), int(audio["sample_rate"]))
+
+
+# 1 帧静音 WAV,会话历史脱敏时替换音频数据(与 1x1 占位图同理)
+SILENT_WAV_BASE64 = _encode_wav_base64(b"\x00\x00", 16000)
 
 
 # 开头的 ```label(标签限单词类字符,可无,如 json/python/c++);结尾的 ```。
@@ -173,7 +204,12 @@ def get_nested_value(data, dotted_key, default=None):
     keys = dotted_key.split('.')
     for key in keys:
         if isinstance(data, str):
-            data = json.loads(data)
+            # 嵌套的 JSON-in-string 字段:解析失败视为无法下钻,回落 default,
+            # 与 "key 不存在" 的语义一致(顶层输入的解析错误由 parse_json 报出)
+            try:
+                data = json.loads(data)
+            except ValueError:
+                return default
         if isinstance(data, dict) and key in data:
             data = data[key]
         else:
