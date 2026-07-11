@@ -18,6 +18,8 @@ from llama_cpp._ggml import (
     ggml_backend_load_all_from_path,
 )
 
+from ..shared.logger import logger
+
 libggml_base.ggml_backend_dev_name.argtypes = [ctypes.c_void_p]
 libggml_base.ggml_backend_dev_name.restype = ctypes.c_char_p
 libggml_base.ggml_backend_dev_description.argtypes = [ctypes.c_void_p]
@@ -53,7 +55,7 @@ def _detect_gpu_devices():
                 devices.append({"name": name, "desc": desc, "type": type_name})
         return devices
     except Exception as e:
-        print(f"[llama-cpp-vulkan] WARNING: GPU detection failed: {e}")
+        logger.warning(f"[llama-cpp-vulkan] GPU detection failed: {e}")
         return []
 
 
@@ -61,9 +63,9 @@ _gpu_devices = _detect_gpu_devices()
 
 if _gpu_devices:
     _summary = ", ".join(f"{d['name']} ({d['desc']}) [{d['type']}]" for d in _gpu_devices)
-    print(f"[llama-cpp-vulkan] Detected {len(_gpu_devices)} GPU device(s): {_summary}")
+    logger.info(f"[llama-cpp-vulkan] Detected {len(_gpu_devices)} GPU device(s): {_summary}")
 else:
-    print("[llama-cpp-vulkan] WARNING: No GPU devices detected, running on CPU only")
+    logger.warning("[llama-cpp-vulkan] No GPU devices detected, running on CPU only")
 
 
 def _selectable_devices():
@@ -94,7 +96,7 @@ def resolve_device_selection(gpu_device):
         for i, dev in enumerate(_selectable_devices()):
             if _device_label(dev) == gpu_device:
                 return i, SPLIT_MODE_NONE
-        print(f"[llama-cpp-vulkan] WARNING: device '{gpu_device}' is not selectable, falling back to Auto")
+        logger.warning(f"[llama-cpp-vulkan] device '{gpu_device}' is not selectable, falling back to Auto")
     return 0, SPLIT_MODE_LAYER
 
 
@@ -104,11 +106,11 @@ gpu_device_choices = [AUTO_LABEL] + [_device_label(d) for d in _selectable_devic
 def print_backend_summary(main_gpu, split_mode):
     selectable = _selectable_devices()
     if not selectable:
-        print("[llama-cpp-vulkan] WARNING: No GPU backend detected, running on CPU only")
+        logger.warning("[llama-cpp-vulkan] No GPU backend detected, running on CPU only")
         return
     if split_mode == SPLIT_MODE_LAYER and len(selectable) > 1:
         names = ", ".join(d["name"] for d in selectable)
-        print(f"[llama-cpp-vulkan] Active GPUs (layer split): {names}")
+        logger.info(f"[llama-cpp-vulkan] Active GPUs (layer split): {names}")
     else:
         active = selectable[main_gpu] if main_gpu < len(selectable) else selectable[0]
-        print(f"[llama-cpp-vulkan] Active GPU: {active['name']} ({active['desc']}) [{active['type']}]")
+        logger.info(f"[llama-cpp-vulkan] Active GPU: {active['name']} ({active['desc']}) [{active['type']}]")

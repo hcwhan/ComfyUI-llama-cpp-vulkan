@@ -9,6 +9,7 @@ import comfy.model_management as mm
 from .....core.cqdm import cqdm
 from .....core.instruct import llama_cpp_media_instruct_base
 from .....core.storage import LLAMA_CPP_STORAGE
+from .....shared.logger import logger
 from ..encoding import image_content_item, scale_image, tensor_to_uint8
 
 
@@ -55,7 +56,7 @@ class llama_cpp_image_instruct(llama_cpp_media_instruct_base):
         image_content = {"type": "image_url", "image_url": {"url": ""}}
         user_content.append(image_content)
         messages.append({"role": "user", "content": user_content})
-        print(f"[llama-cpp-vulkan] Start processing {len(images)} images")
+        logger.info(f"[llama-cpp-vulkan] Start processing {len(images)} images")
 
         out_list = []
         tmp_list = []

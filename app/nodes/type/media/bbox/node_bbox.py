@@ -3,6 +3,7 @@
 import torch
 import numpy as np
 
+from .....shared.logger import logger
 from .....shared.text_utils import parse_json
 from .bbox_utils import (
     QWEN_BBOX_MODES,
@@ -70,7 +71,7 @@ class json_to_bboxes:
         if mode in QWEN_BBOX_MODES and not flat_images:
             raise ValueError("Image required for Qwen mode")
         if flat_images and len(json) != len(flat_images):
-            print(f"[llama-cpp-vulkan] Warning: {len(json)} JSON result(s) but {len(flat_images)} image frame(s); pairing by index, extra entries reuse the last frame")
+            logger.warning(f"[llama-cpp-vulkan] {len(json)} JSON result(s) but {len(flat_images)} image frame(s); pairing by index, extra entries reuse the last frame")
 
         output_bboxes = []
         drawn_images = []
@@ -94,7 +95,7 @@ class json_to_bboxes:
                     # draw_bbox 返回 [1,H,W,C]
                     drawn_images.append(draw_bbox(curr_img[0], pixel_bboxes, [bbox_label(b) for b in items]))
                 except Exception as e:
-                    print(f"Error drawing bboxes for JSON #{i}: {e}")
+                    logger.warning(f"[llama-cpp-vulkan] Error drawing bboxes for JSON #{i}: {e}")
                     drawn_images.append(curr_img)
             else:
                 pixel_bboxes = json_to_pixel_bboxes(items, mode)
@@ -136,7 +137,7 @@ class bboxes_to_segs:
 
         seg_list = []
         if batch_size > 1:
-            print(f"[llama-cpp-vulkan] Warning: BBoxes to SEGS received a batch of {batch_size} images; cropped images are taken from the first frame only")
+            logger.warning(f"[llama-cpp-vulkan] BBoxes to SEGS received a batch of {batch_size} images; cropped images are taken from the first frame only")
         image_for_cropping = image[0]
 
         for bbox in bboxes:
@@ -150,7 +151,7 @@ class bboxes_to_segs:
             y1 = max(0, min(y1, height))
             y2 = max(0, min(y2, height))
             if x2 <= x1 or y2 <= y1:
-                print(f"Warning: Skipping bbox outside image bounds: {bbox}")
+                logger.warning(f"[llama-cpp-vulkan] Skipping bbox outside image bounds: {bbox}")
                 continue
 
             # 扩张区域同样限制在图像内，保证 crop_region 不含负坐标（Impact Pack 约定）

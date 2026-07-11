@@ -7,6 +7,8 @@ llama_multimodal 模块. 缺失的类只会让对应选项从下拉框消失
 
 import llama_cpp.llama_multimodal as _handler_module
 
+from ..shared.logger import logger
+
 # 显示名 -> (类名, thinking 开关参数名)。带 "-Thinking" 后缀的显示名共享同一个
 # 类,加载时按后缀切换开关值。新增 handler 只需在此加一行。
 # 注意 thinking 参数名必须被该类 __init__ 接受(基类对未知 kwargs 抛 TypeError)。
@@ -55,7 +57,7 @@ def _resolve_handlers():
             continue
         available[label] = (handler_cls, think_param)
     if missing:
-        print(f"[llama-cpp-vulkan] WARNING: chat handler(s) unavailable in this llama-cpp-python build: {', '.join(missing)}")
+        logger.warning(f"[llama-cpp-vulkan] chat handler(s) unavailable in this llama-cpp-python build: {', '.join(missing)}")
     return available
 
 

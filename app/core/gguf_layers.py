@@ -2,6 +2,8 @@
 
 import struct
 
+from ..shared.logger import logger
+
 # GGUF 标量 value type -> struct 格式 (string=8 和 array=9 单独处理)
 _SCALAR_FORMATS = {
     0: "<B",   # uint8
@@ -74,8 +76,8 @@ def get_layer_count(path):
     try:
         count = _parse_block_count(path)
         if count is None:
-            print("[gguf_layers] block_count not found in GGUF metadata")
+            logger.warning("[llama-cpp-vulkan] block_count not found in GGUF metadata")
         return count
     except Exception as e:
-        print(f"[gguf_layers] GGUF parse failed: {e}")
+        logger.warning(f"[llama-cpp-vulkan] GGUF parse failed: {e}")
         return None

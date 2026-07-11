@@ -7,6 +7,7 @@ from llama_cpp import Llama
 
 import comfy.model_management as mm
 
+from ..shared.logger import logger
 from .devices import AUTO_LABEL, resolve_device_selection, print_backend_summary
 from .gguf_layers import get_layer_count
 from .handlers import HANDLERS
@@ -143,10 +144,10 @@ class LLAMA_CPP_STORAGE:
                     mm.get_torch_device(),
                 )
             except Exception as e:
-                print(f"[llama-cpp-vulkan] WARNING: failed to free torch VRAM before load: {e}")
+                logger.warning(f"[llama-cpp-vulkan] failed to free torch VRAM before load: {e}")
 
         if mmproj_path:
-            print(f"[llama-cpp-vulkan] Loading clip:  {mmproj}")
+            logger.info(f"[llama-cpp-vulkan] Loading clip:  {mmproj}")
 
             kwargs = {
                 "mmproj_path": mmproj_path,
@@ -165,8 +166,8 @@ class LLAMA_CPP_STORAGE:
         else:
             cls.chat_handler = None
 
-        print(f"[llama-cpp-vulkan] Loading model: {model}")
-        print(f"[llama-cpp-vulkan] n_gpu_layers = {n_gpu_layers}, main_gpu = {main_gpu}, split_mode = {split_mode}")
+        logger.info(f"[llama-cpp-vulkan] Loading model: {model}")
+        logger.info(f"[llama-cpp-vulkan] n_gpu_layers = {n_gpu_layers}, main_gpu = {main_gpu}, split_mode = {split_mode}")
         cls.llm = Llama(model_path, chat_handler=cls.chat_handler, n_gpu_layers=n_gpu_layers, main_gpu=main_gpu, split_mode=split_mode, n_ctx=config["n_ctx"], verbose=False)
         # 加载成功后才记录配置,避免加载失败时残留新配置导致后续误判"无需重载"
         cls.current_config = config.copy()
@@ -180,4 +181,4 @@ if not hasattr(mm, "unload_all_models_backup"):
         result = mm.unload_all_models_backup(*args, **kwargs)
         return result
     mm.unload_all_models = patched_unload_all_models
-    print("[llama-cpp-vulkan] Model cleanup hook applied!")
+    logger.info("[llama-cpp-vulkan] Model cleanup hook applied!")

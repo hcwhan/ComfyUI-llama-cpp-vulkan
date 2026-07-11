@@ -7,6 +7,7 @@ import numpy as np
 from PIL import Image, ImageDraw
 from scipy.ndimage import gaussian_filter
 
+from .....shared.logger import logger
 from ..encoding import tensor_to_uint8
 
 QWEN_BBOX_MODES = ("Qwen3-VL", "Qwen2.5-VL")
@@ -69,12 +70,12 @@ def valid_int_bbox(bbox):
     坐标值来自 LLM 输出,非数字时按无效项跳过。
     """
     if not isinstance(bbox, (list, tuple)) or len(bbox) < 4:
-        print(f"Warning: Skipping invalid bbox item: {bbox}")
+        logger.warning(f"[llama-cpp-vulkan] Skipping invalid bbox item: {bbox}")
         return None
     try:
         return tuple(int(round(float(v))) for v in bbox[:4])
     except (TypeError, ValueError):
-        print(f"Warning: Skipping bbox with non-numeric coordinates: {bbox}")
+        logger.warning(f"[llama-cpp-vulkan] Skipping bbox with non-numeric coordinates: {bbox}")
         return None
 
 
