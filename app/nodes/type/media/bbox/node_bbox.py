@@ -1,31 +1,17 @@
+"""BBox 工具链节点: JSON 解析转框, SEGS/MASK 转换, 索引选取."""
+
 import torch
 import numpy as np
-from scipy.ndimage import gaussian_filter
 
-from .shared import parse_json, draw_bbox, bbox_label, json_to_pixel_bboxes, QWEN_BBOX_MODES
-
-
-def _valid_int_bbox(bbox):
-    """校验 bbox 结构并取整为 (x1, y1, x2, y2),非法时打 warning 返回 None。"""
-    if not isinstance(bbox, (list, tuple)) or len(bbox) < 4:
-        print(f"Warning: Skipping invalid bbox item: {bbox}")
-        return None
-    return tuple(int(v) for v in bbox[:4])
-
-
-def _feathered_rect_mask(window_h, window_w, inner_rect, feather):
-    """在 (window_h, window_w) 局部窗口内构建矩形 mask,feather > 0 时做高斯羽化。
-
-    inner_rect 是窗口坐标系下的 (x1, y1, x2, y2)。
-    在局部窗口而非全图上跑 gaussian_filter,避免每个 bbox 的羽化代价随图像尺寸增长。
-    """
-    mask = np.zeros((window_h, window_w), dtype=np.float32)
-    x1, y1, x2, y2 = inner_rect
-    if x2 > x1 and y2 > y1:
-        mask[y1:y2, x1:x2] = 1.0
-    if feather > 0:
-        mask = gaussian_filter(mask, sigma=feather)
-    return mask
+from .....shared.text_utils import parse_json
+from .bbox_utils import (
+    QWEN_BBOX_MODES,
+    bbox_label,
+    draw_bbox,
+    feathered_rect_mask,
+    json_to_pixel_bboxes,
+    valid_int_bbox,
+)
 
 
 class SEG:
@@ -42,7 +28,7 @@ class SEG:
         return (f"SEG(cropped_image={self.cropped_image}, cropped_mask=shape{self.cropped_mask.shape}, confidence={self.confidence}, bbox={self.bbox}, label='{self.label}'), control_net_wrapper={self.control_net_wrapper}")
 
 
-class json_to_bbox:
+class json_to_bboxes:
     @classmethod
     def INPUT_TYPES(s):
         return {
@@ -52,7 +38,7 @@ class json_to_bbox:
                 "label": ("STRING", {
                     "default":"",
                     "multiline": False,
-                    "tooltip": "Select only the BBoxes with specific labels."
+                    "tooltip": "只保留指定 label 的 BBox."
                 }),
             },
             "optional": {
@@ -122,7 +108,7 @@ class json_to_bbox:
         return (output_bboxes, restructured_images)
 
 
-class bbox_to_segs:
+class bboxes_to_segs:
     @classmethod
     def INPUT_TYPES(s):
         return {
@@ -135,6 +121,7 @@ class bbox_to_segs:
         }
 
     RETURN_TYPES = ("SEGS",)
+    RETURN_NAMES = ("segs",)
     FUNCTION = "process"
     CATEGORY = "llama-cpp-vulkan"
 
@@ -146,7 +133,7 @@ class bbox_to_segs:
         image_for_cropping = image[0]
 
         for bbox in bboxes:
-            coords = _valid_int_bbox(bbox)
+            coords = valid_int_bbox(bbox)
             if coords is None:
                 continue
             x1, y1, x2, y2 = coords
@@ -171,7 +158,7 @@ class bbox_to_segs:
 
             # 原始 bbox 在扩张窗口坐标系中的位置
             inner_rect = (x1 - x1_exp, y1 - y1_exp, x2 - x1_exp, y2 - y1_exp)
-            cropped_mask_np = _feathered_rect_mask(crop_h, crop_w, inner_rect, feather)
+            cropped_mask_np = feathered_rect_mask(crop_h, crop_w, inner_rect, feather)
             # Impact Pack 的 SEG 约定 cropped_image 为 [1, H, W, C]
             cropped_image_tensor = image_for_cropping[y1_exp:y2_exp, x1_exp:x2_exp, :].unsqueeze(0)
 
@@ -192,7 +179,7 @@ class bbox_to_segs:
         return (segs,)
 
 
-class bbox_to_mask:
+class bboxes_to_mask:
     @classmethod
     def INPUT_TYPES(s):
         return {
@@ -218,7 +205,7 @@ class bbox_to_mask:
         margin = int(4 * feather) + 1 if feather > 0 else 0
 
         for bbox in bboxes:
-            coords = _valid_int_bbox(bbox)
+            coords = valid_int_bbox(bbox)
             if coords is None:
                 continue
             x1, y1, x2, y2 = coords
@@ -241,7 +228,7 @@ class bbox_to_mask:
                 max(0, x1_exp) - wx1, max(0, y1_exp) - wy1,
                 min(width, x2_exp) - wx1, min(height, y2_exp) - wy1,
             )
-            local_mask_np = _feathered_rect_mask(wy2 - wy1, wx2 - wx1, inner_rect, feather)
+            local_mask_np = feathered_rect_mask(wy2 - wy1, wx2 - wx1, inner_rect, feather)
             local_mask_tensor = torch.from_numpy(local_mask_np).to(image.device)
             region = combined_full_mask[wy1:wy2, wx1:wx2]
             combined_full_mask[wy1:wy2, wx1:wx2] = torch.maximum(region, local_mask_tensor)
@@ -261,14 +248,14 @@ class bboxes_to_bbox:
                     "min": -998,
                     "max": 999,
                     "step": 1,
-                    "tooltip": "BBox index in the image. Set to 999 to get all bboxes."
+                    "tooltip": "图内 BBox 索引. 设为 999 时返回该图全部 BBox."
                 }),
             }
         }
 
     RETURN_TYPES = ("BBOX",)
     RETURN_NAMES = ("bbox",)
-    # 上游 json_to_bbox 的 BBOX 输出是 OUTPUT_IS_LIST（每元素一组）。
+    # 上游 json_to_bboxes 的 BBOX 输出是 OUTPUT_IS_LIST（每元素一组）。
     # 必须声明 INPUT_IS_LIST 才能在单次调用中拿到完整的组列表，
     # 否则 ComfyUI 按组 map 执行，image_index/bbox_index 的二级索引语义失效。
     INPUT_IS_LIST = True

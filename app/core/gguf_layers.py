@@ -1,3 +1,5 @@
+"""GGUF 文件头解析, 只读取元数据中的 block_count(模型层数), 供显存折算使用."""
+
 import struct
 
 # GGUF 标量 value type -> struct 格式 (string=8 和 array=9 单独处理)

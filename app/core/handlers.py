@@ -1,16 +1,11 @@
-"""Chat handler 注册表。
+"""Chat handler 注册表.
 
-JamePeng 分支 (requirements.txt 固定的 wheel) 把全部 VLM handler 集中在
-llama_multimodal 模块;官方 llama-cpp-python 没有该模块,老式 handler 定义在
-llama_chat_format 里,退回该模块查找。缺失的类只会让对应选项从下拉框消失
-(启动日志给出 warning),不会静默吞掉错误。
+requirements.txt 固定的 JamePeng 分支 wheel 把全部 VLM handler 集中在
+llama_multimodal 模块. 缺失的类只会让对应选项从下拉框消失
+(启动日志给出 warning), 不会静默吞掉错误.
 """
-try:
-    import llama_cpp.llama_multimodal as _handler_module
-except ImportError:
-    import llama_cpp.llama_chat_format as _handler_module
 
-HAS_MTMD = hasattr(_handler_module, "MTMDChatHandler")
+import llama_cpp.llama_multimodal as _handler_module
 
 # 显示名 -> (类名, thinking 开关参数名)。带 "-Thinking" 后缀的显示名共享同一个
 # 类,加载时按后缀切换开关值。新增 handler 只需在此加一行。

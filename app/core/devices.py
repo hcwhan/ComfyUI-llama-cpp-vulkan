@@ -1,11 +1,12 @@
-"""Vulkan GPU 设备检测与选择。
+"""Vulkan GPU 设备检测与选择.
 
-通过 ggml C API (ctypes) 直接枚举后端设备,区分独显 (GPU) 和核显 (IGPU),
-是独立于 PyTorch/CUDA 的 Vulkan 推理路径。
+通过 ggml C API (ctypes) 直接枚举后端设备, 区分独显 (GPU) 和核显 (IGPU),
+是独立于 PyTorch/CUDA 的 Vulkan 推理路径.
 
-设备枚举在模块 import 时同步执行(约几百 ms),属有意设计:
-UI 下拉框需要在启动期确定设备列表。
+设备枚举在模块 import 时同步执行(约几百 ms), 属有意设计:
+UI 下拉框需要在启动期确定设备列表.
 """
+
 import ctypes
 from pathlib import Path
 

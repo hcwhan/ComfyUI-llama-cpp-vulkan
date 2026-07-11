@@ -89,10 +89,16 @@ CMAKE_ARGS="-DGGML_VULKAN=on" pip install llama-cpp-python --no-cache-dir --forc
 
   > If you need a VLM model to process image input, don't forget to download the `mmproj` weights.
 
+## Nodes (v2.0)
+
+- **Loaders**: `llm Model Loader` for text-only GGUF models, `vlm Model Loader` for vision/audio models (mmproj + chat handler required). Their outputs are separate types: llm connects only to `text Instruct`, vlm connects only to `image / video / audio Instruct`.
+- **Instruct**: one node per modality — `text` (prompt refining etc.), `image` (per-image or batched), `video` (IMAGE frame batch input, evenly sampled), `audio` (ASR / omni).
+
 ## Notes
 
-- **Audio input (ASR)**: connect a ComfyUI `AUDIO` output to the instruct node's optional `audio` input and select an audio-capable handler (e.g. Qwen3-ASR) with its matching mmproj. Audio is sent as 16-bit mono WAV; resampling is handled by llama.cpp.
+- **Audio input (ASR)**: connect a ComfyUI `AUDIO` output to the `audio Instruct` node and load the model with `vlm Model Loader` using an audio-capable handler (e.g. Qwen3-ASR) with its matching mmproj. Audio is sent as 16-bit mono WAV; resampling is handled by llama.cpp.
 - **Stateless inference**: every run is an independent one-shot request (system prompt + current prompt). No conversation history is kept between runs.
+- **Workflows from v1.x**: the old `Model Loader` / `Instruct` nodes were replaced by the split nodes above; rebuild those nodes when loading old workflows.
 
 ## Credits
 

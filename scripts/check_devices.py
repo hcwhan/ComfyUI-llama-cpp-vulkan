@@ -1,4 +1,4 @@
-"""List all GGML backend devices detected by llama-cpp-python."""
+"""独立诊断脚本, 列出 GGML 后端检测到的所有设备(CPU/GPU/IGPU/ACCEL)."""
 
 import ctypes
 from pathlib import Path

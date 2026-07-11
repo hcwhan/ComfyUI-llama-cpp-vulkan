@@ -89,10 +89,16 @@ CMAKE_ARGS="-DGGML_VULKAN=on" pip install llama-cpp-python --no-cache-dir --forc
 
   > 在使用 VLM 模型进行图像推理之前, 请确保已经下载并选择了主模型对应的 `mmproj` 权重文件。
 
+## 节点说明 (v2.0)
+
+- **加载器**: `llm Model Loader` 加载纯文本 GGUF 模型, `vlm Model Loader` 加载视觉/音频模型 (mmproj 与 chat handler 必选)。两者输出类型完全独立: llm 只能连 `text Instruct`, vlm 只能连 `image / video / audio Instruct`。
+- **推理节点**: 每个模态一个节点 — `text` (prompt 改写等)、`image` (逐张或合并批量)、`video` (输入为 IMAGE 帧批次, 均匀抽帧)、`audio` (语音识别 / omni)。
+
 ## 注意事项
 
-- **音频输入 (语音识别)**: 将 ComfyUI 的 `AUDIO` 输出连接到 Instruct 节点的可选 `audio` 输入, 并选择支持音频的 handler (如 Qwen3-ASR) 及其配套 mmproj。音频以 16-bit 单声道 WAV 发送, 重采样由 llama.cpp 完成。
+- **音频输入 (语音识别)**: 将 ComfyUI 的 `AUDIO` 输出连接到 `audio Instruct` 节点, 模型用 `vlm Model Loader` 加载并选择支持音频的 handler (如 Qwen3-ASR) 及其配套 mmproj。音频以 16-bit 单声道 WAV 发送, 重采样由 llama.cpp 完成。
 - **无状态推理**: 每次运行都是独立的一次性请求 (system prompt + 本次提问), 不保留任何跨运行的对话历史。
+- **v1.x 旧工作流**: 原 `Model Loader` / `Instruct` 节点已被上述拆分节点取代, 加载旧工作流时需重建这些节点。
 
 ## 致谢
 

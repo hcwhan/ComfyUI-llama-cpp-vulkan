@@ -1,3 +1,5 @@
+"""进度条封装, 一个迭代器同时驱动 ComfyUI 前端 ProgressBar 和终端 tqdm."""
+
 import sys
 
 import comfy.utils

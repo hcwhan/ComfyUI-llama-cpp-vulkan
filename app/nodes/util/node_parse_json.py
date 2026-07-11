@@ -1,5 +1,7 @@
-from ..support.prompt_enhancer_preset import PRESETS
-from .shared import any_type, get_nested_value, parse_json, strip_code_fence
+"""Parse JSON 节点, 解析 JSON 字符串, 按点分 key 下钻取值, 输出五种类型."""
+
+from ...shared.types import any_type
+from ...shared.text_utils import get_nested_value, parse_json
 
 
 # from: https://github.com/crystian/ComfyUI-Crystools
@@ -42,42 +44,3 @@ class parse_json_node:
             boolean = str(val).strip().lower() == "true"
 
         return (val, str(val), integer, number, boolean)
-
-
-class remove_code_block:
-    @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": {
-                "input": ("STRING", {"forceInput": True}),
-            },
-            "optional": {
-                "label": ("STRING",),
-            },
-        }
-
-    RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("output",)
-    FUNCTION = "process"
-    CATEGORY = "llama-cpp-vulkan"
-
-    def process(self, input, label=""):
-        return (strip_code_fence(input, label),)
-
-
-class PromptEnhancerPreset:
-    @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": {
-                "preset": (list(PRESETS),),
-            }
-        }
-
-    RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("system_prompt",)
-    FUNCTION = "main"
-    CATEGORY = "llama-cpp-vulkan"
-
-    def main(self, preset):
-        return (PRESETS[preset],)

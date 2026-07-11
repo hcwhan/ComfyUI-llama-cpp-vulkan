@@ -4,7 +4,7 @@
 
 ## 项目概况
 
-- **版本**: 1.5.0
+- **版本**: 2.0.0
 - **核心依赖**: llama-cpp-python (自编译 Vulkan ABI3 wheel, v0.3.41)
 - **GPU 后端**: Vulkan (非 CUDA/ROCm，独立于 PyTorch 的 GPU 推理路径)
 - **支持平台**: Windows / Linux（预编译 Vulkan wheel 仅覆盖这两个平台；Linux 为 manylinux_2_31，要求 glibc >= 2.31）
@@ -12,25 +12,53 @@
 
 ## 目录结构
 
+组织原则：`app/nodes/` 只放节点声明（文件名一律 `node_` 前缀），与某个节点强相关的工具放在该节点文件旁边（如 `bbox_utils.py`、`prompt_enhancer_presets.py`、media 共用的 `encoding.py`）；跨领域复用的逻辑放 `app/core/`（模型生命周期、推理骨架、基础设施）与 `app/shared/`（纯工具）。
+
 ```
 ComfyUI-llama-cpp-vulkan/
-  __init__.py                 # 入口：导出 NODE_CLASS_MAPPINGS
+  __init__.py                 # 入口：from .app.nodes 导出 NODE_CLASS_MAPPINGS
   pyproject.toml              # 项目元数据、依赖声明
   requirements.txt            # pip 依赖（含平台条件 llama-cpp-python wheel URL）
   .github/workflows/
     build-vulkan-wheels-abi3.yml  # CI：构建/发布双平台 Vulkan ABI3 wheel
-  nodes/
-    __init__.py               # 节点注册表（11 个节点的映射）
-    llm.py                    # 核心：模型加载、推理 (~520 行)
-    devices.py                # Vulkan GPU 设备检测与选择（ggml C API / ctypes）
-    handlers.py               # Chat handler 注册表（30 种 VLM 格式）
-    shared.py                 # 公共工具：模型路径、图片/音频编码、预设 prompt、BBox 坐标换算与绘制
-    bbox.py                   # BBox 相关节点：JSON 解析、SEGS/MASK 转换
-    utils_nodes.py            # 工具节点：JSON 解析、代码块提取、Prompt 增强预设
-  support/
-    gguf_layers.py            # GGUF 文件解析：读取模型层数 (block_count)
-    cqdm.py                   # 进度条封装：同时驱动 ComfyUI ProgressBar 和 tqdm
-    prompt_enhancer_preset.py # 18 个 Prompt 增强系统提示词模板
+  app/
+    core/                     # 核心逻辑（非节点）
+      storage.py              #   模型生命周期：全局单例、resolve_config 校验、显存折算、unload 钩子
+      instruct.py             #   Instruct 基类（text 骨架）+ media 基类（VLM 校验）+ 中断/thinking/hybrid 工具
+      prompts.py              #   任务预设 prompt 模板池（@/# 占位符）
+      devices.py              #   Vulkan GPU 设备检测与选择（ggml C API / ctypes）
+      handlers.py             #   Chat handler 注册表（30 种 VLM 格式）
+      model_paths.py          #   llm/LLM 模型目录注册与路径查找
+      gguf_layers.py          #   GGUF 文件解析：读取模型层数 (block_count)
+      cqdm.py                 #   进度条封装：同时驱动 ComfyUI ProgressBar 和 tqdm
+    shared/                   # 跨领域纯工具（非节点）
+      text_utils.py           #   代码围栏剥离、JSON 解析、嵌套取值
+      types.py                #   AnyType 万能透传类型
+    nodes/                    # 只放节点声明
+      __init__.py             #   节点注册表（15 个节点的映射）
+      model/
+        node_loaders.py       #   llm / vlm 两个 Model Loader
+        node_parameters.py    #   llama.cpp Parameters
+        node_unload.py        #   llama.cpp Unload Model
+      type/
+        text/
+          node_instruct.py    #   llama.cpp text Instruct
+        media/
+          encoding.py         #   media 共用：张量/音频转 base64、缩放
+          image/
+            node_instruct.py  #   llama.cpp image Instruct
+          video/
+            node_instruct.py  #   llama.cpp video Instruct
+          audio/
+            node_instruct.py  #   llama.cpp audio Instruct
+          bbox/
+            node_bbox.py      #   BBox 工具链 4 节点
+            bbox_utils.py     #   BBox 强相关工具：坐标换算、画框、羽化 mask
+      util/
+        node_parse_json.py    #   Parse JSON
+        node_remove_code_block.py  # Unpack Code Block
+        node_prompt_enhancer.py    # Prompt Enhancer Preset
+        prompt_enhancer_presets.py # 12 个中文 Prompt 增强系统提示词模板
   scripts/
     check_devices.py          # 独立诊断脚本：列出 GGML 后端检测到的所有设备
 ```
@@ -39,23 +67,31 @@ ComfyUI-llama-cpp-vulkan/
 
 | 节点 ID | 显示名 | 用途 |
 |---------|--------|------|
-| `llama_cpp_model_loader` | llama.cpp Model Loader | 加载 GGUF 模型，配置 GPU 设备/上下文长度/显存限制 |
-| `llama_cpp_instruct_adv` | llama.cpp Instruct | 文本/图片/音频/视频推理，支持预设 prompt、thinking 剥离、生成中途取消 |
+| `llama_cpp_llm_model_loader` | llama.cpp llm Model Loader | 加载纯文本 GGUF 模型（无 mmproj/handler 字段），输出 `LLAMACPPLLM` |
+| `llama_cpp_vlm_model_loader` | llama.cpp vlm Model Loader | 加载 VLM 模型（mmproj 与 chat_handler 必选），输出 `LLAMACPPVLM` |
+| `llama_cpp_text_instruct` | llama.cpp text Instruct | 纯文本推理（prompt 改写等），只接受 `LLAMACPPLLM` |
+| `llama_cpp_image_instruct` | llama.cpp image Instruct | 图片推理：逐张 / batch 两种模式，只接受 `LLAMACPPVLM` |
+| `llama_cpp_video_instruct` | llama.cpp video Instruct | 视频帧序列推理：均匀抽帧 + 连续视频语义提示，输入端口名 `frames` |
+| `llama_cpp_audio_instruct` | llama.cpp audio Instruct | 音频推理（ASR/omni，如 Qwen3-ASR） |
 | `llama_cpp_parameters` | llama.cpp Parameters | 采样参数配置（temperature/top_k/top_p 等） |
 | `llama_cpp_unload_model` | llama.cpp Unload Model | 手动卸载模型释放资源 |
 | `parse_json_node` | Parse JSON | 解析 JSON 字符串，按 key 提取值 |
-| `json_to_bbox` | JSON to BBoxes | 将 LLM 输出的 JSON 转为 BBox 坐标 |
-| `bbox_to_segs` | BBoxes to SEGS | BBox 转 SEGS 格式（兼容 Impact Pack） |
-| `bbox_to_mask` | BBoxes to MASK | BBox 转遮罩图 |
+| `json_to_bboxes` | JSON to BBoxes | 将 LLM 输出的 JSON 转为 BBox 坐标 |
+| `bboxes_to_segs` | BBoxes to SEGS | BBox 转 SEGS 格式（兼容 Impact Pack） |
+| `bboxes_to_mask` | BBoxes to MASK | BBox 转遮罩图 |
 | `bboxes_to_bbox` | BBoxes to BBox | 从多组 BBox 中选取特定索引 |
 | `remove_code_block` | Unpack Code Block | 去除 LLM 输出中的代码块标记 |
-| `PromptEnhancerPreset` | Prompt Enhancer Preset | 18 种 Prompt 增强系统提示词预设 |
+| `prompt_enhancer_preset` | Prompt Enhancer Preset | 12 种中文 Prompt 增强系统提示词预设 |
+
+### 类型隔离
+
+`LLAMACPPLLM`（llm Loader 输出）与 `LLAMACPPVLM`（vlm Loader 输出）完全独立：llm 配置只能连 text Instruct，vlm 配置只能连 image/video/audio Instruct，连错在连线阶段即被 ComfyUI 类型系统拦截。两种配置 dict 结构相同（llm 侧 mmproj/chat_handler 固定为 "None"），底层共用 `core/storage.py` 的加载路径。
 
 ## 架构要点
 
 ### GPU 设备管理
 
-`nodes/devices.py` 通过 ggml C API (ctypes) 直接枚举 Vulkan GPU 设备，区分独显 (GPU) 和核显 (IGPU)。这是独立于 PyTorch/CUDA 的 Vulkan 推理路径。
+`app/core/devices.py` 通过 ggml C API (ctypes) 直接枚举 Vulkan GPU 设备，区分独显 (GPU) 和核显 (IGPU)。这是独立于 PyTorch/CUDA 的 Vulkan 推理路径。
 
 关键函数链：`_detect_gpu_devices()` -> `_selectable_devices()` -> `gpu_device_choices` / `resolve_device_selection()`
 
@@ -66,74 +102,84 @@ ComfyUI-llama-cpp-vulkan/
 
 ### 模型生命周期
 
-`LLAMA_CPP_STORAGE` 类管理全局单例模型状态：
-- 懒加载：`llama_cpp_model_loader` 只调用 `_resolve_config()` 做快速失败校验（模型/mmproj 路径存在、mmproj 与 chat_handler 配对合法）并返回 config，实际加载由 `llama_cpp_instruct_adv` 按需触发；多组 loader+instruct 交错时避免全局单例被 loader 反复挤占
-- `load_model()`: 先 `_resolve_config()` 校验再卸载旧模型（无效配置不影响已加载的模型），随后加载 GGUF 模型 + 可选的 mmproj（视觉编码器）
+`app/core/storage.py` 的 `LLAMA_CPP_STORAGE` 类管理全局单例模型状态：
+- 懒加载：两个 Loader 只调用 `resolve_config()` 做快速失败校验（模型/mmproj 路径存在、mmproj 与 chat_handler 配对合法）并返回 config，实际加载由 Instruct 节点按需触发；多组 loader+instruct 交错时避免全局单例被 loader 反复挤占
+- `load_model()`: 先 `resolve_config()` 校验再卸载旧模型（无效配置不影响已加载的模型），随后加载 GGUF 模型 + 可选的 mmproj（视觉编码器）
 - `clean()`: 释放模型和 chat_handler 资源
 - 通过 monkey-patch `mm.unload_all_models` 实现 ComfyUI 模型卸载（前端 Free 按钮 / OOM 处理）时自动清理
-- `vram_limit` 折算 `n_gpu_layers` 集中在 `_estimate_n_gpu_layers()`：按 GGUF 层数（`support/gguf_layers.py` 手写解析 `block_count`，命中即返回避免解析 tokenizer 元数据）均摊文件体积，乘经验系数 `_VRAM_OVERHEAD_FACTOR`(1.55) 估算每层显存，mmproj 体积先从预算中扣除
+- `vram_limit` 折算 `n_gpu_layers` 集中在 `_estimate_n_gpu_layers()`：按 GGUF 层数（`core/gguf_layers.py` 手写解析 `block_count`，命中即返回避免解析 tokenizer 元数据）均摊文件体积，乘经验系数 `_VRAM_OVERHEAD_FACTOR`(1.55) 估算每层显存，mmproj 体积先从预算中扣除
+
+### Instruct 继承体系
+
+`app/core/instruct.py` 提供两级基类，四个 Instruct 节点只声明 `INPUT_TYPES` 与模态专属的 runner 闭包：
+- `llama_cpp_instruct_base`：通用骨架。`_run()` 负责组消息（system + user）、复制采样参数、`InterruptWatcher` 监视、force_offload / hybrid KV 重置收尾；`prompt_inputs()/runtime_inputs()/optional_inputs()` 是 INPUT_TYPES 字段组装块
+- `llama_cpp_media_instruct_base`：多模态骨架，`MODEL_TYPE = "LLAMACPPVLM"`，附 `require_mmproj()` 兜底校验
+- 类属性 `PRESETS`/`DEFAULT_PRESET` 按模态过滤任务预设下拉框；`MEDIA_WORD` 决定模板中 `@` 占位符的替换词（text/image -> 图像、video -> 视频、audio -> 音频）；任务预设与增强预设文本均为中文
 
 ### Chat Handler 注册表
 
-`nodes/handlers.py` 中的 `_HANDLER_SPECS` 表集中定义全部 handler：显示名 -> (类名, thinking 开关参数名)。启动时 `_resolve_handlers()` 用 `getattr` 对照 handler 模块解析类名，缺失的类打 warning 并从下拉框剔除（不静默）。支持 30 种 VLM 模型格式（Qwen/Gemma/GLM/MiniCPM/LLaVA 等）。
-
-Handler 模块优先取 `llama_cpp.llama_multimodal`（JamePeng 分支，requirements.txt 固定的 wheel），官方构建无此模块时回退 `llama_cpp.llama_chat_format`。mmproj 路径统一用 `clip_model_path` 键传入：官方构建只认这个名字，JamePeng 构建把它作为 `mmproj_path` 的兼容别名接受。
+`app/core/handlers.py` 中的 `_HANDLER_SPECS` 表集中定义全部 handler：显示名 -> (类名, thinking 开关参数名)。启动时 `_resolve_handlers()` 用 `getattr` 对照 `llama_cpp.llama_multimodal` 模块解析类名，缺失的类打 warning 并从下拉框剔除（防御未来 wheel 升级时的类变动，不静默）。支持 30 种 VLM 模型格式（Qwen/Gemma/GLM/MiniCPM/LLaVA 等）。
 
 ### 多模态输入
 
-- 图片：`images` 输入按 `inference_mode`（one by one / images / video）构造 `image_url` 内容项；images/video 模式多帧时缩放到 `max_size`，单帧保持原分辨率
-- 音频：`audio` 可选输入（ComfyUI `AUDIO` dict）由 `shared.audio2base64()` 均值混为单声道 16-bit WAV，以 `input_audio` 内容项注入（重采样由 llama.cpp 的 mtmd 解码端完成），服务 Qwen3-ASR 等音频 handler；仅 MTMD 构建可用——官方构建的旧式 handler 会静默忽略音频项，`_append_audio()` 在节点层直接报错拦截
+- image Instruct：`batch_images` 开关切换逐张推理（每张一条结果）与合并单请求；batch 多图时缩放到 `max_size`，单图保持原分辨率
+- video Instruct：`frames` 输入为 IMAGE 帧批次（ComfyUI 生态的视频通行形态），按 `max_frames` linspace 均匀抽帧后缩放，并在 system prompt 前注入"连续视频"语义提示
+- audio Instruct：ComfyUI `AUDIO` dict 由 `media/encoding.py` 的 `audio2base64()` 均值混为单声道 16-bit WAV，以 `input_audio` 内容项注入（重采样由 llama.cpp 的 mtmd 解码端完成），服务 Qwen3-ASR 等音频 handler；音频是否被 mmproj 支持由 llama-cpp-python 侧校验
 
 ### 推理输出与中断
 
 - 无会话状态：每次执行都是全新的一次性请求（system prompt + 本次提问），不保留任何跨执行的对话历史
-- `strip_thinking` 开关（默认开）：用 `_strip_thinking()` 剥离 `<think>...</think>` 推理块；兼容 generation prompt 已注入 `<think>` 导致输出只含闭合标签的情况，未闭合（生成截断）时保持原样
-- `_InterruptWatcher`：推理期间守护线程每 200ms 轮询 `mm.processing_interrupted()`，命中后调用 `Llama.abort()` 使生成立即停止；llama-cpp-python 在每次请求开始会 clear abort 事件，因此监视线程命中后持续重复 set 以抗竞态
-- 每次请求结束后按 `_is_hybrid_arch()`（`_model.is_hybrid()`/`is_recurrent()` C API）判断是否整体重置 KV cache：hybrid/recurrent 架构（Qwen3.5、LFM2 系等）的线性注意力状态无法跨请求前缀复用；纯 SWA 模型（Gemma3）不受影响
+- `strip_thinking` 开关（默认开）：剥离 `<think>...</think>` 推理块；兼容 generation prompt 已注入 `<think>` 导致输出只含闭合标签的情况，未闭合（生成截断）时保持原样
+- `InterruptWatcher`：推理期间守护线程每 200ms 轮询 `mm.processing_interrupted()`，命中后调用 `Llama.abort()` 使生成立即停止；llama-cpp-python 在每次请求开始会 clear abort 事件，因此监视线程命中后持续重复 set 以抗竞态
+- 每次请求结束后按 `is_hybrid_arch()`（`_model.is_hybrid()`/`is_recurrent()` C API）判断是否整体重置 KV cache：hybrid/recurrent 架构（Qwen3.5、LFM2 系等）的线性注意力状态无法跨请求前缀复用；纯 SWA 模型（Gemma3）不受影响
 
 ## 数据流
 
 ```
-llama_cpp_model_loader  -->  LLAMACPPMODEL (config dict)
-                                  |
-llama_cpp_parameters  -->  LLAMACPPARAMS (kwargs dict)
-                                  |
-                                  v
-                     llama_cpp_instruct_adv
+llama_cpp_llm_model_loader --> LLAMACPPLLM   ----> llama_cpp_text_instruct
+llama_cpp_vlm_model_loader --> LLAMACPPVLM   --+-> llama_cpp_image_instruct
+                                               +-> llama_cpp_video_instruct
+llama_cpp_parameters --> LLAMACPPARAMS --------+-> llama_cpp_audio_instruct
+                                  (全部 Instruct 的可选输入)
                        |         |
                     STRING    STRING[]
                    (output)  (output_list)
                        |
                        v
-              parse_json_node / json_to_bbox / remove_code_block
+              parse_json_node / json_to_bboxes / remove_code_block
                        |
                        v
-              bbox_to_segs / bbox_to_mask  (下游图像处理)
+              bboxes_to_segs / bboxes_to_mask  (下游图像处理)
 ```
 
 ## 修改代码须知
 
+### 依赖版本对接原则
+
+项目代码只对接 `requirements.txt` 中固定的依赖版本（特别是 llama-cpp-python 的 JamePeng Vulkan wheel），不为历史版本或官方构建编写兼容/回退代码。mmproj 路径统一用 `mmproj_path` 键传入 handler。
+
+### 文件顶部注释规范
+
+- 每个 .py 文件顶部必须有描述整个文件用途的模块 docstring, docstring 之后空一行再写代码(空包的 `__init__.py` 只保留 docstring)
+- docstring 内的标点: 逗号使用英文逗号加一个空格 ", ", 句号使用英文句号 "."
+
 ### INPUT_TYPES 字段顺序
 
-ComfyUI 的 widget 值按 `INPUT_TYPES` 中字段的声明顺序序列化。
+ComfyUI 的 widget 值按 `INPUT_TYPES` 中字段的声明顺序序列化，调整字段顺序会破坏已保存工作流的 widget 值映射。
 
-当前 `llama_cpp_model_loader` 的字段顺序：
-1. `gpu_device`
-2. `model`
-3. `mmproj`
-4. `chat_handler`
-5. `n_ctx`
-6. `vram_limit`
-7. `image_min_tokens`
-8. `image_max_tokens`
+Instruct 子类的字段顺序约定：模型端口 -> 媒体输入 -> `prompt_inputs()` -> 模态专属字段 -> `runtime_inputs()`。
 
 ### 新增 Chat Handler
 
-在 `nodes/handlers.py` 的 `_HANDLER_SPECS` 表中加一行：`"显示名": ("类名", thinking开关参数名或None)`。显示名含 "-Thinking" 后缀时加载器自动把开关参数设为 True。注意 thinking 参数名必须被该类 `__init__` 接受（基类会对未知 kwargs 抛 TypeError），如 GLM41VChatHandler 不接受 `enable_thinking`。
+在 `app/core/handlers.py` 的 `_HANDLER_SPECS` 表中加一行：`"显示名": ("类名", thinking开关参数名或None)`。显示名含 "-Thinking" 后缀时加载器自动把开关参数设为 True。注意 thinking 参数名必须被该类 `__init__` 接受（基类会对未知 kwargs 抛 TypeError），如 GLM41VChatHandler 不接受 `enable_thinking`。
+
+### 新增任务预设
+
+在 `app/core/prompts.py` 的 `preset_prompts` 加模板，并把预设名加入相应 Instruct 节点类的 `PRESETS` 列表（列表顺序即 UI 下拉框顺序）。
 
 ### Prompt 增强预设
 
-在 `support/prompt_enhancer_preset.py` 中添加新常量，并在文件末尾的 `PRESETS` dict 中加一行（dict 顺序即 UI 下拉框顺序）。
+在 `app/nodes/util/prompt_enhancer_presets.py` 中添加新常量，并在文件末尾的 `PRESETS` dict 中加一行（dict 顺序即 UI 下拉框顺序）。
 
 ### Wheel 构建与发布 (CI)
 
