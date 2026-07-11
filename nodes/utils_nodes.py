@@ -1,5 +1,3 @@
-import json
-
 from ..support.prompt_enhancer_preset import *
 from .shared import any_type, get_nested_value
 
@@ -28,10 +26,10 @@ class parse_json_node:
             input = [input]
 
         result = {"any": {}, "string": {}, "int": {}, "float": {}, "boolean": {}}
-        for i, json in enumerate(input):
+        for i, json_str in enumerate(input):
             val = ""
             if key is not None and key != "":
-                val = get_nested_value(json.strip().removeprefix("```json").removesuffix("```"), key, default)
+                val = get_nested_value(json_str.strip().removeprefix("```json").removesuffix("```"), key, default)
             else:
                 raise ValueError("Key cannot be empty!")
 

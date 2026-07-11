@@ -177,7 +177,8 @@ class bbox_to_segs:
             seg = SEG(
                 cropped_image=cropped_image_tensor,
                 cropped_mask=cropped_mask_np,
-                confidence=np.array([0.9], dtype=np.float32),
+                # Impact Pack 约定 confidence 为标量
+                confidence=0.9,
                 crop_region=crop_region,
                 bbox=np.array([x1, y1, x2, y2], dtype=np.float32),
                 label="bbox"
@@ -270,6 +271,11 @@ class bboxes_to_bbox:
     CATEGORY = "llama-cpp-vulkan"
 
     def process(self, bboxes, image_index, bbox_index):
-        if bbox_index != 999:
-            return ([bboxes[image_index][bbox_index]],)
-        return (bboxes[image_index],)
+        if not 0 <= image_index < len(bboxes):
+            raise IndexError(f"image_index {image_index} out of range: only {len(bboxes)} bbox group(s) available")
+        group = bboxes[image_index]
+        if bbox_index == 999:
+            return (group,)
+        if not -len(group) <= bbox_index < len(group):
+            raise IndexError(f"bbox_index {bbox_index} out of range: image {image_index} has {len(group)} bbox(es)")
+        return ([group[bbox_index]],)
