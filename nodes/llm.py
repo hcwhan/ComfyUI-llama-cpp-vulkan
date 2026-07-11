@@ -384,9 +384,13 @@ class LLAMA_CPP_STORAGE:
             if vram_limit != -1:
                 n_gpu_layers = max(1, int(vram_limit / gguf_layer_size))
             if handler is not None:
-                cls.chat_handler = handler(verbose=False)
-            else:
-                cls.chat_handler = None
+                # 当前所有 chat handler 均为 VLM handler，实例化时强制要求 mmproj；
+                # 提前拦截，避免抛出含糊的 "mmproj_path is required"
+                raise ValueError(
+                    f'Chat handler "{chat_handler}" requires a mmproj model. '
+                    'Select the matching mmproj file, or set chat_handler to "None" for text-only models.'
+                )
+            cls.chat_handler = None
 
         print(f"[llama-cpp-vulkan] Loading model: {model}")
         print(f"[llama-cpp-vulkan] n_gpu_layers = {n_gpu_layers}, main_gpu = {main_gpu}, split_mode = {split_mode}")
@@ -563,20 +567,22 @@ class llama_cpp_instruct_adv:
         system_prompts = "请将输入的图片序列当做视频而不是静态帧序列, " + system_prompt if video_input else system_prompt
         if last_sys_prompt != system_prompts:
             messages = []
-            LLAMA_CPP_STORAGE.clean_state()
+            # 只清除当前会话，避免误伤其他 state_uid 的历史
+            LLAMA_CPP_STORAGE.clean_state(uid)
             LLAMA_CPP_STORAGE.sys_prompts[f"{uid}"] = system_prompts
             if system_prompts.strip():
                 messages.append({"role": "system", "content": system_prompts})
         else:
             if save_states:
-                try:
-                    print(f"[llama-cpp-vulkan] Loading state and history id={uid}...")
-                    #LLAMA_CPP_STORAGE.llm.load_state(LLAMA_CPP_STORAGE.states[f"{uid}"])
-                    messages = LLAMA_CPP_STORAGE.messages.get(f"{uid}", [])
-                except Exception as e:
-                    messages = []
+                print(f"[llama-cpp-vulkan] Loading state and history id={uid}...")
+                # 浅拷贝：后续 append 不直接写入存储，推理中断/异常时历史保持一致
+                messages = list(LLAMA_CPP_STORAGE.messages.get(f"{uid}", []))
             else:
                 messages = []
+            # 历史为空时重建 system 消息（如该 uid 曾以 save_states=True 保存过、
+            # 本次关闭 save_states，此时 sys_prompts 记录还在但不会走上面的分支）
+            if not messages and system_prompts.strip():
+                messages.append({"role": "system", "content": system_prompts})
         out1 = ""
         out2 = []
         user_content = []
