@@ -4,7 +4,7 @@
 
 ## 项目概况
 
-- **版本**: 1.2.9
+- **版本**: 1.3.0
 - **核心依赖**: llama-cpp-python (自编译 Vulkan ABI3 wheel, v0.3.41)
 - **GPU 后端**: Vulkan (非 CUDA/ROCm，独立于 PyTorch 的 GPU 推理路径)
 - **支持平台**: Windows / Linux（预编译 Vulkan wheel 仅覆盖这两个平台）
@@ -19,7 +19,7 @@ ComfyUI-llama-cpp-vulkan/
   requirements.txt            # pip 依赖（含平台条件 llama-cpp-python wheel URL）
   nodes/
     __init__.py               # 节点注册表（12 个节点的映射）
-    llm.py                    # 核心：模型加载、推理、GPU 设备检测、会话管理 (~820 行)
+    llm.py                    # 核心：模型加载、推理、GPU 设备检测、会话管理 (~740 行)
     shared.py                 # 公共工具：模型路径、图片编码、预设 prompt、BBox 绘制
     bbox.py                   # BBox 相关节点：JSON 解析、SEGS/MASK 转换
     utils_nodes.py            # 工具节点：JSON 解析、代码块提取、Prompt 增强预设
@@ -68,9 +68,11 @@ ComfyUI-llama-cpp-vulkan/
 - `clean()`: 释放模型和 chat_handler 资源（不清会话历史）；`clean(all=True)` 额外清除全部会话
 - 通过 monkey-patch `mm.unload_all_models` 实现 ComfyUI 模型卸载（前端 Free 按钮 / OOM 处理）时自动清理，只卸模型、保留会话历史
 
-### Chat Handler 动态注册
+### Chat Handler 注册表
 
-`chat_handlers` 列表通过 try/except 逐个导入 `llama_cpp.llama_chat_format` 中的 Handler 类，实现运行时能力检测。支持 29+ 种 VLM 模型格式（Qwen/Gemma/GLM/MiniCPM/LLaVA 等）。
+`llm.py` 中的 `_HANDLER_SPECS` 表集中定义全部 handler：显示名 -> (类名, thinking 开关参数名)。启动时 `_resolve_handlers()` 用 `getattr` 对照 handler 模块解析类名，缺失的类打 warning 并从下拉框剔除（不静默）。支持 30 种 VLM 模型格式（Qwen/Gemma/GLM/MiniCPM/LLaVA 等）。
+
+Handler 模块优先取 `llama_cpp.llama_multimodal`（JamePeng 分支，requirements.txt 固定的 wheel），官方构建无此模块时回退 `llama_cpp.llama_chat_format`。mmproj 路径统一用 `clip_model_path` 键传入：官方构建只认这个名字，JamePeng 构建把它作为 `mmproj_path` 的兼容别名接受。
 
 ### 会话状态管理
 
@@ -80,6 +82,8 @@ ComfyUI-llama-cpp-vulkan/
 - system prompt 变化只清当前 `state_uid` 的会话（`clean_state(uid)`），不影响其他会话
 - 读取历史时做浅拷贝，推理中断/异常不会把残缺消息写入存储
 - 历史为空时自动重建 system 消息（覆盖 `save_states` 从 True 切到 False 的场景）
+- `IS_CHANGED` 在 `save_states=True` 时返回 NaN 强制节点重执行：多轮会话依赖真实执行来追加历史，不能命中 ComfyUI 输出缓存；`save_states=False` 时维持正常缓存
+- 每次请求结束后按 `_is_hybrid_arch()`（`_model.is_hybrid()`/`is_recurrent()` C API）判断是否整体重置 KV cache：hybrid/recurrent 架构（Qwen3.5、LFM2 系等）的线性注意力状态无法跨请求前缀复用；纯 SWA 模型（Gemma3）不受影响
 
 ### 推理输出与中断
 
@@ -124,21 +128,17 @@ ComfyUI 的 widget 值按 `INPUT_TYPES` 中字段的声明顺序序列化。
 
 ### 新增 Chat Handler
 
-1. 在 `llm.py` 顶部添加 try/except 导入块
-2. 在 `chat_handlers` 列表中追加显示名
-3. 在 `LLAMA_CPP_STORAGE.load_model()` 的 `get_chat_handler()` match 语句中添加分支
-4. 如有特殊参数（如 `enable_thinking`/`force_reasoning`），在 kwargs 构建处添加条件
+在 `llm.py` 的 `_HANDLER_SPECS` 表中加一行：`"显示名": ("类名", thinking开关参数名或None)`。显示名含 "-Thinking" 后缀时加载器自动把开关参数设为 True。注意 thinking 参数名必须被该类 `__init__` 接受（基类会对未知 kwargs 抛 TypeError），如 GLM41VChatHandler 不接受 `enable_thinking`。
 
 ### Prompt 增强预设
 
-在 `support/prompt_enhancer_preset.py` 中添加新常量，然后在 `nodes/utils_nodes.py` 的 `PromptEnhancerPreset` 类中注册。
+在 `support/prompt_enhancer_preset.py` 中添加新常量，并在文件末尾的 `PRESETS` dict 中加一行（dict 顺序即 UI 下拉框顺序）。
 
 ## 依赖
 
 | 包 | 用途 |
 |----|------|
 | llama-cpp-python | llama.cpp Python 绑定（自编译 Vulkan wheel） |
-| diskcache | 缓存（当前代码未直接使用，可能预留） |
 | scipy | `gaussian_filter` 用于 BBox 遮罩羽化 |
 | numpy | 图像数组操作 |
 | pillow | 图像编解码、BBox 绘制 |

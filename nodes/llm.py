@@ -134,117 +134,86 @@ def _print_backend_summary(main_gpu, split_mode):
         print(f"[llama-cpp-vulkan] Active GPU: {active['name']} ({active['desc']}) [{active['type']}]")
 
 
-from llama_cpp.llama_chat_format import (
-    Llava15ChatHandler, Llava16ChatHandler, MoondreamChatHandler,
-    NanoLlavaChatHandler, Llama3VisionAlphaChatHandler, MiniCPMv26ChatHandler
-)
-
-chat_handlers = ["None", "LLaVA-1.5", "LLaVA-1.6", "Moondream2", "nanoLLaVA", "llama3-Vision-Alpha", "MiniCPM-v2.6"]
-
+# ── Chat handler 注册表 ──────────────────────────────────────────
+# JamePeng 分支 (requirements.txt 固定的 wheel) 把全部 VLM handler 集中在
+# llama_multimodal 模块；官方 llama-cpp-python 没有该模块，老式 handler 定义在
+# llama_chat_format 里，退回该模块查找。缺失的类只会让对应选项从下拉框消失
+# （启动日志给出 warning），不会静默吞掉错误。
 try:
-    from llama_cpp.llama_chat_format import MTMDChatHandler
-    chat_handlers += ["DeepSeek-OCR"]
-    _MTMD = True
-except:
-    _MTMD = False
+    import llama_cpp.llama_multimodal as _handler_module
+except ImportError:
+    import llama_cpp.llama_chat_format as _handler_module
 
-try:
-    from llama_cpp.llama_chat_format import Gemma3ChatHandler
-    chat_handlers += ["Gemma3"]
-except:
-    Gemma3ChatHandler = None
+_HAS_MTMD = hasattr(_handler_module, "MTMDChatHandler")
 
-try:
-    from llama_cpp.llama_chat_format import Gemma4ChatHandler
-    chat_handlers += ["Gemma4"]
-except:
-    Gemma4ChatHandler = None
+# 显示名 -> (类名, thinking 开关参数名)。带 "-Thinking" 后缀的显示名共享同一个
+# 类，加载时按后缀切换开关值。新增 handler 只需在此加一行。
+_HANDLER_SPECS = {
+    "LLaVA-1.5": ("Llava15ChatHandler", None),
+    "LLaVA-1.6": ("Llava16ChatHandler", None),
+    "Moondream2": ("MoondreamChatHandler", None),
+    "nanoLLaVA": ("NanoLlavaChatHandler", None),
+    "llama3-Vision-Alpha": ("Llama3VisionAlphaChatHandler", None),
+    "MiniCPM-v2.6": ("MiniCPMv26ChatHandler", None),
+    "DeepSeek-OCR": ("MTMDChatHandler", None),
+    "Gemma3": ("Gemma3ChatHandler", None),
+    "Gemma4": ("Gemma4ChatHandler", None),
+    "Qwen2.5-VL": ("Qwen25VLChatHandler", None),
+    "MinerU2.5-Pro": ("Qwen25VLChatHandler", None),
+    "Qwen3-VL": ("Qwen3VLChatHandler", "force_reasoning"),
+    "Qwen3-VL-Thinking": ("Qwen3VLChatHandler", "force_reasoning"),
+    "Qwen3.5": ("Qwen35ChatHandler", "enable_thinking"),
+    "Qwen3.5-Thinking": ("Qwen35ChatHandler", "enable_thinking"),
+    "Qwen3.6": ("Qwen35ChatHandler", "enable_thinking"),
+    "Qwen3.6-Thinking": ("Qwen35ChatHandler", "enable_thinking"),
+    "GLM-4.6V": ("GLM46VChatHandler", "enable_thinking"),
+    "GLM-4.6V-Thinking": ("GLM46VChatHandler", "enable_thinking"),
+    # GLM41VChatHandler 不接受 enable_thinking（模板固定输出 thinking 块）
+    "GLM-4.1V-Thinking": ("GLM41VChatHandler", None),
+    "LFM2-VL": ("LFM2VLChatHandler", None),
+    "LFM2.5-VL": ("LFM25VLChatHandler", None),
+    "Granite-Docling": ("GraniteDoclingChatHandler", None),
+    "MiniCPM-v4.5": ("MiniCPMv45ChatHandler", "enable_thinking"),
+    "MiniCPM-v4.5-Thinking": ("MiniCPMv45ChatHandler", "enable_thinking"),
+    "MiniCPM-v4.6": ("MiniCPMV46ChatHandler", "enable_thinking"),
+    "MiniCPM-v4.6-Thinking": ("MiniCPMV46ChatHandler", "enable_thinking"),
+    "PaddleOCR-VL-1.5": ("PaddleOCRChatHandler", None),
+    "Qwen3-ASR": ("Qwen3ASRChatHandler", None),
+    "Step3-VL": ("Step3VLChatHandler", None),
+}
 
-try:
-    from llama_cpp.llama_chat_format import Qwen25VLChatHandler
-    chat_handlers += ["Qwen2.5-VL", "MinerU2.5-Pro"]
-except:
-    Qwen25VLChatHandler = None
 
-try:
-    from llama_cpp.llama_chat_format import Qwen3VLChatHandler
-    chat_handlers += ["Qwen3-VL", "Qwen3-VL-Thinking"]
-except:
-    Qwen3VLChatHandler = None
+def _resolve_handlers():
+    available = {}
+    missing = []
+    for label, (cls_name, think_param) in _HANDLER_SPECS.items():
+        handler_cls = getattr(_handler_module, cls_name, None)
+        if handler_cls is None:
+            missing.append(f"{label} ({cls_name})")
+            continue
+        available[label] = (handler_cls, think_param)
+    if missing:
+        print(f"[llama-cpp-vulkan] WARNING: chat handler(s) unavailable in this llama-cpp-python build: {', '.join(missing)}")
+    return available
 
-try:
-    from llama_cpp.llama_chat_format import Qwen35ChatHandler
-    chat_handlers += ["Qwen3.5", "Qwen3.5-Thinking", "Qwen3.6", "Qwen3.6-Thinking"]
-except:
-    Qwen35ChatHandler = None
 
-try:
-    from llama_cpp.llama_chat_format import (GLM46VChatHandler, LFM2VLChatHandler, GLM41VChatHandler)
-    chat_handlers += ["GLM-4.6V", "GLM-4.6V-Thinking", "GLM-4.1V-Thinking", "LFM2-VL"]
-except:
-    GLM46VChatHandler = None
-    LFM2VLChatHandler = None
-    GLM41VChatHandler = None
-
-try:
-    from llama_cpp.llama_chat_format import LFM25VLChatHandler
-    chat_handlers += ["LFM2.5-VL"]
-except:
-    LFM25VLChatHandler = None
-
-try:
-    from llama_cpp.llama_chat_format import GraniteDoclingChatHandler
-    chat_handlers += ["Granite-Docling"]
-except:
-    GraniteDoclingChatHandler = None
-
-try:
-    from llama_cpp.llama_chat_format import MiniCPMv45ChatHandler
-    chat_handlers += ["MiniCPM-v4.5", "MiniCPM-v4.5-Thinking"]
-except:
-    MiniCPMv45ChatHandler = None
-
-try:
-    from llama_cpp.llama_chat_format import MiniCPMV46ChatHandler as MiniCPMv46ChatHandler
-    chat_handlers += ["MiniCPM-v4.6", "MiniCPM-v4.6-Thinking"]
-except:
-    MiniCPMv46ChatHandler = None
-
-try:
-    from llama_cpp.llama_chat_format import PaddleOCRChatHandler
-    chat_handlers += ["PaddleOCR-VL-1.5"]
-except:
-    PaddleOCRChatHandler = None
-
-try:
-    from llama_cpp.llama_chat_format import Qwen3ASRChatHandler
-    chat_handlers += ["Qwen3-ASR"]
-except:
-    Qwen3ASRChatHandler = None
-
-try:
-    from llama_cpp.llama_chat_format import Step3VLChatHandler
-    chat_handlers += ["Step3-VL"]
-except:
-    Step3VLChatHandler = None
+_HANDLERS = _resolve_handlers()
+chat_handlers = ["None"] + list(_HANDLERS)
 
 
 class LLAMA_CPP_STORAGE:
     llm = None
     chat_handler = None
     current_config = None
-    #states = {}
     messages = {}
     sys_prompts = {}
 
     @classmethod
     def clean_state(cls, id=-1):
         if id == -1:
-            #cls.states.clear()
             cls.messages.clear()
             cls.sys_prompts.clear()
         else:
-            #cls.states.pop(f"{id}", None)
             cls.messages.pop(f"{id}", None)
             cls.sys_prompts.pop(f"{id}", None)
 
@@ -272,57 +241,6 @@ class LLAMA_CPP_STORAGE:
 
     @classmethod
     def load_model(cls, config):
-        def get_chat_handler(chat_handler):
-            match chat_handler:
-                case "Qwen3.5"|"Qwen3.5-Thinking"|"Qwen3.6"|"Qwen3.6-Thinking":
-                    return Qwen35ChatHandler
-                case "Qwen3-VL"|"Qwen3-VL-Thinking":
-                    return Qwen3VLChatHandler
-                case "Qwen3-ASR":
-                    return Qwen3ASRChatHandler
-                case "Qwen2.5-VL"|"MinerU2.5-Pro":
-                    return Qwen25VLChatHandler
-                case "LLaVA-1.5":
-                    return Llava15ChatHandler
-                case "LLaVA-1.6":
-                    return Llava16ChatHandler
-                case "Moondream2":
-                    return MoondreamChatHandler
-                case "nanoLLaVA":
-                    return NanoLlavaChatHandler
-                case "llama3-Vision-Alpha":
-                    return Llama3VisionAlphaChatHandler
-                case "MiniCPM-v2.6":
-                    return MiniCPMv26ChatHandler
-                case "MiniCPM-v4.5"|"MiniCPM-v4.5-Thinking":
-                    return MiniCPMv45ChatHandler
-                case "MiniCPM-v4.6"|"MiniCPM-v4.6-Thinking":
-                    return MiniCPMv46ChatHandler
-                case "Gemma3":
-                    return Gemma3ChatHandler
-                case "Gemma4":
-                    return Gemma4ChatHandler
-                case "GLM-4.6V"|"GLM-4.6V-Thinking":
-                    return GLM46VChatHandler
-                case "GLM-4.1V-Thinking":
-                    return GLM41VChatHandler
-                case "LFM2-VL":
-                    return LFM2VLChatHandler
-                case "LFM2.5-VL":
-                    return LFM25VLChatHandler
-                case "Granite-Docling":
-                    return GraniteDoclingChatHandler
-                case "DeepSeek-OCR":
-                    return MTMDChatHandler
-                case "PaddleOCR-VL-1.5":
-                    return PaddleOCRChatHandler
-                case "Step3-VL":
-                    return Step3VLChatHandler
-                case "None":
-                    return None
-                case _:
-                    raise ValueError(f'Unknown model type: "{chat_handler}"')
-
         cls.clean(all=True)
         model = config["model"]
         mmproj = config["mmproj"]
@@ -338,7 +256,14 @@ class LLAMA_CPP_STORAGE:
         model_path = get_llm_full_path(model)
         if model_path is None:
             raise FileNotFoundError(f"Model '{model}' not found in any llm/LLM folder")
-        handler = get_chat_handler(chat_handler)
+
+        if chat_handler == "None":
+            handler_cls = think_param = None
+        else:
+            try:
+                handler_cls, think_param = _HANDLERS[chat_handler]
+            except KeyError:
+                raise ValueError(f'Unknown chat handler: "{chat_handler}"') from None
 
         if vram_limit != -1:
             gguf_layers = get_layer_count(model_path) or 32
@@ -358,33 +283,26 @@ class LLAMA_CPP_STORAGE:
 
             print(f"[llama-cpp-vulkan] Loading clip:  {mmproj}")
 
-            think_mode = "Thinking" in chat_handler
+            # 官方构建只认 clip_model_path；JamePeng 构建把它作为 mmproj_path 的
+            # 兼容别名接受（verbose=False 时无告警），统一用旧名兼容两者
             kwargs = {"clip_model_path": mmproj_path, "verbose": False}
-            if chat_handler in ["Qwen3-VL", "Qwen3-VL-Thinking"]:
-                kwargs["force_reasoning"] = think_mode
-                kwargs["image_max_tokens"] = image_max_tokens
-                kwargs["image_min_tokens"] = image_min_tokens
-            elif chat_handler in [
-                "MiniCPM-v4.5", "MiniCPM-v4.5-Thinking",
-                "MiniCPM-v4.6", "MiniCPM-v4.6-Thinking",
-                "GLM-4.6V", "GLM-4.6V-Thinking",
-                "Qwen3.5", "Qwen3.5-Thinking", "Qwen3.6", "Qwen3.6-Thinking",
-            ]:
-                kwargs["enable_thinking"] = think_mode
-
-            if _MTMD:
+            if think_param:
+                kwargs[think_param] = "Thinking" in chat_handler
+            if _HAS_MTMD:
+                # <=0 视为未设置，与库内默认值 -1 语义一致；官方构建的旧式
+                # handler 不接受这两个参数，跳过
                 kwargs["image_max_tokens"] = image_max_tokens
                 kwargs["image_min_tokens"] = image_min_tokens
 
             try:
-                cls.chat_handler = handler(**kwargs)
+                cls.chat_handler = handler_cls(**kwargs)
             except Exception as e:
                 raise RuntimeError(f"{e}\nChatHandler initialization failed. Please update llama-cpp-python to the latest version with Vulkan support.")
 
         else:
             if vram_limit != -1:
                 n_gpu_layers = max(1, int(vram_limit / gguf_layer_size))
-            if handler is not None:
+            if handler_cls is not None:
                 # 当前所有 chat handler 均为 VLM handler，实例化时强制要求 mmproj；
                 # 提前拦截，避免抛出含糊的 "mmproj_path is required"
                 raise ValueError(
@@ -410,6 +328,19 @@ if not hasattr(mm, "unload_all_models_backup"):
         return result
     mm.unload_all_models = patched_unload_all_models
     print("[llama-cpp-vulkan] Model cleanup hook applied!")
+
+
+def _is_hybrid_arch(llm):
+    """判断模型是否为 hybrid/recurrent 架构（如 Qwen3.5 的线性注意力、Mamba 类）。
+
+    纯 SWA 模型（如 Gemma3）不算：其前缀缓存由 llama-cpp-python 内置的
+    checkpoint 机制处理，无需请求后整体重置。
+    """
+    try:
+        return llm._model.is_hybrid() or llm._model.is_recurrent()
+    except AttributeError:
+        # 官方构建的旧版绑定没有这两个 C API，也不支持 hybrid 模型
+        return False
 
 
 _THINK_BLOCK_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
@@ -585,12 +516,17 @@ class llama_cpp_instruct_adv:
                         item["image_url"]["url"] = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAACXBIWXMAAAsTAAALEwEAmpwYAAAADElEQVQImWP4//8/AAX+Av5Y8msOAAAAAElFTkSuQmCC"
         return clean_messages
 
+    @classmethod
+    def IS_CHANGED(cls, save_states=False, **kwargs):
+        # save_states 会话依赖节点真实执行来追加历史，输入不变时也不能命中
+        # ComfyUI 输出缓存，否则重复提交同一问题不会真的推理
+        return float("NaN") if save_states else False
+
     def process(self, llama_model, preset_prompt, custom_prompt, system_prompt, inference_mode, max_frames, max_size, seed, force_offload, save_states, unique_id, strip_thinking=True, parameters=None, images=None, queue_handler=None):
         # 校验当前已加载的模型确实是本节点连线的配置：
         # 多组 loader+instruct 交错执行时，全局单例可能已被切换成其他模型
         if not LLAMA_CPP_STORAGE.llm or LLAMA_CPP_STORAGE.current_config != llama_model:
             LLAMA_CPP_STORAGE.load_model(llama_model)
-            #raise RuntimeError("The model has been unloaded or failed to load!")
 
         if parameters is None:
             parameters = {}
@@ -604,7 +540,8 @@ class llama_cpp_instruct_adv:
 
         last_sys_prompt = LLAMA_CPP_STORAGE.sys_prompts.get(f"{uid}", None)
         video_input = inference_mode == "video"
-        system_prompts = "请将输入的图片序列当做视频而不是静态帧序列, " + system_prompt if video_input else system_prompt
+        # 英文指令对多语言模型的跟随更稳定
+        system_prompts = "Treat the input image sequence as a continuous video rather than independent still frames. " + system_prompt if video_input else system_prompt
         if last_sys_prompt != system_prompts:
             messages = []
             # 只清除当前会话，避免误伤其他 state_uid 的历史
@@ -710,7 +647,6 @@ class llama_cpp_instruct_adv:
 
         if save_states:
             print(f"[llama-cpp-vulkan] Saving state id={uid}...")
-            #LLAMA_CPP_STORAGE.states[f"{uid}"] = LLAMA_CPP_STORAGE.llm.save_state()
             messages.append({"role": "assistant", "content": out1})
             clear_message = self.sanitize_messages(messages)
             LLAMA_CPP_STORAGE.messages[f"{uid}"] = clear_message
@@ -720,14 +656,16 @@ class llama_cpp_instruct_adv:
 
         if force_offload:
             LLAMA_CPP_STORAGE.clean()
-        else:
-            if LLAMA_CPP_STORAGE.current_config["chat_handler"] in ["Qwen3.5", "Qwen3.5-Thinking", "Qwen3.6", "Qwen3.6-Thinking"]:
-                LLAMA_CPP_STORAGE.llm.n_tokens = 0
-                LLAMA_CPP_STORAGE.llm._ctx.memory_clear(True)
-                if LLAMA_CPP_STORAGE.llm.is_hybrid and LLAMA_CPP_STORAGE.llm._hybrid_cache_mgr is not None:
-                    LLAMA_CPP_STORAGE.llm._hybrid_cache_mgr.clear()
+        elif _is_hybrid_arch(LLAMA_CPP_STORAGE.llm):
+            # 真 hybrid/recurrent 架构（Qwen3.5、LFM2 系等）的线性注意力状态无法
+            # 跨请求做前缀复用，不重置会导致后续请求输出错乱；按架构判断而非
+            # handler 名单，避免每加一个 hybrid 模型都要维护名单
+            llm = LLAMA_CPP_STORAGE.llm
+            llm.n_tokens = 0
+            llm._ctx.memory_clear(True)
+            if llm._hybrid_cache_mgr is not None:
+                llm._hybrid_cache_mgr.clear()
 
-        del messages
         return (out1, out2, uid)
 
 

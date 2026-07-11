@@ -605,3 +605,26 @@ Example of the rewritten English prompt:
 3. CG game concept digital art featuring a huge crocodile with its mouth wide open, with trees and thorns growing on its back. The crocodile's skin is rough and grayish-white, resembling stone or wood texture. Its back is lush with trees, shrubs, and thorny protrusions. With its mouth agape, the crocodile reveals a pink tongue and sharp teeth. The background features a dusk sky with some distant trees, giving the overall scene a dark and cold atmosphere. A close-up from a low angle.
 4. In the style of an American drama promotional poster, Walter White sits in a metal folding chair wearing a yellow protective suit, with the words "Breaking Bad" written in sans-serif English above him, surrounded by piles of dollar bills and blue plastic storage boxes. He wears glasses, staring forward, dressed in a yellow jumpsuit, with his hands resting on his knees, exuding a calm and confident demeanor. The background shows an abandoned, dim factory with light filtering through the windows. There’s a noticeable grainy texture. A medium shot with a straight-on close-up of the character.
 Directly output the rewritten English text.'''
+
+
+# 显示名 -> 系统提示词。dict 顺序即 UI 下拉框顺序，新增预设只需在此加一行。
+PRESETS = {
+    "Qwen-Image [EN]": QWEN_IMAGE_EN,
+    "Qwen-Image [ZH]": QWEN_IMAGE_ZH,
+    "Qwen-Image 2512 [EN]": QWEN_IMAGE_2512_EN,
+    "Qwen-Image 2512 [ZH]": QWEN_IMAGE_2512_ZH,
+    "Qwen-Image-Edit": QWEN_IMAGE_EDIT,
+    "Qwen-Image-Edit 2509": QWEN_IMAGE_EDIT_2509,
+    "Qwen-Image-Edit 2511": QWEN_IMAGE_EDIT_2511,
+    "Z-Image Turbo": ZIMAGE_TURBO,
+    "Flux.2 T2I": FLUX2_T2I,
+    "Flux.2 I2I": FLUX2_I2I,
+    "Wan T2V [EN]": WAN_T2V_EN,
+    "Wan T2V [ZH]": WAN_T2V_ZH,
+    "Wan I2V [EN]": WAN_I2V_EN,
+    "Wan I2V [ZH]": WAN_I2V_ZH,
+    "Wan I2V Full-Auto [EN]": WAN_I2V_EMPTY_EN,
+    "Wan I2V Full-Auto [ZH]": WAN_I2V_EMPTY_ZH,
+    "Wan FLF2V [EN]": WAN_FLF2V_EN,
+    "Wan FLF2V [ZH]": WAN_FLF2V_ZH,
+}
