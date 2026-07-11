@@ -27,7 +27,7 @@ _N_CTX_FIELD = ("INT", {
 _VRAM_LIMIT_FIELD = ("INT", {
     "default": -1,
     "min": -1, "max": 1024, "step": 1,
-    "tooltip": "显存占用上限, 单位 GB(-1 = 不限制)\n参考值, 实际占用可能略微超出."
+    "tooltip": "显存占用上限, 单位 GB(-1 = 不限制, 0 = 纯 CPU 推理)\n参考值, 实际占用可能略微超出."
 })
 
 

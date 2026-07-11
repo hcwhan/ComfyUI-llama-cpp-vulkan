@@ -12,22 +12,34 @@ from .gguf_layers import get_layer_count
 from .handlers import HANDLERS
 from .model_paths import get_llm_full_path
 
-# GGUF 文件体积 -> 运行时显存占用的经验放大系数(权重 + KV/计算缓冲)
-_VRAM_OVERHEAD_FACTOR = 1.55
+# GGUF 文件体积 -> 运行时显存占用的经验放大系数,按 n_ctx=8192 校准拆成两项:
+# 与上下文无关的计算缓冲等固定开销 + 随 n_ctx 线性增长的 KV/激活开销
+# (8192 时合计 1.55,与旧版单一系数保持一致)
+_BASE_OVERHEAD = 0.15
+_KV_OVERHEAD_AT_8K = 0.40
+_KV_CALIBRATION_CTX = 8192
 
 
-def _estimate_n_gpu_layers(model_path, mmproj_path, vram_limit):
+def _vram_factor(n_ctx):
+    return 1.0 + _BASE_OVERHEAD + _KV_OVERHEAD_AT_8K * n_ctx / _KV_CALIBRATION_CTX
+
+
+def _estimate_n_gpu_layers(model_path, mmproj_path, vram_limit, n_ctx):
     """按 GGUF 层数把 vram_limit (GB) 折算成 n_gpu_layers。
 
-    -1 表示不限制,全部层上 GPU;mmproj 常驻显存,先从预算中扣除。
+    -1 透传给 llama.cpp 的 auto 语义(自动按空闲显存适配,通常为全部层);
+    0 表示纯 CPU 推理;mmproj 常驻显存,先从预算中扣除。
     """
     if vram_limit == -1:
         return -1
+    if vram_limit == 0:
+        return 0
+    factor = _vram_factor(n_ctx)
     layers = get_layer_count(model_path) or 32
-    layer_size = os.path.getsize(model_path) * _VRAM_OVERHEAD_FACTOR / (1024 ** 3) / layers
+    layer_size = os.path.getsize(model_path) * factor / (1024 ** 3) / layers
     usable = vram_limit
     if mmproj_path:
-        usable -= os.path.getsize(mmproj_path) * _VRAM_OVERHEAD_FACTOR / (1024 ** 3)
+        usable -= os.path.getsize(mmproj_path) * factor / (1024 ** 3)
     return max(1, int(usable / layer_size))
 
 
@@ -108,7 +120,7 @@ class LLAMA_CPP_STORAGE:
         gpu_device = config.get("gpu_device", AUTO_LABEL)
         main_gpu, split_mode = resolve_device_selection(gpu_device)
 
-        n_gpu_layers = _estimate_n_gpu_layers(model_path, mmproj_path, config["vram_limit"])
+        n_gpu_layers = _estimate_n_gpu_layers(model_path, mmproj_path, config["vram_limit"], config["n_ctx"])
 
         if mmproj_path:
             print(f"[llama-cpp-vulkan] Loading clip:  {mmproj}")
