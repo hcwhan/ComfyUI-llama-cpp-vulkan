@@ -25,7 +25,13 @@ def json_to_pixel_bboxes(json_items, mode, width=0, height=0):
     """
     bboxes = []
     for item in json_items:
-        x0, y0, x1, y1 = item["bbox_2d"]
+        # LLM 输出结构不可信,显式校验并给出期望格式,避免裸 KeyError/TypeError
+        if not isinstance(item, dict):
+            raise ValueError(f'Expected a JSON list of objects like {{"bbox_2d": [x1, y1, x2, y2], "label": "..."}}, got item: {item!r}')
+        coords = item.get("bbox_2d")
+        if not isinstance(coords, (list, tuple)) or len(coords) != 4:
+            raise ValueError(f'BBox item is missing a valid "bbox_2d": [x1, y1, x2, y2] field: {item!r}')
+        x0, y0, x1, y1 = coords
         if mode in QWEN_BBOX_MODES:
             x0 = x0 / 1000 * width
             y0 = y0 / 1000 * height

@@ -77,6 +77,11 @@ class json_to_bboxes:
 
         for i, json_str in enumerate(json):
             items = parse_json(json_str)
+            # 模型只检出单个目标时可能直接输出对象而非单元素列表
+            if isinstance(items, dict):
+                items = [items]
+            if not isinstance(items, list):
+                raise ValueError(f'Expected a JSON list of {{"bbox_2d": [...], "label": "..."}} objects, got: {type(items).__name__}')
             if label != "":
                 # 兼容 label / text_content 混用的输出,任一字段匹配即保留
                 items = [b for b in items if label in (b.get("label"), b.get("text_content"))]
