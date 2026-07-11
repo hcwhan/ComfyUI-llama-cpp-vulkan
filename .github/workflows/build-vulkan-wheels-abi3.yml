@@ -155,12 +155,8 @@ jobs:
           # manylinux_2_28: GGML_CPU_ALL_VARIANTS needs GCC >= 11 (AMX/AVX-VNNI flags)
           CIBW_MANYLINUX_X86_64_IMAGE: "manylinux_2_28"
           # Vulkan headers/loader/glslc come from conda-forge instead of the
-          # full LunarG SDK tarball (~700MB download saved). The conda env is
-          # used ONLY for Vulkan headers/glslc/link-time libvulkan; everything
-          # else (OpenSSL etc.) must resolve to system libs, otherwise
-          # auditwheel rejects the wheel for too-recent versioned symbols.
+          # full LunarG SDK tarball (~700MB download saved).
           CIBW_BEFORE_ALL_LINUX: >
-            dnf install -y openssl-devel &&
             curl -fL "https://github.com/mamba-org/micromamba-releases/releases/download/${{ env.MICROMAMBA_VERSION }}/micromamba-linux-64"
             -o /usr/local/bin/micromamba &&
             chmod +x /usr/local/bin/micromamba &&
@@ -168,6 +164,8 @@ jobs:
             -c conda-forge shaderc libvulkan-loader spirv-headers
             libvulkan-headers=${{ env.VULKAN_SDK_VERSION }} &&
             /opt/vulkan/bin/glslc --version
+          # CMAKE_PREFIX_PATH is required: ggml-vulkan does
+          # find_package(SPIRV-Headers), which only exists in the conda env.
           CIBW_ENVIRONMENT_LINUX: >
             SKBUILD_WHEEL_PY_API=${{ env.ABI3_MIN_CPYTHON }}
             CMAKE_ARGS="-DGGML_NATIVE=OFF
@@ -176,11 +174,17 @@ jobs:
             -DGGML_VULKAN=ON
             -DGGML_BACKEND_DL=ON
             -DGGML_CPU_ALL_VARIANTS=ON
+            -DCMAKE_PREFIX_PATH=/opt/vulkan
             -DVulkan_INCLUDE_DIR=/opt/vulkan/include
             -DVulkan_LIBRARY=/opt/vulkan/lib/libvulkan.so
             -DVulkan_GLSLC_EXECUTABLE=/opt/vulkan/bin/glslc"
+          # /opt/vulkan/lib must NOT be on LD_LIBRARY_PATH here: auditwheel
+          # would resolve libstdc++/libgcc_s to the conda copies, whose symbol
+          # versions exceed the manylinux_2_28 policy ("too-recent versioned
+          # symbols"). libvulkan.so.1 is excluded, so only the wheel's own lib
+          # dir is needed to resolve intra-wheel dependencies.
           CIBW_REPAIR_WHEEL_COMMAND_LINUX: >
-            auditwheel show {wheel} &&
+            (LD_LIBRARY_PATH=/project/llama_cpp/lib:/opt/vulkan/lib auditwheel show {wheel} || true) &&
             LD_LIBRARY_PATH=/project/llama_cpp/lib
             auditwheel repair --exclude libvulkan.so.1 -w {dest_dir} {wheel}
         with:
