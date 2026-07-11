@@ -43,6 +43,18 @@ def _estimate_n_gpu_layers(model_path, mmproj_path, vram_limit, n_ctx):
     return max(1, int(usable / layer_size))
 
 
+def _estimate_vram_bytes(model_path, mmproj_path, n_gpu_layers, n_ctx):
+    """估算本次加载的显存需求(字节),用于请求 ComfyUI 先腾挪 torch 侧显存。"""
+    factor = _vram_factor(n_ctx)
+    size = os.path.getsize(model_path) * factor
+    if n_gpu_layers > 0:
+        layers = get_layer_count(model_path) or 32
+        size *= min(1.0, n_gpu_layers / layers)
+    if mmproj_path:
+        size += os.path.getsize(mmproj_path) * factor
+    return int(size)
+
+
 def resolve_config(config):
     """校验 loader 配置并解析出 (model_path, mmproj_path, handler_cls, think_param)。
 
@@ -121,6 +133,17 @@ class LLAMA_CPP_STORAGE:
         main_gpu, split_mode = resolve_device_selection(gpu_device)
 
         n_gpu_layers = _estimate_n_gpu_layers(model_path, mmproj_path, config["vram_limit"], config["n_ctx"])
+
+        # Vulkan 与 PyTorch 共享同一张物理卡但分配器互不感知,先请求 ComfyUI
+        # 卸载 torch 侧模型腾出显存,否则 SD 模型占满显存时 Vulkan 分配直接失败
+        if n_gpu_layers != 0:
+            try:
+                mm.free_memory(
+                    _estimate_vram_bytes(model_path, mmproj_path, n_gpu_layers, config["n_ctx"]),
+                    mm.get_torch_device(),
+                )
+            except Exception as e:
+                print(f"[llama-cpp-vulkan] WARNING: failed to free torch VRAM before load: {e}")
 
         if mmproj_path:
             print(f"[llama-cpp-vulkan] Loading clip:  {mmproj}")
