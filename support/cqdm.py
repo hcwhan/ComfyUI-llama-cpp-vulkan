@@ -59,4 +59,4 @@ class cqdm:
         self.close()
 
     def __len__(self):
-        return self.total
+        return self.total if self.total is not None else 0

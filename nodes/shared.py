@@ -61,6 +61,18 @@ preset_prompts = {
 preset_tags = list(preset_prompts.keys())
 
 
+def tensor_to_uint8(image: torch.Tensor):
+    """ComfyUI IMAGE 张量 ([H,W,C] 或 [1,H,W,C]) 转 uint8 数组。
+
+    只剥离 batch 维，不用 squeeze()：squeeze 会把 H=1/W=1 的边缘尺寸也压掉，
+    导致 PIL 把 [W,C] 误解析为灰度图。
+    """
+    arr = image.cpu().numpy()
+    if arr.ndim == 4:
+        arr = arr[0]
+    return np.clip(255.0 * arr, 0, 255).astype(np.uint8)
+
+
 def image2base64(image):
     # PNG 无损：JPEG q85 的压缩伪影会影响 OCR 类模型的小字识别，
     # 且 JPEG 不支持 RGBA 输入
@@ -81,19 +93,19 @@ def parse_json(json_str):
 
 
 def scale_image(image: torch.Tensor, max_size: int = 128):
-    img_np = np.clip(255.0 * image.cpu().numpy().squeeze(), 0, 255).astype(np.uint8)
-    img_pil = Image.fromarray(img_np)
+    img_pil = Image.fromarray(tensor_to_uint8(image))
 
     w, h = img_pil.size
     scale = min(max_size / max(w, h), 1.0)
-    new_w, new_h = int(w * scale), int(h * scale)
+    # 极端长宽比下缩放结果可能取整为 0，至少保留 1 像素
+    new_w, new_h = max(1, int(w * scale)), max(1, int(h * scale))
     img_resized = img_pil.resize((new_w, new_h), Image.Resampling.LANCZOS)
 
     return np.array(img_resized)
 
 
 def qwen3bbox(image, json):
-    img = Image.fromarray(np.clip(255.0 * image.cpu().numpy().squeeze(), 0, 255).astype(np.uint8))
+    img = Image.fromarray(tensor_to_uint8(image))
     bboxes = []
     for item in json:
         x0, y0, x1, y1 = item["bbox_2d"]
@@ -108,7 +120,7 @@ def qwen3bbox(image, json):
 
 def draw_bbox(image, json, mode):
     label_colors = {}
-    img = Image.fromarray(np.clip(255.0 * image.cpu().numpy().squeeze(), 0, 255).astype(np.uint8))
+    img = Image.fromarray(tensor_to_uint8(image))
     draw = ImageDraw.Draw(img)
 
     for item in json:

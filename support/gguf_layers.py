@@ -98,21 +98,23 @@ def get_layer_count(path):
             return v
     
     print(f"[gguf_layers] block_count not found in metadata, trying GGUFReader fallback...")
-    
-    from gguf import GGUFReader
-    reader = GGUFReader(path)
-    
+
     try:
-        layer_count = reader.get_field("llama.block_count") 
-        if layer_count is None:
+        from gguf import GGUFReader
+        reader = GGUFReader(path)
+
+        # get_field 返回 ReaderField 而非数值，直接 int() 会取到 offset 等错误值；
+        # 统一通过 parts[data[0]] 读取实际数据
+        layer_field = reader.get_field("llama.block_count")
+        if layer_field is None:
             for field in reader.fields.values():
                 if field.name.endswith(".block_count"):
-                    layer_count = field.parts[field.data[0]]
+                    layer_field = field
                     break
-                
-        if layer_count:
-            return int(layer_count[0] if isinstance(layer_count, list) else layer_count)
+
+        if layer_field is not None:
+            return int(layer_field.parts[layer_field.data[0]][0])
     except Exception as e:
         print(f"Failed to get block_count: {e}")
-        
+
     return None

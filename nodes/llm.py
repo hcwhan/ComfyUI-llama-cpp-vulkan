@@ -1,12 +1,10 @@
 import os
 import gc
 import copy
-import json
 import ctypes
 from pathlib import Path
 
 import numpy as np
-import torch
 
 from llama_cpp import Llama
 import llama_cpp.llama_cpp as _llama_cpp_lib
@@ -28,6 +26,7 @@ from .shared import (
     get_llm_full_path,
     image2base64,
     scale_image,
+    tensor_to_uint8,
     preset_prompts,
     preset_tags,
 )
@@ -590,6 +589,8 @@ class llama_cpp_instruct_adv:
         if custom_prompt.strip() and "*" not in preset_prompt:
             user_content.append({"type": "text", "text": custom_prompt})
         else:
+            if "*" in preset_prompt and not custom_prompt.strip():
+                raise ValueError(f'Preset "{preset_prompt}" requires custom_prompt to fill its placeholder (e.g. object categories for BBox detection).')
             # 先替换 @ 再注入用户文本，避免 custom_prompt 中的 @ 被误替换
             p = preset_prompts[preset_prompt].replace("@", "video" if video_input else "image").replace("#", custom_prompt.strip())
             user_content.append({"type": "text", "text": p})
@@ -620,7 +621,7 @@ class llama_cpp_instruct_adv:
                 for i, image in enumerate(cqdm(frames)):
                     if mm.processing_interrupted():
                         raise mm.InterruptProcessingException()
-                    data = image2base64(np.clip(255.0 * image.cpu().numpy().squeeze(), 0, 255).astype(np.uint8))
+                    data = image2base64(tensor_to_uint8(image))
                     for item in user_content:
                         if item.get("type") == "image_url":
                             item["image_url"]["url"] = f"data:image/png;base64,{data}"
@@ -638,7 +639,7 @@ class llama_cpp_instruct_adv:
                     if len(frames) > 1:
                         data = image2base64(scale_image(image, max_size))
                     else:
-                        data = image2base64(np.clip(255.0 * image.cpu().numpy().squeeze(), 0, 255).astype(np.uint8))
+                        data = image2base64(tensor_to_uint8(image))
                     image_content = {
                         "type": "image_url",
                         "image_url": {"url": f"data:image/png;base64,{data}"}
@@ -683,7 +684,7 @@ class llama_cpp_parameters:
     def INPUT_TYPES(s):
         return {
             "required": {
-                "max_tokens": ("INT", {"default": 1024, "min": 0, "max": 4096, "step": 1}),
+                "max_tokens": ("INT", {"default": 1024, "min": 0, "max": 4096, "step": 1, "tooltip": "Max tokens to generate (0 = unlimited, bounded by n_ctx)."}),
                 "top_k": ("INT", {"default": 30, "min": 0, "max": 1000, "step": 1}),
                 "top_p": ("FLOAT", {"default": 0.9, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "min_p": ("FLOAT", {"default": 0.05, "min": 0.0, "max": 1.0, "step": 0.01}),
