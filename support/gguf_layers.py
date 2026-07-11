@@ -100,30 +100,12 @@ def _parse_block_count(path):
 
 
 def get_layer_count(path):
+    """读取 GGUF 模型层数,失败返回 None(调用方回退默认值)。"""
     try:
         count = _parse_block_count(path)
-        if count is not None:
-            return count
-        print("[gguf_layers] block_count not found in metadata, trying GGUFReader fallback...")
+        if count is None:
+            print("[gguf_layers] block_count not found in GGUF metadata")
+        return count
     except Exception as e:
-        print(f"[gguf_layers] manual GGUF parse failed ({e}), trying GGUFReader fallback...")
-
-    try:
-        from gguf import GGUFReader
-        reader = GGUFReader(path)
-
-        # get_field 返回 ReaderField 而非数值，直接 int() 会取到 offset 等错误值；
-        # 统一通过 parts[data[0]] 读取实际数据
-        layer_field = reader.get_field("llama.block_count")
-        if layer_field is None:
-            for field in reader.fields.values():
-                if field.name.endswith(".block_count"):
-                    layer_field = field
-                    break
-
-        if layer_field is not None:
-            return int(layer_field.parts[layer_field.data[0]][0])
-    except Exception as e:
-        print(f"Failed to get block_count: {e}")
-
-    return None
+        print(f"[gguf_layers] GGUF parse failed: {e}")
+        return None

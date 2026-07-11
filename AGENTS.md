@@ -19,8 +19,10 @@ ComfyUI-llama-cpp-vulkan/
   requirements.txt            # pip 依赖（含平台条件 llama-cpp-python wheel URL）
   nodes/
     __init__.py               # 节点注册表（12 个节点的映射）
-    llm.py                    # 核心：模型加载、推理、GPU 设备检测、会话管理 (~740 行)
-    shared.py                 # 公共工具：模型路径、图片编码、预设 prompt、BBox 绘制
+    llm.py                    # 核心：模型加载、推理、会话管理 (~540 行)
+    devices.py                # Vulkan GPU 设备检测与选择（ggml C API / ctypes）
+    handlers.py               # Chat handler 注册表（30 种 VLM 格式）
+    shared.py                 # 公共工具：模型路径、图片编码、预设 prompt、BBox 坐标换算与绘制
     bbox.py                   # BBox 相关节点：JSON 解析、SEGS/MASK 转换
     utils_nodes.py            # 工具节点：JSON 解析、代码块提取、Prompt 增强预设
   support/
@@ -52,9 +54,9 @@ ComfyUI-llama-cpp-vulkan/
 
 ### GPU 设备管理
 
-`llm.py` 通过 ggml C API (ctypes) 直接枚举 Vulkan GPU 设备，区分独显 (GPU) 和核显 (IGPU)。这是独立于 PyTorch/CUDA 的 Vulkan 推理路径。
+`nodes/devices.py` 通过 ggml C API (ctypes) 直接枚举 Vulkan GPU 设备，区分独显 (GPU) 和核显 (IGPU)。这是独立于 PyTorch/CUDA 的 Vulkan 推理路径。
 
-关键函数链：`_detect_gpu_devices()` -> `_selectable_devices()` -> `_build_gpu_device_choices()` / `_resolve_device_selection()`
+关键函数链：`_detect_gpu_devices()` -> `_selectable_devices()` -> `gpu_device_choices` / `resolve_device_selection()`
 
 选择语义（与 llama.cpp 构建 `model->devices` 的规则对齐）：
 - llama.cpp 只把独显按枚举顺序收入设备列表，仅当无独显时才收第一个核显，其余设备无法通过 `main_gpu` 到达，因此下拉框只展示可达设备
@@ -67,10 +69,11 @@ ComfyUI-llama-cpp-vulkan/
 - `load_model()`: 加载 GGUF 模型 + 可选的 mmproj（视觉编码器）；纯文本模型（无 mmproj）选择 chat_handler 会在此阶段直接报错
 - `clean()`: 释放模型和 chat_handler 资源（不清会话历史）；`clean(all=True)` 额外清除全部会话
 - 通过 monkey-patch `mm.unload_all_models` 实现 ComfyUI 模型卸载（前端 Free 按钮 / OOM 处理）时自动清理，只卸模型、保留会话历史
+- `vram_limit` 折算 `n_gpu_layers` 集中在 `_estimate_n_gpu_layers()`：按 GGUF 层数（`support/gguf_layers.py` 手写解析 `block_count`，命中即返回避免解析 tokenizer 元数据）均摊文件体积，乘经验系数 `_VRAM_OVERHEAD_FACTOR`(1.55) 估算每层显存，mmproj 体积先从预算中扣除
 
 ### Chat Handler 注册表
 
-`llm.py` 中的 `_HANDLER_SPECS` 表集中定义全部 handler：显示名 -> (类名, thinking 开关参数名)。启动时 `_resolve_handlers()` 用 `getattr` 对照 handler 模块解析类名，缺失的类打 warning 并从下拉框剔除（不静默）。支持 30 种 VLM 模型格式（Qwen/Gemma/GLM/MiniCPM/LLaVA 等）。
+`nodes/handlers.py` 中的 `_HANDLER_SPECS` 表集中定义全部 handler：显示名 -> (类名, thinking 开关参数名)。启动时 `_resolve_handlers()` 用 `getattr` 对照 handler 模块解析类名，缺失的类打 warning 并从下拉框剔除（不静默）。支持 30 种 VLM 模型格式（Qwen/Gemma/GLM/MiniCPM/LLaVA 等）。
 
 Handler 模块优先取 `llama_cpp.llama_multimodal`（JamePeng 分支，requirements.txt 固定的 wheel），官方构建无此模块时回退 `llama_cpp.llama_chat_format`。mmproj 路径统一用 `clip_model_path` 键传入：官方构建只认这个名字，JamePeng 构建把它作为 `mmproj_path` 的兼容别名接受。
 
@@ -79,6 +82,7 @@ Handler 模块优先取 `llama_cpp.llama_multimodal`（JamePeng 分支，require
 `llama_cpp_instruct_adv` 节点通过 `save_states` 参数控制多轮对话。会话历史按 `state_uid` 存储在 `LLAMA_CPP_STORAGE.messages` 中，图片 base64 数据在保存时替换为 1x1 占位图以节省内存。
 
 实现要点：
+- `messages`/`sys_prompts` 以 int 型 `state_uid` 为键；`clean_state(-1)` 清全部
 - system prompt 变化只清当前 `state_uid` 的会话（`clean_state(uid)`），不影响其他会话
 - 读取历史时做浅拷贝，推理中断/异常不会把残缺消息写入存储
 - 历史为空时自动重建 system 消息（覆盖 `save_states` 从 True 切到 False 的场景）
@@ -128,7 +132,7 @@ ComfyUI 的 widget 值按 `INPUT_TYPES` 中字段的声明顺序序列化。
 
 ### 新增 Chat Handler
 
-在 `llm.py` 的 `_HANDLER_SPECS` 表中加一行：`"显示名": ("类名", thinking开关参数名或None)`。显示名含 "-Thinking" 后缀时加载器自动把开关参数设为 True。注意 thinking 参数名必须被该类 `__init__` 接受（基类会对未知 kwargs 抛 TypeError），如 GLM41VChatHandler 不接受 `enable_thinking`。
+在 `nodes/handlers.py` 的 `_HANDLER_SPECS` 表中加一行：`"显示名": ("类名", thinking开关参数名或None)`。显示名含 "-Thinking" 后缀时加载器自动把开关参数设为 True。注意 thinking 参数名必须被该类 `__init__` 接受（基类会对未知 kwargs 抛 TypeError），如 GLM41VChatHandler 不接受 `enable_thinking`。
 
 ### Prompt 增强预设
 
@@ -139,14 +143,13 @@ ComfyUI 的 widget 值按 `INPUT_TYPES` 中字段的声明顺序序列化。
 | 包 | 用途 |
 |----|------|
 | llama-cpp-python | llama.cpp Python 绑定（自编译 Vulkan wheel） |
-| scipy | `gaussian_filter` 用于 BBox 遮罩羽化 |
+| scipy | `gaussian_filter` 用于 BBox 遮罩羽化（在局部窗口上计算，非全图） |
 | numpy | 图像数组操作 |
 | pillow | 图像编解码、BBox 绘制 |
-| gguf | GGUF 文件元数据读取（备选方案） |
 | tqdm | 终端进度条 |
 
 ## 已知问题
 
 1. **单模型实例**: `LLAMA_CPP_STORAGE` 是全局单例，不支持同时加载多个模型
-2. **核显不可选（有独显时）**: llama.cpp 的设备收集规则决定了有独显时核显无法通过 `main_gpu` 选中；如需强制核显推理，只能在进程启动前设置 `GGML_VK_VISIBLE_DEVICES` 环境变量（llm.py import 时即初始化 Vulkan，之后设置无效）
+2. **核显不可选（有独显时）**: llama.cpp 的设备收集规则决定了有独显时核显无法通过 `main_gpu` 选中；如需强制核显推理，只能在进程启动前设置 `GGML_VK_VISIBLE_DEVICES` 环境变量（devices.py import 时即初始化 Vulkan，之后设置无效）
 3. **import 时初始化 Vulkan**: 设备枚举在插件加载时同步执行（约几百 ms），属有意设计（UI 下拉框需要启动期确定设备列表）

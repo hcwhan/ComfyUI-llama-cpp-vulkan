@@ -2,7 +2,7 @@ import os
 import io
 import json
 import base64
-import random
+import hashlib
 import torch
 
 import numpy as np
@@ -83,10 +83,14 @@ def image2base64(image):
     return img_base64
 
 
+def strip_code_fence(text, label=""):
+    """去除 LLM 输出首尾的 ```label ... ``` 代码块标记。"""
+    return text.strip().removeprefix(f"```{label}").removesuffix("```")
+
+
 def parse_json(json_str):
-    json_output = json_str.strip().removeprefix("```json").removesuffix("```")
     try:
-        parsed = json.loads(json_output)
+        parsed = json.loads(strip_code_fence(json_str, "json"))
     except Exception as e:
         raise ValueError(f"Unable to load JSON data!\n{e}")
     return parsed
@@ -104,46 +108,46 @@ def scale_image(image: torch.Tensor, max_size: int = 128):
     return np.array(img_resized)
 
 
-def qwen3bbox(image, json):
-    img = Image.fromarray(tensor_to_uint8(image))
+QWEN_BBOX_MODES = ("Qwen3-VL", "Qwen2.5-VL")
+
+
+def bbox_label(item):
+    """取 bbox JSON 项的标签,兼容 label / text_content 两种字段。"""
+    return item.get("label") or item.get("text_content") or "bbox"
+
+
+def json_to_pixel_bboxes(json_items, mode, width=0, height=0):
+    """把 LLM 输出的 bbox JSON 项换算为像素坐标 [(x0, y0, x1, y1), ...]。
+
+    Qwen 系列模型输出 0-1000 归一化坐标,需按图像尺寸换算;
+    simple 模式视为已是像素坐标,原样透传。
+    """
     bboxes = []
-    for item in json:
+    for item in json_items:
         x0, y0, x1, y1 = item["bbox_2d"]
-        size = 1000
-        x0 = x0 / size * img.width
-        y0 = y0 / size * img.height
-        x1 = x1 / size * img.width
-        y1 = y1 / size * img.height
+        if mode in QWEN_BBOX_MODES:
+            x0 = x0 / 1000 * width
+            y0 = y0 / 1000 * height
+            x1 = x1 / 1000 * width
+            y1 = y1 / 1000 * height
         bboxes.append((x0, y0, x1, y1))
     return bboxes
 
 
-def draw_bbox(image, json, mode):
-    label_colors = {}
+def _label_color(label):
+    # 由 label 内容哈希出稳定颜色,同一 label 每次运行颜色一致;
+    # 80-180 区间保证中等亮度,白色标签文字可读
+    digest = hashlib.md5(label.encode("utf-8")).digest()
+    return tuple(80 + b % 101 for b in digest[:3])
+
+
+def draw_bbox(image, pixel_bboxes, labels):
     img = Image.fromarray(tensor_to_uint8(image))
     draw = ImageDraw.Draw(img)
 
-    for item in json:
-        try:
-            label = item["label"]
-        except Exception:
-            try:
-                label = item["text_content"]
-            except Exception:
-                label = "bbox"
-        x0, y0, x1, y1 = item["bbox_2d"]
-        if mode in ["Qwen3-VL", "Qwen2.5-VL"]:
-            size = 1000
-            x0 = x0 / size * img.width
-            y0 = y0 / size * img.height
-            x1 = x1 / size * img.width
-            y1 = y1 / size * img.height
-        bbox = (x0, y0, x1, y1)
-
-        if label not in label_colors:
-            label_colors[label] = tuple(random.randint(80, 180) for _ in range(3))
-        color = label_colors[label]
-        draw.rectangle(bbox, outline=color, width=4)
+    for (x0, y0, x1, y1), label in zip(pixel_bboxes, labels):
+        color = _label_color(label)
+        draw.rectangle((x0, y0, x1, y1), outline=color, width=4)
         text_y = max(0, y0 - 10)
         text_size = draw.textbbox((x0, text_y), label)
         draw.rectangle([text_size[0], text_size[1]-2, text_size[2]+4, text_size[3]+2], fill=color)

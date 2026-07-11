@@ -1,7 +1,6 @@
 scipy
 numpy
 pillow
-gguf
 tqdm
 
 # for Windows (Vulkan) - ABI3 universal wheel, supports CPython 3.10+

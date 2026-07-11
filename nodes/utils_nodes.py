@@ -1,5 +1,5 @@
 from ..support.prompt_enhancer_preset import PRESETS
-from .shared import any_type, get_nested_value
+from .shared import any_type, get_nested_value, strip_code_fence
 
 
 # from: https://github.com/crystian/ComfyUI-Crystools
@@ -25,20 +25,22 @@ class parse_json_node:
         if not key:
             raise ValueError("Key cannot be empty!")
 
-        val = get_nested_value(input.strip().removeprefix("```json").removesuffix("```"), key, default)
+        val = get_nested_value(strip_code_fence(input, "json"), key, default)
 
-        def coerce(fn):
-            try:
-                return fn(val)
-            except Exception:
-                return val
+        # 转换失败时回退类型零值,保证输出与声明的 INT/FLOAT 类型一致,
+        # 不能把原始值(可能是 str/dict)透传给下游节点
+        try:
+            number = float(val)
+            integer = int(number)
+        except (TypeError, ValueError, OverflowError):
+            number, integer = 0.0, 0
 
         if isinstance(val, bool):
             boolean = val
         else:
             boolean = str(val).strip().lower() == "true"
 
-        return (val, coerce(str), coerce(int), coerce(float), boolean)
+        return (val, str(val), integer, number, boolean)
 
 
 class remove_code_block:
@@ -59,7 +61,7 @@ class remove_code_block:
     CATEGORY = "llama-cpp-vulkan"
 
     def process(self, input, label=""):
-        return (input.strip().removeprefix(f"```{label}").removesuffix("```"),)
+        return (strip_code_fence(input, label),)
 
 
 class PromptEnhancerPreset:
