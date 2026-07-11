@@ -1,19 +1,15 @@
 [project]
-name = "llama-cpp_vllm"
-description = "Run LLM/VLM models natively in ComfyUI based on llama.cpp"
+name = "comfyui-llama-cpp-vulkan"
+description = "Run LLM/VLM models natively in ComfyUI based on llama.cpp with Vulkan GPU acceleration"
 version = "1.2.8"
 license = {file = "LICENSE"}
 classifiers = [
      "Operating System :: Microsoft :: Windows",
      "Operating System :: POSIX :: Linux",
      "Operating System :: MacOS",
-     "Environment :: GPU :: NVIDIA CUDA",
-     "Environment :: GPU :: AMD ROCm",
-     "Environment :: GPU :: Intel Arc",
-     "Environment :: GPU :: Apple Metal",
 ]
 
-dependencies = ["diskcache", "scipy", "numpy", "pillow", "gguf"]
+dependencies = ["diskcache", "scipy", "numpy", "pillow", "gguf", "tqdm"]
 
 [project.urls]
 Repository = "https://github.com/hcwhan/ComfyUI-llama-cpp-vulkan"
