@@ -155,8 +155,12 @@ jobs:
           # manylinux_2_28: GGML_CPU_ALL_VARIANTS needs GCC >= 11 (AMX/AVX-VNNI flags)
           CIBW_MANYLINUX_X86_64_IMAGE: "manylinux_2_28"
           # Vulkan headers/loader/glslc come from conda-forge instead of the
-          # full LunarG SDK tarball (~700MB download saved).
+          # full LunarG SDK tarball (~700MB download saved). The conda env is
+          # used ONLY for Vulkan headers/glslc/link-time libvulkan; everything
+          # else (OpenSSL etc.) must resolve to system libs, otherwise
+          # auditwheel rejects the wheel for too-recent versioned symbols.
           CIBW_BEFORE_ALL_LINUX: >
+            dnf install -y openssl-devel &&
             curl -fL "https://github.com/mamba-org/micromamba-releases/releases/download/${{ env.MICROMAMBA_VERSION }}/micromamba-linux-64"
             -o /usr/local/bin/micromamba &&
             chmod +x /usr/local/bin/micromamba &&
@@ -172,12 +176,12 @@ jobs:
             -DGGML_VULKAN=ON
             -DGGML_BACKEND_DL=ON
             -DGGML_CPU_ALL_VARIANTS=ON
-            -DCMAKE_PREFIX_PATH=/opt/vulkan
             -DVulkan_INCLUDE_DIR=/opt/vulkan/include
             -DVulkan_LIBRARY=/opt/vulkan/lib/libvulkan.so
             -DVulkan_GLSLC_EXECUTABLE=/opt/vulkan/bin/glslc"
           CIBW_REPAIR_WHEEL_COMMAND_LINUX: >
-            LD_LIBRARY_PATH=/project/llama_cpp/lib:/opt/vulkan/lib
+            auditwheel show {wheel} &&
+            LD_LIBRARY_PATH=/project/llama_cpp/lib
             auditwheel repair --exclude libvulkan.so.1 -w {dest_dir} {wheel}
         with:
           package-dir: .
