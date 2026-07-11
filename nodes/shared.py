@@ -1,5 +1,6 @@
 import os
 import io
+import re
 import json
 import base64
 import hashlib
@@ -83,9 +84,22 @@ def image2base64(image):
     return img_base64
 
 
+# 开头的 ```label(标签限单词类字符,可无,如 json/python/c++);结尾的 ```。
+# 两端独立匹配,生成被截断导致围栏未闭合时,开头的标记仍能剥离。
+# 标签不能用 [^\s`]* 之类的宽匹配:围栏后无换行直接跟正文时会把正文吞掉
+_FENCE_OPEN_RE = re.compile(r"^```[\w+.-]*[ \t]*\r?\n?")
+_FENCE_CLOSE_RE = re.compile(r"\r?\n?```$")
+
+
 def strip_code_fence(text, label=""):
-    """去除 LLM 输出首尾的 ```label ... ``` 代码块标记。"""
-    return text.strip().removeprefix(f"```{label}").removesuffix("```")
+    """去除 LLM 输出首尾的 ```label ... ``` 代码块标记。
+
+    label 仅为语义提示,实际兼容任意标签和裸 ``` 围栏:
+    模型即使被要求输出 json 也可能给出不带标签的围栏。
+    """
+    text = text.strip()
+    text = _FENCE_OPEN_RE.sub("", text)
+    return _FENCE_CLOSE_RE.sub("", text)
 
 
 def parse_json(json_str):
