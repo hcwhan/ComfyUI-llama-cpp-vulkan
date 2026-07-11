@@ -8,6 +8,8 @@
 - vlm Loader -> LLAMACPPVLM, 只能连 image/video/audio Instruct
 """
 
+import os
+
 from ...core.devices import AUTO_LABEL, gpu_device_choices
 from ...core.handlers import HANDLERS
 from ...core.model_paths import get_llm_filename_list
@@ -31,13 +33,18 @@ _VRAM_LIMIT_FIELD = ("INT", {
 })
 
 
+def _is_mmproj(path):
+    # 只看文件名,避免目录名含 mmproj 时整个目录的主模型被误过滤
+    return "mmproj" in os.path.basename(path).lower()
+
+
 def _model_list():
-    return ["None"] + [f for f in get_llm_filename_list() if "mmproj" not in f.lower()]
+    return ["None"] + [f for f in get_llm_filename_list() if not _is_mmproj(f)]
 
 
 def _mmproj_list():
     # 无 mmproj 文件时保留 "None" 占位,避免空下拉框;运行期校验会给出明确报错
-    return [f for f in get_llm_filename_list() if "mmproj" in f.lower()] or ["None"]
+    return [f for f in get_llm_filename_list() if _is_mmproj(f)] or ["None"]
 
 
 class llama_cpp_llm_model_loader:
@@ -98,6 +105,9 @@ class llama_cpp_vlm_model_loader:
             raise ValueError("vlm Model Loader requires a mmproj file. Put the matching mmproj gguf in the llm/LLM folder, or use llm Model Loader for text-only models.")
         if chat_handler == "None":
             raise ValueError("vlm Model Loader requires a chat handler matching the model.")
+        # 与 handler 侧同一条件,只是提前到 loader 报错(<=0 视为未设置)
+        if 0 < image_max_tokens < image_min_tokens:
+            raise ValueError(f"image_max_tokens ({image_max_tokens}) cannot be less than image_min_tokens ({image_min_tokens}).")
         config = {
             "model": model,
             "mmproj": mmproj,
