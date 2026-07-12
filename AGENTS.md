@@ -73,8 +73,8 @@ ComfyUI-llama-cpp-vulkan/
 |---------|--------|------|
 | `llama_cpp_llm_model_loader` | llama.cpp llm Model Loader | 加载纯文本 GGUF 模型（无 mmproj/handler 字段），输出 `LLAMACPPLLM` |
 | `llama_cpp_vlm_model_loader` | llama.cpp vlm Model Loader | 加载 VLM 模型（mmproj 与 chat_handler 必选），输出 `LLAMACPPVLM` |
-| `llama_cpp_text_instruct` | llama.cpp text Instruct | 纯文本推理（prompt 改写等），只接受 `LLAMACPPLLM` |
-| `llama_cpp_image_instruct` | llama.cpp image Instruct | 图片推理：逐张 / 批量两种模式，只接受 `LLAMACPPVLM` |
+| `llama_cpp_text_instruct` | llama.cpp text Instruct | 纯文本推理（prompt 改写等） |
+| `llama_cpp_image_instruct` | llama.cpp image Instruct | 图片推理：逐张 / 批量两种模式 |
 | `llama_cpp_video_instruct` | llama.cpp video Instruct | 视频帧序列推理：均匀抽帧 + 连续视频语义提示，输入端口名 `frames` |
 | `llama_cpp_audio_instruct` | llama.cpp audio Instruct | 音频推理（ASR/omni，如 Qwen3-ASR） |
 | `llama_cpp_parameters` | llama.cpp Parameters | 采样参数配置（temperature/top_k/top_p 等） |
@@ -173,13 +173,12 @@ image 逐张模式的多图结果以 "====== Image N ======" 分隔行拼接
 
 - 本文件只记录无法从代码直接看出的内容：架构决策、跨文件约束、易踩的坑。一般性内容（如"在某个 dict 加一行"式的操作步骤、读代码即可自然得出的说明）不要写入本文件
 - 根目录 `复核结论.md` 是复核结论存档：只收录经过明确代码验证与源码分析（对照 wheel / ComfyUI / llama.cpp 上游 / 下游生态实际源码）确立的重要且关键的结论，用于避免重复排查或重新争论；写入前需与用户确认
-- 本地笔记类文件（如 `TODO.md`）不入仓库（已在 `.gitignore` 中）
 
 ### Commit message 规范
 
 - 一律使用中文书写（标题与正文），保留 conventional commits 类型前缀（`feat:` / `fix:` / `refactor:` / `docs:` / `chore:` / `ci:` / `test:`，破坏性变更加 `!`）
 - 代码标识符、文件名、API 名等专有名词保持原文，不翻译
-- 提交用消息文件而非 `-m` 内联：Windows PowerShell 下 `-m` 中的引号、heredoc 与以 `-` 开头的词（如 "-Thinking"）会被参数解析破坏。先把消息写入临时文件，再 `git commit -F <文件>`，提交后删除临时文件
+- 提交用消息文件而非 `-m` 内联：Windows PowerShell 下 `-m` 中的引号、heredoc 与以 `-` 开头的词会被参数解析破坏。先把消息写入临时文件，再 `git commit -F <文件>`，提交后删除临时文件
 
 ### Python 文件规范
 
@@ -196,10 +195,6 @@ image 逐张模式的多图结果以 "====== Image N ======" 分隔行拼接
 修改代码时不考虑兼容旧工作流（ComfyUI 的 widget 值按 `INPUT_TYPES` 声明顺序序列化，调整顺序会使已保存工作流的 widget 值错位，属预期代价），只考虑代码本身的合理性。特别是后加的配置项，不要为迁就旧工作流而堆在末尾，应按语义放到合理位置（与相关字段分组）。
 
 Instruct 子类的字段顺序约定：模型端口 -> 媒体输入 -> `prompt_inputs()` -> 模态专属字段 -> `runtime_inputs()`。
-
-### 新增 Chat Handler
-
-改 `app/core/handlers.py` 的 `_HANDLER_SPECS` 表，thinking 开关等构造期参数直接写进条目的 kwargs。坑点：kwargs 的每个 key 必须被该 handler 类 `__init__` 显式接受（基类对未知 kwargs 抛 TypeError），如 GLM41VChatHandler 不接受 `enable_thinking`。类签名带 thinking 开关的条目必须显式声明开关值（否则库侧默认值静默生效）、`-Thinking` 后缀必须与开关值一致——这两条不变式由 `tests/test_handlers.py` 拦截，新增后跑一遍测试即可。
 
 ### Wheel 构建与发布 (CI)
 
