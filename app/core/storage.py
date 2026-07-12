@@ -25,6 +25,10 @@ def _vram_factor(n_ctx):
     return 1.0 + _BASE_OVERHEAD + _KV_OVERHEAD_AT_8K * n_ctx / _KV_CALIBRATION_CTX
 
 
+# mmproj(视觉编码器)无 KV cache,只计固定开销,不随 n_ctx 增长
+_MMPROJ_FACTOR = 1.0 + _BASE_OVERHEAD
+
+
 def _estimate_n_gpu_layers(model_path, mmproj_path, vram_limit, n_ctx):
     """按 GGUF 层数把 vram_limit (GB) 折算成 n_gpu_layers。
 
@@ -38,9 +42,15 @@ def _estimate_n_gpu_layers(model_path, mmproj_path, vram_limit, n_ctx):
     factor = _vram_factor(n_ctx)
     layers = get_layer_count(model_path) or 32
     layer_size = os.path.getsize(model_path) * factor / (1024 ** 3) / layers
+    if layer_size <= 0:
+        return -1
     usable = vram_limit
     if mmproj_path:
-        usable -= os.path.getsize(mmproj_path) * factor / (1024 ** 3)
+        usable -= os.path.getsize(mmproj_path) * _MMPROJ_FACTOR / (1024 ** 3)
+    if usable <= 0:
+        # mmproj 只能整只进显存,预算无法满足时主模型全留 CPU 以免雪上加霜
+        logger.warning(f"[llama-cpp-vulkan] vram_limit ({vram_limit} GB) is fully consumed by the mmproj file, keeping all main model layers on CPU")
+        return 0
     return max(1, int(usable / layer_size))
 
 
@@ -48,11 +58,11 @@ def _estimate_vram_bytes(model_path, mmproj_path, n_gpu_layers, n_ctx):
     """估算本次加载的显存需求(字节),用于请求 ComfyUI 先腾挪 torch 侧显存。"""
     factor = _vram_factor(n_ctx)
     size = os.path.getsize(model_path) * factor
-    if n_gpu_layers > 0:
+    if n_gpu_layers >= 0:
         layers = get_layer_count(model_path) or 32
         size *= min(1.0, n_gpu_layers / layers)
     if mmproj_path:
-        size += os.path.getsize(mmproj_path) * factor
+        size += os.path.getsize(mmproj_path) * _MMPROJ_FACTOR
     return int(size)
 
 
@@ -136,8 +146,10 @@ class LLAMA_CPP_STORAGE:
         n_gpu_layers = _estimate_n_gpu_layers(model_path, mmproj_path, config["vram_limit"], config["n_ctx"])
 
         # Vulkan 与 PyTorch 共享同一张物理卡但分配器互不感知,先请求 ComfyUI
-        # 卸载 torch 侧模型腾出显存,否则 SD 模型占满显存时 Vulkan 分配直接失败
-        if n_gpu_layers != 0:
+        # 卸载 torch 侧模型腾出显存,否则 SD 模型占满显存时 Vulkan 分配直接失败;
+        # 主模型 0 层时 mmproj 仍可能进显存(use_gpu),同样需要腾挪
+        mmproj_on_gpu = mmproj_path is not None and config["vram_limit"] != 0
+        if n_gpu_layers != 0 or mmproj_on_gpu:
             try:
                 mm.free_memory(
                     _estimate_vram_bytes(model_path, mmproj_path, n_gpu_layers, config["n_ctx"]),
