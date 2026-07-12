@@ -17,7 +17,9 @@ def install():
     comfy = types.ModuleType("comfy")
     mm = types.ModuleType("comfy.model_management")
 
-    class InterruptProcessingException(Exception):
+    # 与真实 ComfyUI 保持一致继承 BaseException(而非 Exception):
+    # 否则替身会掩盖生产代码用 except Exception 误吞中断一类的问题
+    class InterruptProcessingException(BaseException):
         pass
 
     mm.InterruptProcessingException = InterruptProcessingException
