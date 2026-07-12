@@ -122,12 +122,15 @@ class json_to_bboxes:
 class bboxes_to_segs:
     @classmethod
     def INPUT_TYPES(s):
+        # 新字段只能追加在尾部: widget 值按声明顺序序列化, 中间插入会破坏旧工作流
         return {
             "required": {
                 "bboxes": ("BBOX",),
                 "image": ("IMAGE",),
                 "dilation": ("INT", {"default": 10, "min": 0, "max": 200, "step": 1}),
                 "feather": ("INT", {"default": 0, "min": 0, "max": 100, "step": 1}),
+                "label": ("STRING", {"default": "bbox", "tooltip": "写入每个 SEG 的 label, 供下游按 label 过滤/赋值 (如 Impact Pack 的 SEGS Filter)."}),
+                "confidence": ("FLOAT", {"default": 0.9, "min": 0.0, "max": 1.0, "step": 0.01, "tooltip": "写入每个 SEG 的置信度, 供下游按阈值过滤."}),
             }
         }
 
@@ -136,7 +139,7 @@ class bboxes_to_segs:
     FUNCTION = "process"
     CATEGORY = "llama-cpp-vulkan"
 
-    def process(self, bboxes, image, dilation, feather):
+    def process(self, bboxes, image, dilation, feather, label, confidence):
         batch_size, height, width, _channels = image.shape
         mask_shape = (height, width)
 
@@ -179,10 +182,10 @@ class bboxes_to_segs:
                 cropped_image=cropped_image_tensor,
                 cropped_mask=cropped_mask_np,
                 # Impact Pack 约定 confidence 为标量
-                confidence=0.9,
+                confidence=confidence,
                 crop_region=crop_region,
                 bbox=np.array([x1, y1, x2, y2], dtype=np.float32),
-                label="bbox"
+                label=label,
             )
 
             seg_list.append(seg)
