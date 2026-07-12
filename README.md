@@ -98,7 +98,6 @@ CMAKE_ARGS="-DGGML_VULKAN=on" pip install llama-cpp-python --no-cache-dir --forc
 
 - **Audio input (ASR)**: connect a ComfyUI `AUDIO` output to the `audio Instruct` node and load the model with `vlm Model Loader` using an audio-capable handler (e.g. Qwen3-ASR) with its matching mmproj. Audio is sent as 16-bit mono WAV; resampling is handled by llama.cpp.
 - **Stateless inference**: every run is an independent one-shot request (system prompt + current prompt). No conversation history is kept between runs.
-- **Workflows from v1.x**: the old `Model Loader` / `Instruct` nodes were replaced by the split nodes above; rebuild those nodes when loading old workflows.
 - **GPU not detected?** Run `python scripts/check_devices.py` (with ComfyUI's Python) to list every device the GGML backend enumerates (CPU/GPU/IGPU/ACCEL) without starting ComfyUI — useful for diagnosing Vulkan driver issues.
 
 ## Credits

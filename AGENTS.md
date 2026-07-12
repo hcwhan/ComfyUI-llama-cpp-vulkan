@@ -191,7 +191,7 @@ image 逐张模式的多图结果以 "====== Image N ======" 分隔行拼接
 
 ### INPUT_TYPES 字段顺序
 
-ComfyUI 的 widget 值按 `INPUT_TYPES` 中字段的声明顺序序列化，调整字段顺序会破坏已保存工作流的 widget 值映射。
+修改代码时不考虑兼容旧工作流（ComfyUI 的 widget 值按 `INPUT_TYPES` 声明顺序序列化，调整顺序会使已保存工作流的 widget 值错位，属预期代价），只考虑代码本身的合理性。特别是后加的配置项，不要为迁就旧工作流而堆在末尾，应按语义放到合理位置（与相关字段分组）。
 
 Instruct 子类的字段顺序约定：模型端口 -> 媒体输入 -> `prompt_inputs()` -> 模态专属字段 -> `runtime_inputs()`。
 
