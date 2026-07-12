@@ -86,7 +86,9 @@ class llama_cpp_vlm_model_loader:
             "gpu_device": _GPU_DEVICE_FIELD,
             "model": (_model_list(),),
             "mmproj": (_mmproj_list(),),
-            "chat_handler": (list(HANDLERS) or ["None"],),
+            # "None" 占位在首位作为默认值, 强制用户显式选择匹配的 handler
+            # (loadmodel 做非空校验), 避免默认首个 handler 被误用于不匹配的模型
+            "chat_handler": (["None"] + list(HANDLERS),),
             "n_ctx": _N_CTX_FIELD,
             "vram_limit": _VRAM_LIMIT_FIELD,
             "image_min_tokens": ("INT", {"default": 0, "min": 0, "max": 4096, "step": 32}),
