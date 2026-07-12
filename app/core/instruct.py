@@ -158,6 +158,9 @@ class llama_cpp_instruct_base:
 
     def _make_extract(self, strip_thinking):
         def extract_text(output):
+            # ": " 前缀剥离针对 Vicuna/LLaVA 风格模板(生成提示以 "ASSISTANT:" 收尾,
+            # 如 Llava15ChatHandler 与部分 GGUF 内嵌模板): 部分模型会把冒号连同空格
+            # 再输出一遍。正文本身以 ": " 开头的场景极罕见, 误剥按可接受代价处理
             text = output['choices'][0]['message']['content'].removeprefix(": ").lstrip()
             return strip_thinking_blocks(text) if strip_thinking else text
         return extract_text
