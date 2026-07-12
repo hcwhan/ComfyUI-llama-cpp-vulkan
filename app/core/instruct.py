@@ -206,8 +206,10 @@ class llama_cpp_instruct_base:
         由子类提供,返回输出文本(image 逐张模式为按分隔行拼接的整段文本,
         下游可用 Split Instruct Output 节点或 JSON to BBoxes 的内建拆分还原)。
         """
-        messages = self._prepare_messages(llama_model, system_prompt)
+        # 先做零成本的 prompt 校验(占位符预设缺 custom_prompt 时直接 ValueError),
+        # 再触发可能长达数 GB 的模型加载, 避免漏填时白白完成一次全量加载才报错
         user_content = [self._build_user_prompt(preset_prompt, custom_prompt)]
+        messages = self._prepare_messages(llama_model, system_prompt)
         # 防御性复制:parameters 是 ComfyUI 缓存的共享 dict,防止 runner 修改时污染
         params = (parameters or {}).copy()
         extract_text = self._make_extract(strip_thinking)
