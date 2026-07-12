@@ -31,6 +31,23 @@ class TestStripCodeFence(unittest.TestCase):
     def test_surrounding_whitespace(self):
         self.assertEqual(strip_code_fence("  ```\nx\n```  "), "x")
 
+    def test_leading_prose_extracts_first_block(self):
+        text = '好的, 结果如下:\n```json\n{"a": 1}\n```'
+        self.assertEqual(strip_code_fence(text), '{"a": 1}')
+
+    def test_leading_prose_ignores_trailing_prose(self):
+        text = '说明:\n```json\n{"a": 1}\n```\n以上就是结果。'
+        self.assertEqual(strip_code_fence(text), '{"a": 1}')
+
+    def test_leading_prose_takes_first_of_multiple_blocks(self):
+        text = 'A:\n```\nfirst\n```\nB:\n```\nsecond\n```'
+        self.assertEqual(strip_code_fence(text), "first")
+
+    def test_leading_prose_with_unclosed_fence_kept(self):
+        # 前导文字 + 未闭合围栏: 无完整块可提取, 保持原样(仅剥尾部围栏的现状行为)
+        text = '说明:\n```json\n{"a": 1'
+        self.assertEqual(strip_code_fence(text), text)
+
 
 class TestSplitImageResults(unittest.TestCase):
     def test_multi_image_output_split(self):

@@ -8,6 +8,8 @@ import json
 # 标签不能用 [^\s`]* 之类的宽匹配:围栏后无换行直接跟正文时会把正文吞掉
 _FENCE_OPEN_RE = re.compile(r"^```[\w+.-]*[ \t]*\r?\n?")
 _FENCE_CLOSE_RE = re.compile(r"\r?\n?```$")
+# 文本中部的完整围栏块(用于 "前导说明 + 围栏块" 形态的回退提取)
+_FENCE_BLOCK_RE = re.compile(r"```[\w+.-]*[ \t]*\r?\n(.*?)\r?\n?```", re.DOTALL)
 
 # image Instruct 逐张模式在多图结果间插入的分隔行(独占一行, 行首行尾锚定,
 # 降低正文文本误匹配的概率; JSON 文本中换行均为 \n 转义, 不会产生真实分隔行)
@@ -30,9 +32,16 @@ def strip_code_fence(text, label=""):
 
     label 仅为语义提示,实际兼容任意标签和裸 ``` 围栏:
     模型即使被要求输出 json 也可能给出不带标签的围栏。
+    模型输出 "好的, 结果如下:" 之类前导说明时首部不是围栏,
+    此时回退为提取文本中第一个完整围栏块的内容。
     """
     text = text.strip()
-    text = _FENCE_OPEN_RE.sub("", text)
+    stripped = _FENCE_OPEN_RE.sub("", text)
+    if stripped != text:
+        return _FENCE_CLOSE_RE.sub("", stripped)
+    block = _FENCE_BLOCK_RE.search(text)
+    if block:
+        return block.group(1)
     return _FENCE_CLOSE_RE.sub("", text)
 
 
