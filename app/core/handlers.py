@@ -37,8 +37,9 @@ _HANDLER_SPECS = {
     "GLM-4.1V-Thinking": ("GLM41VChatHandler", None),
 
     # ---- Gemma ----
-    # Gemma4 的 enable_thinking 按 wheel 说明仅 31B/26BA4B 支持,
-    # E2B/E4B 输出异常时建议选 -Thinking 变体(等于旧行为)
+    # Gemma4 的 enable_thinking 按 wheel 说明仅 31B/26BA4B 支持;
+    # E2B 实测: 传 False 安全, 但 E 系列关不掉思考(仍以纯文本思考并输出
+    # <channel|> 分隔符), 思考内容由 strip_thinking 按 <channel|> 剥离
     "Gemma4": ("Gemma4ChatHandler", {"enable_thinking": False}),
     "Gemma4-Thinking": ("Gemma4ChatHandler", {"enable_thinking": True}),
     "Gemma3": ("Gemma3ChatHandler", None),

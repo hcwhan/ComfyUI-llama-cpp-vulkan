@@ -163,7 +163,7 @@ image 逐张模式的多图结果以 "====== Image N ======" 分隔行拼接
 ### 推理输出与中断
 
 - 无会话状态：每次执行都是全新的一次性请求（system prompt + 本次提问），不保留任何跨执行的对话历史
-- `strip_thinking` 开关（默认开）：剥离 `<think>...</think>` 推理块；兼容 generation prompt 已注入 `<think>` 导致输出只含闭合标签的情况，未闭合（生成截断）时保持原样
+- `strip_thinking` 开关（默认开）：剥离三种思考形态——`<think>...</think>` 推理块（兼容 generation prompt 已注入 `<think>` 导致输出只含闭合标签的情况）、Gemma4 的 channel 格式（取最后一个 `<channel|>` 之后，覆盖 E 系列无开标签的纯文本思考形态）、GLM-4.1V 的 `<answer>` 包裹（handler 以 `</answer>` 为 stop token 导致开标签残留）；未闭合（生成截断）时均保持原样
 - `InterruptWatcher`：推理期间守护线程每 200ms 轮询 `mm.processing_interrupted()`，命中后调用 `Llama.abort()` 使生成立即停止；llama-cpp-python 在每次请求开始会 clear abort 事件，因此监视线程命中后持续重复 set 以抗竞态
 - 每次节点执行结束后按 `is_hybrid_arch()`（`_model.is_hybrid()`/`is_recurrent()` C API）判断是否整体重置 KV cache（重置在 `_run()` 的 finally 中，image 逐张模式中间的多次请求之间不重置，依赖 wheel 内置的 hybrid checkpoint 前缀匹配）：hybrid/recurrent 架构（Qwen3.5、LFM2 系等）的线性注意力状态无法跨请求前缀复用；纯 SWA 模型（Gemma3）不受影响
 

@@ -32,7 +32,7 @@ Vulkan provides near-native GPU performance without requiring CUDA or ROCm toolk
 | Step3-VL | Yes |
 | LFM2.5-VL / LFM2-VL | - |
 
-> Handlers marked "Yes" appear twice in the dropdown: the plain entry disables thinking, the `-Thinking` variant enables it. GLM-4.1V is a thinking-only model with no toggle. The dropdown groups handlers by family (newest first) and is the authoritative list.
+> Handlers marked "Yes" appear twice in the dropdown: the plain entry disables thinking, the `-Thinking` variant enables it. GLM-4.1V is a thinking-only model with no toggle. Gemma4 E2B/E4B think regardless of the toggle (only 31B/26BA4B honor it); the reasoning is stripped from the output either way. The dropdown groups handlers by family (newest first) and is the authoritative list.
 
 Legacy handlers (LLaVA-1.6 / 1.5, llama3-Vision-Alpha, nanoLLaVA, Moondream2, Obsidian, MiniCPM-v2.6) are also available.
 
