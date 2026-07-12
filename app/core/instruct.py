@@ -18,6 +18,12 @@ from .storage import LLAMA_CPP_STORAGE
 
 _THINK_BLOCK_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
 
+# Gemma4 思考块的闭合 token (格式 <|channel>thought ... <channel|>)。
+# E2B/E4B 在 enable_thinking=False 时仍会以纯文本思考并自行输出 <channel|>
+# 分隔符(无开标签, 实测确认), 因此不能按 "开标签...闭标签" 成对匹配,
+# 统一取最后一个 <channel|> 之后的内容
+_GEMMA4_CHANNEL_CLOSE = "<channel|>"
+
 _ANSWER_OPEN = "<answer>"
 _ANSWER_CLOSE = "</answer>"
 
@@ -40,16 +46,19 @@ def _unwrap_answer(text):
 
 
 def strip_thinking_blocks(text):
-    """移除 <think>...</think> 推理块与 GLM-4.1V 的 <answer> 包裹。
+    """移除思考块: <think>...</think>、Gemma4 的 channel 格式、GLM-4.1V 的 <answer> 包裹。
 
     Thinking 模型的 generation prompt 通常已注入开头的 <think>,
     此时输出只含闭合标签,需要取最后一个 </think> 之后的内容。
+    Gemma4 同理只认闭合 token <channel|>; 未闭合(生成截断)时保持原样。
     """
     if "</think>" in text:
         cleaned = _THINK_BLOCK_RE.sub("", text)
         if "</think>" in cleaned:
             cleaned = cleaned.rsplit("</think>", 1)[-1]
         text = cleaned.lstrip()
+    if _GEMMA4_CHANNEL_CLOSE in text:
+        text = text.rsplit(_GEMMA4_CHANNEL_CLOSE, 1)[-1].lstrip()
     return _unwrap_answer(text)
 
 

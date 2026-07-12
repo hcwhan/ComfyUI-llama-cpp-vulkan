@@ -45,6 +45,25 @@ class TestStripThinkingBlocks(unittest.TestCase):
     def test_multiline_block(self):
         self.assertEqual(strip_thinking_blocks("<think>line1\nline2</think>\nanswer"), "answer")
 
+    def test_gemma4_channel_block_removed(self):
+        # Gemma4 思考块格式: <|channel>thought ... <channel|>正文
+        text = "<|channel>thought\nreasoning here<channel|>正文"
+        self.assertEqual(strip_thinking_blocks(text), "正文")
+
+    def test_gemma4_channel_without_opening_tag(self):
+        # E2B/E4B 在 enable_thinking=False 时仍以纯文本思考并自行输出
+        # <channel|> 分隔符(无开标签, 实测确认), 取最后一段
+        text = "The user wants the main color.\nIt is red.<channel|>红色"
+        self.assertEqual(strip_thinking_blocks(text), "红色")
+
+    def test_gemma4_multiple_channel_marks_take_last(self):
+        self.assertEqual(strip_thinking_blocks("a<channel|>b<channel|>c"), "c")
+
+    def test_gemma4_unclosed_thought_kept(self):
+        # 生成截断在思考块内部, 无闭合 token 时保持原样(与 <think> 约定一致)
+        text = "<|channel>thought\ntruncated reasoning"
+        self.assertEqual(strip_thinking_blocks(text), text)
+
     def test_glm41v_answer_wrapper_removed(self):
         # 回归: GLM-4.1V 输出 <think>...</think>\n<answer>正文</answer>,
         # handler 以 </answer> 为 stop token, 开标签会残留
