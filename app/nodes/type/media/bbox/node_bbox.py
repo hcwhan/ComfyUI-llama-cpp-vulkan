@@ -241,12 +241,14 @@ class bboxes_to_mask:
             y2_exp = y2 + dilation
 
             if x2_exp - x1_exp <= 0 or y2_exp - y1_exp <= 0:
+                logger.warning(f"[llama-cpp-vulkan] Skipping bbox with empty area: {bbox}")
                 continue
 
             # 局部窗口(含羽化边界),裁剪到图像范围
             wx1, wy1 = max(0, x1_exp - margin), max(0, y1_exp - margin)
             wx2, wy2 = min(width, x2_exp + margin), min(height, y2_exp + margin)
             if wx2 <= wx1 or wy2 <= wy1:
+                logger.warning(f"[llama-cpp-vulkan] Skipping bbox outside image bounds: {bbox}")
                 continue
 
             # 扩张框(裁剪到图像内)在窗口坐标系中的位置
