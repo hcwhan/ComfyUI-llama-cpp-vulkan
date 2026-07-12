@@ -5,6 +5,6 @@ checkpoints/
 *.egg-info
 .pytest_cache
 .DS_Store
+
 # 本地生成的分析报告等产物
-*.html
 TODO.md
