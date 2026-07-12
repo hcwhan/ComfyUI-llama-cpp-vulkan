@@ -20,11 +20,15 @@ def split_image_results(text):
     """把 image Instruct 逐张模式的拼接输出按分隔行拆回逐张结果列表。
 
     无分隔行时返回单元素列表(整段原文), 普通文本 / 单图结果可安全通过。
+    只丢弃首个分隔行之前的空首段; 中间/末尾的空结果保留为空字符串占位,
+    维持 "第 i 段对应第 i 张图" 的索引对齐(下游按索引配对画框/拆列表)。
     """
     if not _IMAGE_SEP_RE.search(text):
         return [text]
     parts = [p.strip() for p in _IMAGE_SEP_RE.split(text)]
-    return [p for p in parts if p]
+    if not parts[0]:
+        parts = parts[1:]
+    return parts
 
 
 def strip_code_fence(text, label=""):
