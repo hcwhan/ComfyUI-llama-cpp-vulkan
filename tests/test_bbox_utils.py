@@ -13,6 +13,7 @@ from app.nodes.type.media.bbox.bbox_utils import (  # noqa: E402
     bbox_label,
     _label_color,
 )
+from app.nodes.type.media.bbox.node_bbox import SEG  # noqa: E402
 
 
 class TestJsonToPixelBboxes(unittest.TestCase):
@@ -74,6 +75,39 @@ class TestFeatheredRectMask(unittest.TestCase):
     def test_empty_rect_stays_zero(self):
         mask = feathered_rect_mask(5, 5, (3, 3, 3, 3), 0)
         self.assertEqual(mask.sum(), 0.0)
+
+
+class TestSEGNamedtupleCompat(unittest.TestCase):
+    """H2 回归: SEG 必须保持 Impact Pack 的 namedtuple 语义。
+
+    Impact Pack 的 SEGSLabelAssign 节点对 SEG 调用 _replace,
+    字段名与顺序须与其 modules/impact/core.py 的定义一致。
+    """
+
+    def _make_seg(self):
+        return SEG(
+            cropped_image=None,
+            cropped_mask=None,
+            confidence=0.9,
+            crop_region=[0, 0, 4, 4],
+            bbox=(0, 0, 4, 4),
+            label="bbox",
+        )
+
+    def test_fields_match_impact_pack(self):
+        self.assertEqual(
+            SEG._fields,
+            ("cropped_image", "cropped_mask", "confidence", "crop_region", "bbox", "label", "control_net_wrapper"),
+        )
+
+    def test_control_net_wrapper_defaults_to_none(self):
+        self.assertIsNone(self._make_seg().control_net_wrapper)
+
+    def test_replace_relabels_without_touching_other_fields(self):
+        relabeled = self._make_seg()._replace(label="person")
+        self.assertEqual(relabeled.label, "person")
+        self.assertEqual(relabeled.confidence, 0.9)
+        self.assertEqual(relabeled.crop_region, [0, 0, 4, 4])
 
 
 class TestLabelHelpers(unittest.TestCase):

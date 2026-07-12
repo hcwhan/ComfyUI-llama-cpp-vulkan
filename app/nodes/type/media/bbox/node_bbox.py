@@ -1,5 +1,7 @@
 """BBox 工具链节点: JSON 解析转框, SEGS/MASK 转换, 索引选取."""
 
+from collections import namedtuple
+
 import torch
 import numpy as np
 
@@ -14,19 +16,13 @@ from .bbox_utils import (
     valid_int_bbox,
 )
 
-
-class SEG:
-    def __init__(self, cropped_image, cropped_mask, confidence, crop_region, bbox, label, control_net_wrapper=None):
-        self.cropped_image = cropped_image
-        self.cropped_mask = cropped_mask
-        self.confidence = confidence
-        self.crop_region = crop_region
-        self.bbox = bbox
-        self.label = label
-        self.control_net_wrapper = control_net_wrapper
-
-    def __repr__(self):
-        return (f"SEG(cropped_image={self.cropped_image}, cropped_mask=shape{self.cropped_mask.shape}, confidence={self.confidence}, bbox={self.bbox}, label='{self.label}'), control_net_wrapper={self.control_net_wrapper}")
+# 与 Impact Pack 的 SEG 保持同定义(modules/impact/core.py),字段名与顺序不能改:
+# 其部分节点依赖 namedtuple 语义(如 SEGSLabelAssign 调用 seg._replace)
+SEG = namedtuple(
+    "SEG",
+    ["cropped_image", "cropped_mask", "confidence", "crop_region", "bbox", "label", "control_net_wrapper"],
+    defaults=[None],
+)
 
 
 class json_to_bboxes:
