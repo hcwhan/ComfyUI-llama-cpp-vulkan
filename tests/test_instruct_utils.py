@@ -46,7 +46,7 @@ class TestStripThinkingBlocks(unittest.TestCase):
 
 
 class TestBuildUserPrompt(unittest.TestCase):
-    """覆盖/填充分支按模板是否含 "#" 判定(预设名的 "*" 仅为 UI 提示)。"""
+    """覆盖/填充分支按模板是否含 "###" 判定(预设名的 "(需custom_prompt)" 仅为 UI 提示)。"""
 
     def setUp(self):
         self.node = llama_cpp_instruct_base()
