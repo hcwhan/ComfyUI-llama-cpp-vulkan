@@ -195,7 +195,11 @@ class LLAMA_CPP_STORAGE:
             raise
         # 加载成功后才记录配置,避免加载失败时残留新配置导致后续误判"无需重载"
         cls.current_config = config.copy()
-        log_backend_summary(main_gpu, split_mode)
+        if n_gpu_layers == 0 and not mmproj_on_gpu:
+            # 纯 CPU 推理时打印 Active GPU 会误导排查
+            logger.info("[llama-cpp-vulkan] CPU-only inference: no layers or mmproj offloaded to GPU")
+        else:
+            log_backend_summary(main_gpu, split_mode)
 
 
 if not hasattr(mm, "unload_all_models_backup"):
