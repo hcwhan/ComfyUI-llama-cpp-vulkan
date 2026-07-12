@@ -154,6 +154,12 @@ llama_cpp_parameters --> LLAMACPPARAMS --------+-> llama_cpp_audio_instruct
 
 ## 修改代码须知
 
+### Commit message 规范
+
+- 一律使用中文书写（标题与正文），保留 conventional commits 类型前缀（`feat:` / `fix:` / `refactor:` / `docs:` / `chore:` / `ci:` / `test:`，破坏性变更加 `!`）
+- 代码标识符、文件名、API 名等专有名词保持原文，不翻译
+- 本地笔记类文件（如 `TODO.md`）不入仓库（已在 `.gitignore` 中）
+
 ### 依赖版本对接原则
 
 项目代码只对接 `requirements.txt` 中固定的依赖版本（特别是 llama-cpp-python 的 JamePeng Vulkan wheel），不为历史版本或官方构建编写兼容/回退代码。mmproj 路径统一用 `mmproj_path` 键传入 handler。
