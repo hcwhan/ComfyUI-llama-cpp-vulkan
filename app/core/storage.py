@@ -186,7 +186,13 @@ class LLAMA_CPP_STORAGE:
 
         logger.info(f"[llama-cpp-vulkan] Loading model: {model}")
         logger.info(f"[llama-cpp-vulkan] n_gpu_layers = {n_gpu_layers}, main_gpu = {main_gpu}, split_mode = {split_mode}")
-        cls.llm = Llama(model_path, chat_handler=cls.chat_handler, n_gpu_layers=n_gpu_layers, main_gpu=main_gpu, split_mode=split_mode, n_ctx=config["n_ctx"], verbose=False)
+        try:
+            cls.llm = Llama(model_path, chat_handler=cls.chat_handler, n_gpu_layers=n_gpu_layers, main_gpu=main_gpu, split_mode=split_mode, n_ctx=config["n_ctx"], verbose=False)
+        except Exception:
+            # 主模型加载失败时立即释放已创建的 chat_handler(mmproj 已进显存),
+            # 不等下一次 load/unload 的 clean() 才回收
+            cls.clean()
+            raise
         # 加载成功后才记录配置,避免加载失败时残留新配置导致后续误判"无需重载"
         cls.current_config = config.copy()
         log_backend_summary(main_gpu, split_mode)
