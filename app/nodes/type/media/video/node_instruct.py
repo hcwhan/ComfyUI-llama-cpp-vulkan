@@ -13,18 +13,7 @@ from ..encoding import image_content_item, scale_image, tensor_to_uint8
 
 class llama_cpp_video_instruct(llama_cpp_media_instruct_base):
     MEDIA_WORD = "视频"
-    PRESETS = [
-        "常规 - 描述",
-        "创意 - 视频总结",
-        "提示词风格 - 标签",
-        "提示词风格 - 简洁",
-        "提示词风格 - 详细",
-        "提示词风格 - 极致详细",
-        "提示词风格 - 电影感",
-        "创意 - 短篇故事",
-        "空白 - 自定义",
-    ]
-    DEFAULT_PRESET = "常规 - 描述"
+    MODALITY = "video"
 
     @classmethod
     def INPUT_TYPES(cls):

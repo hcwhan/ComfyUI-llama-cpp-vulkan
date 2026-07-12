@@ -13,7 +13,7 @@ import threading
 import comfy.model_management as mm
 
 from ..shared.types import any_type
-from .prompts import preset_prompts
+from .prompts import instruct_presets, preset_content
 from .storage import LLAMA_CPP_STORAGE
 
 _THINK_BLOCK_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
@@ -83,19 +83,20 @@ class llama_cpp_instruct_base:
     RETURN_NAMES = ("output", "output_list")
     OUTPUT_IS_LIST = (False, True)
 
-    # 子类覆盖:模型端口类型(llm_model/vlm_model) / 预设模板 @ 占位符替换词 / 可选预设与默认项
+    # 子类覆盖:模型端口类型(llm_model/vlm_model) / 预设模板 @@@ 占位符替换词 /
+    # 模态标识(按预设的 use 字段过滤下拉框名单, 列表第一项即默认预设)
     MODEL_TYPE = "LLAMACPPLLM"
     MEDIA_WORD = "图像"
-    PRESETS = list(preset_prompts)
-    DEFAULT_PRESET = "空白 - 自定义"
+    MODALITY = "text"
 
     # ---- INPUT_TYPES 字段组装块(子类按需拼接,顺序由子类的声明决定) ----
 
     @classmethod
     def prompt_inputs(cls):
+        presets = instruct_presets(cls.MODALITY)
         return {
-            "preset_prompt": (cls.PRESETS, {"default": cls.DEFAULT_PRESET}),
-            "custom_prompt": ("STRING", {"default": "", "multiline": True, "placeholder": '用户提示词\n\n预设名带 "*" 时, 此内容用于填充预设中的占位符(如 BBox 检测的目标类别)\n否则, 此内容会整体覆盖预设提示词.'}),
+            "preset_prompt": (presets, {"default": presets[0]}),
+            "custom_prompt": ("STRING", {"default": "", "multiline": True, "placeholder": '用户提示词\n\n预设含占位符时(如 BBox 检测的目标类别、待改写的提示词), 此内容用于填充占位符\n否则, 此内容会整体覆盖预设提示词.'}),
             "system_prompt": ("STRING", {"multiline": True, "default": ""}),
         }
 
@@ -136,13 +137,22 @@ class llama_cpp_instruct_base:
             messages.append({"role": "system", "content": system_prompt})
         return messages
 
-    def _build_prompt_text(self, preset_prompt, custom_prompt):
-        if custom_prompt.strip() and "*" not in preset_prompt:
-            return {"type": "text", "text": custom_prompt}
-        if "*" in preset_prompt and not custom_prompt.strip():
-            raise ValueError(f'Preset "{preset_prompt}" requires custom_prompt to fill its placeholder (e.g. object categories for BBox detection).')
-        # 先替换 @ 再注入用户文本,避免 custom_prompt 中的 @ 被误替换
-        p = preset_prompts[preset_prompt].replace("@", self.MEDIA_WORD).replace("#", custom_prompt.strip())
+    def _build_user_prompt(self, preset_prompt, custom_prompt):
+        """构建 user 消息的文本内容项(模板取自 user_prompt_presets)。
+
+        覆盖/填充按模板内容判定:
+        - 模板含 "###":custom_prompt 是填充物(必填),替换 "###" 占位符
+        - 模板不含 "###":非空 custom_prompt 整体覆盖预设,为空则用模板原文
+        预设名的 "(需custom_prompt)" 标注仅为 UI 提示,不参与判定。
+        """
+        template = preset_content(preset_prompt)
+        if "###" not in template:
+            if custom_prompt.strip():
+                return {"type": "text", "text": custom_prompt}
+        elif not custom_prompt.strip():
+            raise ValueError(f'Preset "{preset_prompt}" requires custom_prompt to fill its placeholder (e.g. object categories for BBox detection, or the prompt to rewrite).')
+        # 先替换 @@@ 再注入用户文本,避免 custom_prompt 中的 @@@ 被误替换
+        p = template.replace("@@@", self.MEDIA_WORD).replace("###", custom_prompt.strip())
         return {"type": "text", "text": p}
 
     def _make_extract(self, strip_thinking):
@@ -165,7 +175,7 @@ class llama_cpp_instruct_base:
         由子类提供,返回 (output, output_list)。
         """
         messages = self._prepare_messages(llama_model, system_prompt)
-        user_content = [self._build_prompt_text(preset_prompt, custom_prompt)]
+        user_content = [self._build_user_prompt(preset_prompt, custom_prompt)]
         # 先复制再修改,避免污染 ComfyUI 缓存的共享参数 dict
         params = (parameters or {}).copy()
         extract_text = self._make_extract(strip_thinking)

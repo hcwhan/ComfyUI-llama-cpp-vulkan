@@ -10,12 +10,7 @@ from ..encoding import audio2base64
 
 class llama_cpp_audio_instruct(llama_cpp_media_instruct_base):
     MEDIA_WORD = "音频"
-    PRESETS = [
-        "常规 - 转写",
-        "常规 - 描述",
-        "空白 - 自定义",
-    ]
-    DEFAULT_PRESET = "常规 - 转写"
+    MODALITY = "audio"
 
     @classmethod
     def INPUT_TYPES(cls):

@@ -15,19 +15,7 @@ from ..encoding import image_content_item, scale_image, tensor_to_uint8
 
 class llama_cpp_image_instruct(llama_cpp_media_instruct_base):
     MEDIA_WORD = "图像"
-    PRESETS = [
-        "常规 - 描述",
-        "提示词风格 - 标签",
-        "提示词风格 - 简洁",
-        "提示词风格 - 详细",
-        "提示词风格 - 极致详细",
-        "提示词风格 - 电影感",
-        "创意 - 详细分析",
-        "创意 - 短篇故事",
-        "视觉 - *BBox 检测",
-        "空白 - 自定义",
-    ]
-    DEFAULT_PRESET = "常规 - 描述"
+    MODALITY = "image"
 
     @classmethod
     def INPUT_TYPES(cls):

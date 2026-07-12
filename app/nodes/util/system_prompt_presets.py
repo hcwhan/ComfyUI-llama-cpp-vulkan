@@ -1,4 +1,4 @@
-"""Prompt 增强系统提示词模板库, 12 种中文预设(Qwen-Image/Z-Image/Flux.2/Wan), 供 node_prompt_enhancer 使用."""
+"""Prompt 增强系统提示词模板库, 12 种中文预设(Qwen-Image/Z-Image/Flux.2/Wan), 供 node_system_prompt 使用."""
 
 QWEN_IMAGE = '''你是一位Prompt优化师，旨在将用户输入改写为优质Prompt，使其更完整、更具表现力，同时不改变原意。
 任务要求：

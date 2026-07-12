@@ -12,7 +12,7 @@
 
 ## 目录结构
 
-组织原则：`app/nodes/` 只放节点声明（文件名一律 `node_` 前缀），与某个节点强相关的工具放在该节点文件旁边（如 `bbox_utils.py`、`prompt_enhancer_presets.py`、media 共用的 `encoding.py`）；跨领域复用的逻辑放 `app/core/`（模型生命周期、推理骨架、基础设施）与 `app/shared/`（纯工具）。
+组织原则：`app/nodes/` 只放节点声明（文件名一律 `node_` 前缀），与某个节点强相关的工具放在该节点文件旁边（如 `bbox_utils.py`、`system_prompt_presets.py`、media 共用的 `encoding.py`）；跨领域复用的逻辑放 `app/core/`（模型生命周期、推理骨架、基础设施）与 `app/shared/`（纯工具）。
 
 ```
 ComfyUI-llama-cpp-vulkan/
@@ -25,7 +25,7 @@ ComfyUI-llama-cpp-vulkan/
     core/                     # 核心逻辑（非节点）
       storage.py              #   模型生命周期：全局单例、resolve_config 校验、显存折算、unload 钩子
       instruct.py             #   Instruct 基类（text 骨架）+ media 基类（VLM 校验）+ 中断/thinking/hybrid 工具
-      prompts.py              #   任务预设 prompt 模板池（@/# 占位符）
+      prompts.py              #   任务预设模板池（@@@/### 占位符，use 字段声明适用模态）
       devices.py              #   Vulkan GPU 设备检测与选择（ggml C API / ctypes）
       handlers.py             #   Chat handler 注册表（30 种 VLM 格式）
       model_paths.py          #   llm/LLM 模型目录注册与路径查找
@@ -57,8 +57,8 @@ ComfyUI-llama-cpp-vulkan/
       util/
         node_parse_json.py    #   Parse JSON
         node_remove_code_block.py  # Unpack Code Block
-        node_prompt_enhancer.py    # Prompt Enhancer Preset
-        prompt_enhancer_presets.py # 12 个中文 Prompt 增强系统提示词模板
+        node_system_prompt.py      # System Prompt Preset
+        system_prompt_presets.py   # 12 个中文 Prompt 增强系统提示词模板
   scripts/
     check_devices.py          # 独立诊断脚本：列出 GGML 后端检测到的所有设备
 ```
@@ -81,7 +81,7 @@ ComfyUI-llama-cpp-vulkan/
 | `bboxes_to_mask` | BBoxes to MASK | BBox 转遮罩图 |
 | `bboxes_to_bbox` | BBoxes to BBox | 从多组 BBox 中选取特定索引 |
 | `remove_code_block` | Unpack Code Block | 去除 LLM 输出中的代码块标记 |
-| `prompt_enhancer_preset` | Prompt Enhancer Preset | 12 种中文 Prompt 增强系统提示词预设 |
+| `system_prompt_preset` | System Prompt Preset | 12 种中文 Prompt 增强系统提示词预设 |
 
 ### 类型隔离
 
@@ -114,7 +114,7 @@ ComfyUI-llama-cpp-vulkan/
 `app/core/instruct.py` 提供两级基类，四个 Instruct 节点只声明 `INPUT_TYPES` 与模态专属的 runner 闭包：
 - `llama_cpp_instruct_base`：通用骨架。`_run()` 负责组消息（system + user）、复制采样参数、`InterruptWatcher` 监视、force_offload / hybrid KV 重置收尾；`prompt_inputs()/runtime_inputs()/optional_inputs()` 是 INPUT_TYPES 字段组装块
 - `llama_cpp_media_instruct_base`：多模态骨架，`MODEL_TYPE = "LLAMACPPVLM"`，附 `require_mmproj()` 兜底校验
-- 类属性 `PRESETS`/`DEFAULT_PRESET` 按模态过滤任务预设下拉框；`MEDIA_WORD` 决定模板中 `@` 占位符的替换词（text/image -> 图像、video -> 视频、audio -> 音频）；任务预设与增强预设文本均为中文
+- 预设的显示范围由 `core/prompts.py` 中每个预设的 `use` 字段声明（dict 声明顺序即 UI 下拉框顺序，各模态过滤结果的第一项即该节点的默认预设），节点类通过 `MODALITY` 类属性对号入座；`MEDIA_WORD` 决定模板中 `@@@` 占位符的替换词（text/image -> 图像、video -> 视频、audio -> 音频）；`###` 占位符由 custom_prompt 填充（模板含 `###` 时必填，否则非空 custom_prompt 整体覆盖预设）；任务预设与增强预设文本均为中文
 
 ### Chat Handler 注册表
 
@@ -182,11 +182,11 @@ Instruct 子类的字段顺序约定：模型端口 -> 媒体输入 -> `prompt_i
 
 ### 新增任务预设
 
-在 `app/core/prompts.py` 的 `preset_prompts` 加模板，并把预设名加入相应 Instruct 节点类的 `PRESETS` 列表（列表顺序即 UI 下拉框顺序）。
+只改 `app/core/prompts.py` 一个文件：在 `user_prompt_presets` 加一个条目，`use` 声明适用模态（text/image/video/audio），`content` 为模板文本。dict 声明顺序即各模态 UI 下拉框顺序（按 use 过滤后），插入位置决定排序。`use` 中的模态名拼写错误会在模块加载时报错。
 
 ### Prompt 增强预设
 
-在 `app/nodes/util/prompt_enhancer_presets.py` 中添加新常量，并在文件末尾的 `PRESETS` dict 中加一行（dict 顺序即 UI 下拉框顺序）。
+在 `app/nodes/util/system_prompt_presets.py` 中添加新常量，并在文件末尾的 `PRESETS` dict 中加一行（dict 顺序即 UI 下拉框顺序）。
 
 ### Wheel 构建与发布 (CI)
 
