@@ -4,7 +4,6 @@
 
 ## 项目概况
 
-- **版本**: 2.0.0
 - **核心依赖**: llama-cpp-python (自编译 Vulkan ABI3 wheel, v0.3.41)
 - **GPU 后端**: Vulkan (非 CUDA/ROCm，独立于 PyTorch 的 GPU 推理路径)
 - **支持平台**: Windows / Linux（预编译 Vulkan wheel 仅覆盖这两个平台；Linux 为 manylinux_2_31，要求 glibc >= 2.31）
@@ -67,28 +66,9 @@ ComfyUI-llama-cpp-vulkan/
     comfy_stubs.py            #   comfy/folder_paths 最小替身，满足 import 期依赖
 ```
 
-## 节点清单
+## 数据流与类型隔离
 
-| 节点 ID | 显示名 | 用途 |
-|---------|--------|------|
-| `llama_cpp_llm_model_loader` | llama.cpp llm Model Loader | 加载纯文本 GGUF 模型（无 mmproj/handler 字段），输出 `LLAMACPPLLM` |
-| `llama_cpp_vlm_model_loader` | llama.cpp vlm Model Loader | 加载 VLM 模型（mmproj 与 chat_handler 必选），输出 `LLAMACPPVLM` |
-| `llama_cpp_text_instruct` | llama.cpp text Instruct | 纯文本推理（prompt 改写等） |
-| `llama_cpp_image_instruct` | llama.cpp image Instruct | 图片推理：逐张 / 批量两种模式 |
-| `llama_cpp_video_instruct` | llama.cpp video Instruct | 视频帧序列推理：均匀抽帧 + 连续视频语义提示，输入端口名 `frames` |
-| `llama_cpp_audio_instruct` | llama.cpp audio Instruct | 音频推理（ASR/omni，如 Qwen3-ASR） |
-| `llama_cpp_parameters` | llama.cpp Parameters | 采样参数配置（temperature/top_k/top_p 等） |
-| `llama_cpp_unload_model` | llama.cpp Unload Model | 手动卸载模型释放资源 |
-| `parse_json_node` | Parse JSON | 解析 JSON 字符串，按 key 提取值 |
-| `json_to_bboxes` | JSON to BBoxes | 将 LLM 输出的 JSON 转为 BBox 坐标 |
-| `bboxes_to_segs` | BBoxes to SEGS | BBox 转 SEGS 格式（兼容 Impact Pack） |
-| `bboxes_to_mask` | BBoxes to MASK | BBox 转遮罩图 |
-| `bboxes_to_bbox` | BBoxes to BBox | 从多组 BBox 中选取特定索引 |
-| `remove_code_block` | Unpack Code Block | 去除 LLM 输出中的代码块标记 |
-| `split_instruct_output` | Split Instruct Output | 把 image Instruct 逐张模式的拼接输出拆回 STRING 列表 |
-| `system_prompt_preset` | System Prompt Preset | 图像/视频生成模型的中文提示词增强预设 |
-
-### 数据流
+节点全集见 `app/nodes/__init__.py` 注册表。
 
 ```
 llama_cpp_llm_model_loader --> LLAMACPPLLM ------> llama_cpp_text_instruct
@@ -106,8 +86,6 @@ image 逐张模式的多图结果以 "====== Image N ======" 分隔行拼接
               |                  +--> 内建同款拆分, output 可直连
               +--> bboxes_to_segs / bboxes_to_mask  (下游图像处理)
 ```
-
-### 类型隔离
 
 `LLAMACPPLLM`（llm Loader 输出）与 `LLAMACPPVLM`（vlm Loader 输出）完全独立：llm 配置只能连 text Instruct，vlm 配置只能连 image/video/audio Instruct，连错在连线阶段即被 ComfyUI 类型系统拦截。两种配置 dict 结构相同（llm 侧 mmproj/chat_handler 固定为 "None"），底层共用 `core/storage.py` 的加载路径。
 
@@ -152,7 +130,7 @@ image 逐张模式的多图结果以 "====== Image N ======" 分隔行拼接
 
 ### Chat Handler 注册表
 
-`app/core/handlers.py` 中的 `_HANDLER_SPECS` 表集中定义全部 handler：显示名 -> (类名, 构造 kwargs)。kwargs 是构造 handler 时固定注入的参数（thinking 开关、Generic 的 `chat_format=None` 等），解析时经 `functools.partial` 预绑定，`HANDLERS` 的值即可直接调用的构造器，`storage.py` 不再感知 thinking 逻辑。启动时 `_resolve_handlers()` 用 `getattr` 对照 `llama_cpp.llama_multimodal` 模块解析类名，缺失的类打 warning 并从下拉框剔除（防御未来 wheel 升级时的类变动，不静默）。覆盖 Qwen/Gemma/GLM/MiniCPM/LLaVA 等数十种 VLM 模型格式，另有 `Generic-MTMD` 兜底 handler（渲染 GGUF 内置 chat template）适配无专用 handler 的模型。带 `-Thinking` 后缀的显示名与基名共享同一个类、仅 thinking kwargs 值不同，后缀与开关值的一致性由 `tests/test_handlers.py` 契约测试锁定。
+`app/core/handlers.py` 的 `_HANDLER_SPECS` 表集中定义全部 handler，数据形态、排序约定与新增须知见该表头注释。要点：构造期固定参数（thinking 开关、Generic-MTMD 兜底的 `chat_format` 等）经 `functools.partial` 预绑定进 `HANDLERS` 的构造器，`storage.py` 因此不感知 thinking 逻辑；启动时解析失败的类只从下拉框剔除并打 warning（防御 wheel 升级时的类变动，不静默、不阻断 import）；`-Thinking` 后缀与开关值的一致性由 `tests/test_handlers.py` 契约测试锁定。
 
 ### 多模态输入
 
