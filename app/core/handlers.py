@@ -16,46 +16,65 @@ from ..shared.logger import logger
 # 每个 key 必须被该类 __init__ 显式接受(基类对未知 kwargs 抛 TypeError)。
 # 带 "-Thinking" 后缀的显示名与基名共享同一个类, 仅 thinking 值不同,
 # 后缀与开关值的一致性由 tests/test_handlers.py 契约测试锁定。
-# dict 声明顺序即 UI 下拉框顺序。新增 handler 只需在此加一行。
+# dict 声明顺序即 UI 下拉框顺序(首项为默认选项), 排序约定: 同家族聚组,
+# 家族内新版本在上, -Thinking 变体紧随普通版之下; 常用家族在前,
+# OCR/文档专用类居中, 早期模型在后, Generic-MTMD 兜底收尾。
 _HANDLER_SPECS = {
-    "LLaVA-1.5": ("Llava15ChatHandler", None),
-    "LLaVA-1.6": ("Llava16ChatHandler", None),
-    "Obsidian": ("ObsidianChatHandler", None),
-    "Moondream2": ("MoondreamChatHandler", None),
-    "nanoLLaVA": ("NanoLlavaChatHandler", None),
-    "llama3-Vision-Alpha": ("Llama3VisionAlphaChatHandler", None),
-    "MiniCPM-v2.6": ("MiniCPMv26ChatHandler", None),
-    "DeepSeek-OCR": ("MTMDChatHandler", None),
-    # Gemma4 的 enable_thinking 按 wheel 说明仅 31B/26BA4B 支持,
-    # E2B/E4B 输出异常时建议选 -Thinking 变体(等于旧行为)
-    "Gemma3": ("Gemma3ChatHandler", None),
-    "Gemma4": ("Gemma4ChatHandler", {"enable_thinking": False}),
-    "Gemma4-Thinking": ("Gemma4ChatHandler", {"enable_thinking": True}),
-    "Qwen2.5-VL": ("Qwen25VLChatHandler", None),
-    "MinerU2.5-Pro": ("Qwen25VLChatHandler", None),
-    "Qwen3-VL": ("Qwen3VLChatHandler", {"force_reasoning": False}),
-    "Qwen3-VL-Thinking": ("Qwen3VLChatHandler", {"force_reasoning": True}),
-    "Qwen3.5": ("Qwen35ChatHandler", {"enable_thinking": False}),
-    "Qwen3.5-Thinking": ("Qwen35ChatHandler", {"enable_thinking": True}),
+    # ---- Qwen ----
     "Qwen3.6": ("Qwen35ChatHandler", {"enable_thinking": False}),
     "Qwen3.6-Thinking": ("Qwen35ChatHandler", {"enable_thinking": True}),
+    "Qwen3.5": ("Qwen35ChatHandler", {"enable_thinking": False}),
+    "Qwen3.5-Thinking": ("Qwen35ChatHandler", {"enable_thinking": True}),
+    "Qwen3-VL": ("Qwen3VLChatHandler", {"force_reasoning": False}),
+    "Qwen3-VL-Thinking": ("Qwen3VLChatHandler", {"force_reasoning": True}),
+    "Qwen3-ASR": ("Qwen3ASRChatHandler", None),
+    "Qwen2.5-VL": ("Qwen25VLChatHandler", None),
+
+    # ---- GLM ----
     "GLM-4.6V": ("GLM46VChatHandler", {"enable_thinking": False}),
     "GLM-4.6V-Thinking": ("GLM46VChatHandler", {"enable_thinking": True}),
-    # GLM41VChatHandler 不接受 enable_thinking(模板固定输出 thinking 块),
-    # 名字的 -Thinking 仅描述模型本身
+    # GLM41VChatHandler 不接受 enable_thinking参数 (模板固定输出 thinking 块)
     "GLM-4.1V-Thinking": ("GLM41VChatHandler", None),
-    "LFM2-VL": ("LFM2VLChatHandler", None),
-    "LFM2.5-VL": ("LFM25VLChatHandler", None),
-    "Granite-Docling": ("GraniteDoclingChatHandler", None),
-    "MiniCPM-v4.5": ("MiniCPMv45ChatHandler", {"enable_thinking": False}),
-    "MiniCPM-v4.5-Thinking": ("MiniCPMv45ChatHandler", {"enable_thinking": True}),
+
+    # ---- Gemma ----
+    # Gemma4 的 enable_thinking 按 wheel 说明仅 31B/26BA4B 支持,
+    # E2B/E4B 输出异常时建议选 -Thinking 变体(等于旧行为)
+    "Gemma4": ("Gemma4ChatHandler", {"enable_thinking": False}),
+    "Gemma4-Thinking": ("Gemma4ChatHandler", {"enable_thinking": True}),
+    "Gemma3": ("Gemma3ChatHandler", None),
+
+    # ---- MiniCPM ----
     "MiniCPM-v4.6": ("MiniCPMV46ChatHandler", {"enable_thinking": False}),
     "MiniCPM-v4.6-Thinking": ("MiniCPMV46ChatHandler", {"enable_thinking": True}),
-    "PaddleOCR-VL-1.5": ("PaddleOCRChatHandler", None),
-    "Qwen3-ASR": ("Qwen3ASRChatHandler", None),
+    "MiniCPM-v4.5": ("MiniCPMv45ChatHandler", {"enable_thinking": False}),
+    "MiniCPM-v4.5-Thinking": ("MiniCPMv45ChatHandler", {"enable_thinking": True}),
+    "MiniCPM-v2.6": ("MiniCPMv26ChatHandler", None),
+
+    # ---- Step ----
     "Step3-VL": ("Step3VLChatHandler", {"enable_thinking": False}),
     "Step3-VL-Thinking": ("Step3VLChatHandler", {"enable_thinking": True}),
-    # 兜底 handler:渲染 GGUF 内置 chat template 并归一化媒体占位符,
+
+    # ---- LFM ----
+    "LFM2.5-VL": ("LFM25VLChatHandler", None),
+    "LFM2-VL": ("LFM2VLChatHandler", None),
+
+    # ---- OCR / 文档专用 ----
+    "DeepSeek-OCR": ("MTMDChatHandler", None),
+    "PaddleOCR-VL-1.5": ("PaddleOCRChatHandler", None),
+    # MinerU2.5-Pro 基于 Qwen2.5-VL, 复用其 handler
+    "MinerU2.5-Pro": ("Qwen25VLChatHandler", None),
+    "Granite-Docling": ("GraniteDoclingChatHandler", None),
+
+    # ---- 早期模型 ----
+    "LLaVA-1.6": ("Llava16ChatHandler", None),
+    "LLaVA-1.5": ("Llava15ChatHandler", None),
+    "llama3-Vision-Alpha": ("Llama3VisionAlphaChatHandler", None),
+    "nanoLLaVA": ("NanoLlavaChatHandler", None),
+    "Moondream2": ("MoondreamChatHandler", None),
+    "Obsidian": ("ObsidianChatHandler", None),
+
+    # ---- 兜底 ----
+    # 渲染 GGUF 内置 chat template 并归一化媒体占位符,
     # 适配上表没有专用 handler 的 VLM;需要特殊 stop token/生成参数的
     # 模型仍应优先用专用 handler。chat_format=None 表示沿用模型内置模板
     "Generic-MTMD": ("GenericMTMDChatHandler", {"chat_format": None}),
