@@ -1,16 +1,39 @@
 """BBox 节点的强相关工具: 坐标换算, 画框, 羽化 mask, 结构校验."""
 
 import hashlib
+from functools import lru_cache
 
 import torch
 import numpy as np
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 from scipy.ndimage import gaussian_filter
 
 from .....shared.logger import logger
 from ..encoding import tensor_to_uint8
 
 QWEN_BBOX_MODES = ("Qwen3-VL", "Qwen2.5-VL")
+
+# label 常为中文(BBox 检测预设引导用户填中文类别),PIL 默认 bitmap 字体
+# 无 CJK 字形会画成占位方块,按平台常见 CJK 字体依次尝试
+_CJK_FONT_CANDIDATES = (
+    "msyh.ttc",                 # Windows 微软雅黑
+    "simhei.ttf",               # Windows 黑体
+    "NotoSansCJK-Regular.ttc",  # Linux Noto CJK
+    "NotoSansSC-Regular.otf",
+    "wqy-zenhei.ttc",           # Linux 文泉驿正黑
+)
+
+
+@lru_cache(maxsize=8)
+def _label_font(size):
+    """按字号加载 CJK 字体,全部候选缺失时回退 PIL 默认字体(中文会显示为方块)。"""
+    for name in _CJK_FONT_CANDIDATES:
+        try:
+            return ImageFont.truetype(name, size)
+        except OSError:
+            continue
+    logger.warning("[llama-cpp-vulkan] No CJK font found, bbox labels may render as boxes")
+    return ImageFont.load_default(size)
 
 
 def bbox_label(item):
@@ -53,13 +76,19 @@ def draw_bbox(image, pixel_bboxes, labels):
     img = Image.fromarray(tensor_to_uint8(image))
     draw = ImageDraw.Draw(img)
 
+    # 字号/线宽随图像尺寸缩放,高分辨率图上固定像素值会小到不可读
+    ref = min(img.size)
+    font_size = max(12, ref // 40)
+    line_width = max(2, ref // 250)
+    font = _label_font(font_size)
+
     for (x0, y0, x1, y1), label in zip(pixel_bboxes, labels):
         color = _label_color(label)
-        draw.rectangle((x0, y0, x1, y1), outline=color, width=4)
-        text_y = max(0, y0 - 10)
-        text_size = draw.textbbox((x0, text_y), label)
+        draw.rectangle((x0, y0, x1, y1), outline=color, width=line_width)
+        text_y = max(0, y0 - font_size - 4)
+        text_size = draw.textbbox((x0, text_y), label, font=font)
         draw.rectangle([text_size[0], text_size[1]-2, text_size[2]+4, text_size[3]+2], fill=color)
-        draw.text((x0+2, text_y), label, fill=(255,255,255))
+        draw.text((x0+2, text_y), label, fill=(255,255,255), font=font)
     return torch.from_numpy(np.array(img).astype(np.float32) / 255.0).unsqueeze(0)
 
 
