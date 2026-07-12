@@ -30,6 +30,8 @@ Vulkan provides near-native GPU performance without requiring CUDA or ROCm toolk
 | MiniCPM-v4.5 / v4.6 | Yes |
 | Step3-VL | - |
 
+Legacy handlers (LLaVA-1.5 / 1.6, Moondream2, nanoLLaVA, llama3-Vision-Alpha, MiniCPM-v2.6) are also available; the dropdown of `vlm Model Loader` is the authoritative list.
+
 ### Specialized Handlers
 
 | Handler | Type |
@@ -89,6 +91,8 @@ CMAKE_ARGS="-DGGML_VULKAN=on" pip install llama-cpp-python --no-cache-dir --forc
 
 - **Loaders**: `llm Model Loader` for text-only GGUF models, `vlm Model Loader` for vision/audio models (mmproj + chat handler required). Their outputs are separate types: llm connects only to `text Instruct`, vlm connects only to `image / video / audio Instruct`.
 - **Instruct**: one node per modality — `text` (prompt refining etc.), `image` (per-image or batched), `video` (IMAGE frame batch input, evenly sampled), `audio` (ASR / omni).
+- **BBox toolchain**: `JSON to BBoxes` (parse detection JSON, draw boxes), `BBoxes to SEGS` (Impact Pack compatible), `BBoxes to MASK`, `BBoxes to BBox`.
+- **Utilities**: `Parameters` (sampling config), `Unload Model`, `Parse JSON`, `Unpack Code Block`, `Split Instruct Output`, `System Prompt Preset` (Chinese prompt-enhancement presets for Qwen-Image / Z-Image / Flux.2 / Wan).
 
 ## Notes
 

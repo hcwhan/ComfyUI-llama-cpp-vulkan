@@ -185,7 +185,7 @@ class llama_cpp_instruct_base:
         """
         messages = self._prepare_messages(llama_model, system_prompt)
         user_content = [self._build_user_prompt(preset_prompt, custom_prompt)]
-        # 先复制再修改,避免污染 ComfyUI 缓存的共享参数 dict
+        # 防御性复制:parameters 是 ComfyUI 缓存的共享 dict,防止 runner 修改时污染
         params = (parameters or {}).copy()
         extract_text = self._make_extract(strip_thinking)
 

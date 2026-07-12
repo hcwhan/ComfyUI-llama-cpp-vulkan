@@ -32,6 +32,7 @@ ComfyUI-llama-cpp-vulkan/
       gguf_layers.py          #   GGUF 文件解析：读取模型层数 (block_count)
       cqdm.py                 #   进度条封装：同时驱动 ComfyUI ProgressBar 和 tqdm
     shared/                   # 跨领域纯工具（非节点）
+      logger.py               #   插件统一 logging logger（沿用 ComfyUI 的日志配置）
       text_utils.py           #   代码围栏剥离、逐张结果拆分、JSON 解析、嵌套取值
       types.py                #   AnyType 万能透传类型
     nodes/                    # 只放节点声明
@@ -59,9 +60,11 @@ ComfyUI-llama-cpp-vulkan/
         node_remove_code_block.py  # Unpack Code Block
         node_split_output.py       # Split Instruct Output
         node_system_prompt.py      # System Prompt Preset
-        system_prompt_presets.py   # 12 个中文 Prompt 增强系统提示词模板
+        system_prompt_presets.py   # 中文 Prompt 增强系统提示词模板池（Qwen-Image/Z-Image/Flux.2/Wan）
   scripts/
     check_devices.py          # 独立诊断脚本：列出 GGML 后端检测到的所有设备
+  tests/                      # 单元测试（标准库 unittest，用 ComfyUI 嵌入式 Python 运行）
+    comfy_stubs.py            #   comfy/folder_paths 最小替身，满足 import 期依赖
 ```
 
 ## 节点清单
@@ -83,7 +86,7 @@ ComfyUI-llama-cpp-vulkan/
 | `bboxes_to_bbox` | BBoxes to BBox | 从多组 BBox 中选取特定索引 |
 | `remove_code_block` | Unpack Code Block | 去除 LLM 输出中的代码块标记 |
 | `split_instruct_output` | Split Instruct Output | 把 image Instruct 逐张模式的拼接输出拆回 STRING 列表 |
-| `system_prompt_preset` | System Prompt Preset | 12 种中文 Prompt 增强系统提示词预设 |
+| `system_prompt_preset` | System Prompt Preset | 图像/视频生成模型的中文提示词增强预设 |
 
 ### 数据流
 
@@ -130,7 +133,7 @@ image 逐张模式的多图结果以 "====== Image N ======" 分隔行拼接
 - `load_model()`: 先 `resolve_config()` 校验再卸载旧模型（无效配置不影响已加载的模型），随后加载 GGUF 模型 + 可选的 mmproj（视觉编码器）
 - `clean()`: 释放模型和 chat_handler 资源
 - 通过 monkey-patch `mm.unload_all_models` 实现 ComfyUI 模型卸载（前端 Free 按钮 / OOM 处理）时自动清理
-- `vram_limit` 折算 `n_gpu_layers` 集中在 `_estimate_n_gpu_layers()`：按 GGUF 层数（`core/gguf_layers.py` 手写解析 `block_count`，命中即返回避免解析 tokenizer 元数据）均摊文件体积，乘经验系数 `_VRAM_OVERHEAD_FACTOR`(1.55) 估算每层显存，mmproj 体积先从预算中扣除
+- `vram_limit` 折算 `n_gpu_layers` 集中在 `_estimate_n_gpu_layers()`：按 GGUF 层数（`core/gguf_layers.py` 手写解析 `block_count`，命中即返回避免解析 tokenizer 元数据）均摊文件体积，乘 `_vram_factor(n_ctx)` 经验系数（固定计算缓冲开销 + 随 n_ctx 线性增长的 KV/激活开销，n_ctx=8192 时合计 1.55）估算每层显存，mmproj 体积先从预算中扣除
 
 ### Instruct 继承体系
 
@@ -180,7 +183,7 @@ image 逐张模式的多图结果以 "====== Image N ======" 分隔行拼接
 
 - 每个 .py 文件顶部必须有描述整个文件用途的模块 docstring, docstring 之后空一行再写代码
 - docstring 内的标点: 逗号使用英文逗号加一个空格 ", ", 句号使用英文句号 "."
-- 无实际代码的包不创建 `__init__.py`（子包走 Python 隐式命名空间包），全项目只有根入口与 `app/nodes/__init__.py` 注册表两个 `__init__.py`
+- 无实际代码的包不创建 `__init__.py`（子包走 Python 隐式命名空间包）；仅根入口、`app/nodes/__init__.py` 注册表与 `tests/__init__.py`（测试导入引导）三处有 `__init__.py`
 
 ### 依赖版本对接原则
 

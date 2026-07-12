@@ -1,4 +1,4 @@
-"""System Prompt Preset 节点, 输出 12 种图像/视频生成模型的中文提示词增强 system prompt."""
+"""System Prompt Preset 节点, 输出图像/视频生成模型的中文提示词增强 system prompt."""
 
 from .system_prompt_presets import PRESETS
 
