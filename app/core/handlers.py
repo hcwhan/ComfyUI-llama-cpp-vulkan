@@ -20,6 +20,7 @@ from ..shared.logger import logger
 _HANDLER_SPECS = {
     "LLaVA-1.5": ("Llava15ChatHandler", None),
     "LLaVA-1.6": ("Llava16ChatHandler", None),
+    "Obsidian": ("ObsidianChatHandler", None),
     "Moondream2": ("MoondreamChatHandler", None),
     "nanoLLaVA": ("NanoLlavaChatHandler", None),
     "llama3-Vision-Alpha": ("Llama3VisionAlphaChatHandler", None),
