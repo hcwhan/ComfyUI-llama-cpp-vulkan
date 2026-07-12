@@ -147,7 +147,10 @@ class LLAMA_CPP_STORAGE:
 
         # Vulkan 与 PyTorch 共享同一张物理卡但分配器互不感知,先请求 ComfyUI
         # 卸载 torch 侧模型腾出显存,否则 SD 模型占满显存时 Vulkan 分配直接失败;
-        # 主模型 0 层时 mmproj 仍可能进显存(use_gpu),同样需要腾挪
+        # 主模型 0 层时 mmproj 仍可能进显存(use_gpu),同样需要腾挪。
+        # 只腾挪 torch 主设备:假设 Vulkan 推理与 torch 在同一张卡(单 dGPU 环境
+        # 天然成立);多卡下显式选择其他 Vulkan 卡时,该卡与 torch 分配器无关,
+        # 腾挪主设备无效但也无害
         mmproj_on_gpu = mmproj_path is not None and config["vram_limit"] != 0
         if n_gpu_layers != 0 or mmproj_on_gpu:
             try:
