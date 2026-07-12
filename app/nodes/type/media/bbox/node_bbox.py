@@ -79,12 +79,10 @@ class json_to_bboxes:
         if mode in QWEN_BBOX_MODES and not flat_images:
             raise ValueError("Image required for Qwen mode")
         if flat_images and len(json) != len(flat_images):
-            # 按当前实际行为分方向描述: 多出的 JSON 在末帧上画框但重组阶段被丢弃
-            # (bboxes 仍输出全部组), JSON 不足时尾部未配对的帧不进入 image_list
             if len(json) > len(flat_images):
-                detail = "extra JSON entries draw on the last frame but their frames are dropped from image_list (bboxes keeps all groups)"
+                detail = "extra JSON entries reuse the last frame, appended to image_list as single-frame batches"
             else:
-                detail = "unpaired trailing frames are dropped from image_list"
+                detail = "unpaired trailing frames are passed through without boxes"
             logger.warning(f"[llama-cpp-vulkan] {len(json)} JSON result(s) but {len(flat_images)} image frame(s); pairing by index, {detail}")
 
         output_bboxes = []
@@ -116,14 +114,19 @@ class json_to_bboxes:
 
             output_bboxes.append(pixel_bboxes)
 
-        # 画框结果与 JSON 条目一一对应,按输入图像的批次结构重新分组
+        # JSON 少于帧时, 尾部未配对的帧原样进入输出(不画框), 保持批次结构完整
+        if flat_images and len(drawn_images) < len(flat_images):
+            drawn_images.extend(flat_images[len(drawn_images):])
+
+        # 画框结果按输入图像的批次结构重新分组
         restructured_images = []
         cursor = 0
         for count in batch_sizes:
-            chunk = drawn_images[cursor:cursor + count]
-            if chunk:
-                restructured_images.append(torch.cat(chunk, dim=0))
+            restructured_images.append(torch.cat(drawn_images[cursor:cursor + count], dim=0))
             cursor += count
+        # JSON 多于帧时, 多出的画框帧(复用末帧)作为单帧批次追加,
+        # image_list 总帧数与 bboxes 组数保持对齐
+        restructured_images.extend(drawn_images[cursor:])
 
         return (output_bboxes, restructured_images)
 
