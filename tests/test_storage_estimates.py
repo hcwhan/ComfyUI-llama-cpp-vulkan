@@ -36,6 +36,15 @@ class TestEstimateNGpuLayers(unittest.TestCase):
             data += b"\x00" * max(0, pad_to_bytes - len(data))
         return self._write_temp(data)
 
+    def _write_sparse(self, size):
+        """稀疏文件: 估算函数只用 os.path.getsize, 无需真实写入 size 字节."""
+        fd, path = tempfile.mkstemp(suffix=".gguf")
+        with os.fdopen(fd, "wb") as f:
+            f.seek(size - 1)
+            f.write(b"\x00")
+        self.addCleanup(os.remove, path)
+        return path
+
     def test_minus_one_passthrough_auto(self):
         self.assertEqual(_estimate_n_gpu_layers(self._model_path(), None, -1, 8192), -1)
 
@@ -50,7 +59,7 @@ class TestEstimateNGpuLayers(unittest.TestCase):
     def test_mmproj_exceeding_budget_returns_zero(self):
         # mmproj 2GB > 预算 1GB, 主模型应全留 CPU 而不是强塞 1 层
         model = self._model_path(block_count=32, pad_to_bytes=32 * 1024 * 1024)
-        mmproj = self._write_temp(b"\x00" * (2 * _GB // 1024) * 1024)
+        mmproj = self._write_sparse(2 * _GB)
         self.assertEqual(_estimate_n_gpu_layers(model, mmproj, 1, 8192), 0)
 
     def test_tiny_positive_budget_keeps_at_least_one_layer(self):
