@@ -8,6 +8,8 @@ import torch
 import numpy as np
 from PIL import Image
 
+from ....shared.logger import logger
+
 
 def tensor_to_uint8(image: torch.Tensor):
     """ComfyUI IMAGE 张量 ([H,W,C] 或 [1,H,W,C]) 转 uint8 数组。
@@ -49,6 +51,8 @@ def audio2base64(audio):
     """
     waveform = audio["waveform"]
     if waveform.ndim == 3:
+        if waveform.shape[0] > 1:
+            logger.warning(f"[llama-cpp-vulkan] AUDIO batch of {waveform.shape[0]} clips received; only the first clip is processed")
         waveform = waveform[0]
     if waveform.ndim == 2:
         waveform = waveform.mean(dim=0)
