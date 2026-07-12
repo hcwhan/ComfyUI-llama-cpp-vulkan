@@ -179,6 +179,7 @@ image 逐张模式的多图结果以 "====== Image N ======" 分隔行拼接
 
 - 一律使用中文书写（标题与正文），保留 conventional commits 类型前缀（`feat:` / `fix:` / `refactor:` / `docs:` / `chore:` / `ci:` / `test:`，破坏性变更加 `!`）
 - 代码标识符、文件名、API 名等专有名词保持原文，不翻译
+- 提交用消息文件而非 `-m` 内联：Windows PowerShell 下 `-m` 中的引号、heredoc 与以 `-` 开头的词（如 "-Thinking"）会被参数解析破坏。先把消息写入临时文件，再 `git commit -F <文件>`，提交后删除临时文件
 
 ### Python 文件规范
 
