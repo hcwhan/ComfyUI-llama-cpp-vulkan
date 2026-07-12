@@ -8,12 +8,15 @@ from ...shared.text_utils import get_nested_value, parse_json
 class parse_json_node:
     @classmethod
     def INPUT_TYPES(s):
+        # key 运行期必填,声明为 required 保持 UI 语义一致;
+        # 从 optional 移入不影响旧工作流: input 是 forceInput 无 widget 值,
+        # widget 序列化顺序仍为 [key, default]
         return {
             "required": {
                 "input": ("STRING", {"forceInput": True}),
+                "key": ("STRING", {"default": "", "tooltip": "点分路径下钻取值, 如 a.b.c"}),
             },
             "optional": {
-                "key": ("STRING",),
                 "default": ("STRING",),
             },
         }
@@ -23,8 +26,8 @@ class parse_json_node:
     FUNCTION = "process"
     CATEGORY = "llama-cpp-vulkan"
 
-    def process(self, input, key=None, default=None):
-        if not key:
+    def process(self, input, key, default=None):
+        if not key.strip():
             raise ValueError("Key cannot be empty!")
 
         # parse_json 统一顶层报错(含代码围栏剥离),嵌套字符串由 get_nested_value 容错
