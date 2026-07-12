@@ -8,6 +8,7 @@ comfy_stubs.install()
 
 from app.nodes.type.media.bbox.bbox_utils import (  # noqa: E402
     json_to_pixel_bboxes,
+    qwen25_smart_resize,
     valid_int_bbox,
     feathered_rect_mask,
     bbox_label,
@@ -75,6 +76,48 @@ class TestFeatheredRectMask(unittest.TestCase):
     def test_empty_rect_stays_zero(self):
         mask = feathered_rect_mask(5, 5, (3, 3, 3, 3), 0)
         self.assertEqual(mask.sum(), 0.0)
+
+
+class TestQwen25SmartResize(unittest.TestCase):
+    """M3 回归: smart_resize 复现值须与 Qwen2.5-VL-3B GGUF 的 mtmd 实测一致。
+
+    以下期望值全部来自真实模型推理时 mtmd 日志反推(image chunk token 数),
+    并经模型输出坐标逐值印证。
+    """
+
+    def test_large_image_downscaled_to_token_cap(self):
+        self.assertEqual(qwen25_smart_resize(3200, 2400), (2044, 1540))   # 4015 tok
+        self.assertEqual(qwen25_smart_resize(2400, 2400), (1792, 1792))   # 恰 4096 tok
+
+    def test_medium_image_rounded_to_patch_multiple(self):
+        self.assertEqual(qwen25_smart_resize(1600, 1200), (1596, 1204))   # 2451 tok
+        self.assertEqual(qwen25_smart_resize(800, 600), (812, 588))       # 609 tok
+
+    def test_tiny_image_upscaled_to_min_pixels(self):
+        self.assertEqual(qwen25_smart_resize(56, 56), (84, 84))           # 9 tok
+
+
+class TestQwen25ModeConversion(unittest.TestCase):
+    """M3 回归: Qwen2.5-VL 模式把 resize 空间绝对坐标还原为原图坐标。
+
+    用例数据为实测: 3200x2400 原图中方块位于 (2400, 1200)-(2800, 1600),
+    模型输出 [1534, 769, 1789, 1025] (resize 后 2044x1540 空间)。
+    """
+
+    def test_restores_original_coordinates(self):
+        items = [{"bbox_2d": [1534, 769, 1789, 1025], "label": "红色方块"}]
+        (box,) = json_to_pixel_bboxes(items, "Qwen2.5-VL", width=3200, height=2400)
+        expected = (2400, 1200, 2800, 1600)
+        for got, want in zip(box, expected):
+            self.assertAlmostEqual(got, want, delta=5)
+
+    def test_identity_scale_below_cap(self):
+        # 812x588 (28 对齐后与原图 800x600 略有差异), 坐标按比例微调而非除以 1000
+        items = [{"bbox_2d": [609, 294, 711, 392]}]
+        (box,) = json_to_pixel_bboxes(items, "Qwen2.5-VL", width=800, height=600)
+        expected = (600, 300, 700, 400)
+        for got, want in zip(box, expected):
+            self.assertAlmostEqual(got, want, delta=1)
 
 
 class TestSEGNamedtupleCompat(unittest.TestCase):

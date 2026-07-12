@@ -1,5 +1,6 @@
 """BBox 节点的强相关工具: 坐标换算, 画框, 羽化 mask, 结构校验."""
 
+import math
 import hashlib
 from functools import lru_cache
 
@@ -12,6 +13,40 @@ from .....shared.logger import logger
 from ..encoding import tensor_to_uint8
 
 QWEN_BBOX_MODES = ("Qwen3-VL", "Qwen2.5-VL")
+
+# Qwen2.5-VL 输出的是 mtmd smart_resize 后图像空间的绝对像素坐标(官方语义,
+# 实测 Qwen2.5-VL-3B GGUF 逐值吻合), 换算回原图需要复现 resize 尺寸。
+# 三个常量对接 requirements.txt 固定 wheel 的 mtmd 默认值(经 5 组不同尺寸
+# 实测反推并完全复现): patch 28, 下限 8 token, 上限 4096 token。
+# 注意 loader 的 image_min/max_tokens > 0 会改变上下限, 此时换算不再精确。
+_QWEN25_FACTOR = 28
+_QWEN25_MIN_PIXELS = 8 * 28 * 28
+_QWEN25_MAX_PIXELS = 4096 * 28 * 28
+
+
+# floor/ceil 前的浮点容差: beta 缩放的精确值可能恰为整数(如 2400x2400 时
+# 2400/beta 精确等于 1792), 浮点误差会让 floor 少算一个 patch
+_EPS = 1e-6
+
+
+def qwen25_smart_resize(width, height):
+    """复现 Qwen2.5-VL 预处理的 smart_resize, 返回 mtmd 实际送入模型的 (宽, 高)。
+
+    与官方参考实现一致: 宽高先四舍五入到 28 倍数; 面积超上限时按 beta 缩小后
+    向下取整到 28 倍数; 低于下限时放大后向上取整到 28 倍数。
+    """
+    f = _QWEN25_FACTOR
+    w_bar = max(f, round(width / f) * f)
+    h_bar = max(f, round(height / f) * f)
+    if w_bar * h_bar > _QWEN25_MAX_PIXELS:
+        beta = math.sqrt(width * height / _QWEN25_MAX_PIXELS)
+        w_bar = max(f, math.floor(width / beta / f + _EPS) * f)
+        h_bar = max(f, math.floor(height / beta / f + _EPS) * f)
+    elif w_bar * h_bar < _QWEN25_MIN_PIXELS:
+        beta = math.sqrt(_QWEN25_MIN_PIXELS / (width * height))
+        w_bar = math.ceil(width * beta / f - _EPS) * f
+        h_bar = math.ceil(height * beta / f - _EPS) * f
+    return w_bar, h_bar
 
 # label 常为中文(BBox 检测预设引导用户填中文类别),PIL 默认 bitmap 字体
 # 无 CJK 字形会画成占位方块,按平台常见 CJK 字体依次尝试
@@ -42,11 +77,20 @@ def bbox_label(item):
 
 
 def json_to_pixel_bboxes(json_items, mode, width=0, height=0):
-    """把 LLM 输出的 bbox JSON 项换算为像素坐标 [(x0, y0, x1, y1), ...]。
+    """把 LLM 输出的 bbox JSON 项换算为原图像素坐标 [(x0, y0, x1, y1), ...]。
 
-    Qwen 系列模型输出 0-1000 归一化坐标,需按图像尺寸换算;
-    simple 模式视为已是像素坐标,原样透传。
+    - Qwen3-VL:   输出 0-1000 归一化坐标, 按原图尺寸换算
+    - Qwen2.5-VL: 输出 smart_resize 后图像空间的绝对坐标, 按 原图/resize 比例还原
+    - simple:     视为已是原图像素坐标, 原样透传
     """
+    if mode == "Qwen2.5-VL":
+        rw, rh = qwen25_smart_resize(width, height)
+        sx, sy = width / rw, height / rh
+    elif mode == "Qwen3-VL":
+        sx, sy = width / 1000, height / 1000
+    else:
+        sx = sy = 1.0
+
     bboxes = []
     for item in json_items:
         # LLM 输出结构不可信,显式校验并给出期望格式,避免裸 KeyError/TypeError
@@ -56,12 +100,7 @@ def json_to_pixel_bboxes(json_items, mode, width=0, height=0):
         if not isinstance(coords, (list, tuple)) or len(coords) != 4:
             raise ValueError(f'BBox item is missing a valid "bbox_2d": [x1, y1, x2, y2] field: {item!r}')
         x0, y0, x1, y1 = coords
-        if mode in QWEN_BBOX_MODES:
-            x0 = x0 / 1000 * width
-            y0 = y0 / 1000 * height
-            x1 = x1 / 1000 * width
-            y1 = y1 / 1000 * height
-        bboxes.append((x0, y0, x1, y1))
+        bboxes.append((x0 * sx, y0 * sy, x1 * sx, y1 * sy))
     return bboxes
 
 
