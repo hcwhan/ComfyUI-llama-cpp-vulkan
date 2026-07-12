@@ -45,6 +45,23 @@ class TestStripThinkingBlocks(unittest.TestCase):
     def test_multiline_block(self):
         self.assertEqual(strip_thinking_blocks("<think>line1\nline2</think>\nanswer"), "answer")
 
+    def test_glm41v_answer_wrapper_removed(self):
+        # 回归: GLM-4.1V 输出 <think>...</think>\n<answer>正文</answer>,
+        # handler 以 </answer> 为 stop token, 开标签会残留
+        self.assertEqual(strip_thinking_blocks("<think>r</think>\n<answer>正文"), "正文")
+
+    def test_glm41v_closed_answer_wrapper_removed(self):
+        self.assertEqual(strip_thinking_blocks("<think>r</think>\n<answer>正文</answer>"), "正文")
+
+    def test_answer_wrapper_without_think_block(self):
+        # generation prompt 已注入 <think> 时输出只含闭合标签, 同样带 answer 包裹
+        self.assertEqual(strip_thinking_blocks("r</think>\n<answer>正文"), "正文")
+
+    def test_answer_word_in_body_untouched(self):
+        # 正文中出现 <answer> 字样但不在开头, 不剥离
+        text = "标签 <answer> 的用法说明"
+        self.assertEqual(strip_thinking_blocks(text), text)
+
 
 class TestBuildUserPrompt(unittest.TestCase):
     """覆盖/填充分支按模板是否含 "###" 判定(预设名的 "(需custom_prompt)" 仅为 UI 提示)。"""

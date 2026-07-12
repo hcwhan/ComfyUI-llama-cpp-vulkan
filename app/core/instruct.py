@@ -18,19 +18,39 @@ from .storage import LLAMA_CPP_STORAGE
 
 _THINK_BLOCK_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
 
+_ANSWER_OPEN = "<answer>"
+_ANSWER_CLOSE = "</answer>"
+
+
+def _unwrap_answer(text):
+    """剥离 GLM-4.1V 形态的 <answer>...</answer> 包裹。
+
+    GLM-4.1V-Thinking 的输出为 <think>...</think>\\n<answer>正文</answer>
+    (官方推理代码按 <answer>(.*?)</answer> 提取正文); 本插件的 handler 以
+    </answer> 为 stop token, 闭合标签通常不进入文本, 因此开标签会残留。
+    仅在文本以 <answer> 开头时剥离, 避免误伤正文中的同名字样。
+    """
+    stripped = text.lstrip()
+    if not stripped.startswith(_ANSWER_OPEN):
+        return text
+    stripped = stripped[len(_ANSWER_OPEN):]
+    if stripped.rstrip().endswith(_ANSWER_CLOSE):
+        stripped = stripped.rstrip()[:-len(_ANSWER_CLOSE)]
+    return stripped.strip()
+
 
 def strip_thinking_blocks(text):
-    """移除 <think>...</think> 推理块。
+    """移除 <think>...</think> 推理块与 GLM-4.1V 的 <answer> 包裹。
 
     Thinking 模型的 generation prompt 通常已注入开头的 <think>,
     此时输出只含闭合标签,需要取最后一个 </think> 之后的内容。
     """
-    if "</think>" not in text:
-        return text
-    cleaned = _THINK_BLOCK_RE.sub("", text)
-    if "</think>" in cleaned:
-        cleaned = cleaned.rsplit("</think>", 1)[-1]
-    return cleaned.lstrip()
+    if "</think>" in text:
+        cleaned = _THINK_BLOCK_RE.sub("", text)
+        if "</think>" in cleaned:
+            cleaned = cleaned.rsplit("</think>", 1)[-1]
+        text = cleaned.lstrip()
+    return _unwrap_answer(text)
 
 
 def is_hybrid_arch(llm):
