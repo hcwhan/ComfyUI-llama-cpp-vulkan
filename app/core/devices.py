@@ -103,7 +103,7 @@ def resolve_device_selection(gpu_device):
 gpu_device_choices = [AUTO_LABEL] + [_device_label(d) for d in _selectable_devices()]
 
 
-def print_backend_summary(main_gpu, split_mode):
+def log_backend_summary(main_gpu, split_mode):
     selectable = _selectable_devices()
     if not selectable:
         logger.warning("[llama-cpp-vulkan] No GPU backend detected, running on CPU only")
