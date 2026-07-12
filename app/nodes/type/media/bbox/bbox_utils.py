@@ -72,8 +72,12 @@ def _label_font(size):
 
 
 def bbox_label(item):
-    """取 bbox JSON 项的标签,兼容 label / text_content 两种字段。"""
-    return item.get("label") or item.get("text_content") or "bbox"
+    """取 bbox JSON 项的标签,兼容 label / text_content 两种字段。
+
+    LLM 可能输出数字等非字符串标签,强转 str 保证下游
+    _label_color(label.encode) 与 PIL draw.text 不因单个标签放弃整张图。
+    """
+    return str(item.get("label") or item.get("text_content") or "bbox")
 
 
 def json_to_pixel_bboxes(json_items, mode, width=0, height=0):
