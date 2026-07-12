@@ -212,3 +212,4 @@ Instruct 子类的字段顺序约定：模型端口 -> 媒体输入 -> `prompt_i
 1. **单模型实例**: `LLAMA_CPP_STORAGE` 是全局单例，不支持同时加载多个模型
 2. **核显不可选（有独显时）**: llama.cpp 的设备收集规则决定了有独显时核显无法通过 `main_gpu` 选中；如需强制核显推理，只能在进程启动前设置 `GGML_VK_VISIBLE_DEVICES` 环境变量（devices.py import 时即初始化 Vulkan，之后设置无效）
 3. **import 时初始化 Vulkan**: 设备枚举在插件加载时同步执行（约几百 ms），属有意设计（UI 下拉框需要启动期确定设备列表）
+4. **mmproj 不跟随显式选卡**: mtmd 的 `mtmd_context_params` 只有 `use_gpu` 布尔开关、无设备索引字段，多卡下显式选择非默认 GPU 时视觉编码器仍落在 mtmd 默认挑选的设备上（上游限制）；插件仅在 `vram_limit=0`（纯 CPU）时传 `use_gpu=False` 让 mmproj 一并留在 CPU

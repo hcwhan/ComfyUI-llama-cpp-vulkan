@@ -155,6 +155,9 @@ class LLAMA_CPP_STORAGE:
                 # <=0 视为未设置,与库内默认值 -1 语义一致
                 "image_max_tokens": config["image_max_tokens"],
                 "image_min_tokens": config["image_min_tokens"],
+                # vram_limit=0 表示纯 CPU 推理,mmproj(mtmd 编码器)同样留在 CPU;
+                # mtmd 只有 use_gpu 布尔开关,无法指定设备(见 AGENTS.md 已知问题)
+                "use_gpu": config["vram_limit"] != 0,
             }
             if think_param:
                 kwargs[think_param] = "Thinking" in chat_handler
