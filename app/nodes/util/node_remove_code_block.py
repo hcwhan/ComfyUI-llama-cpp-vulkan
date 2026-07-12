@@ -10,9 +10,6 @@ class remove_code_block:
             "required": {
                 "input": ("STRING", {"forceInput": True}),
             },
-            "optional": {
-                "label": ("STRING",),
-            },
         }
 
     RETURN_TYPES = ("STRING",)
@@ -20,5 +17,5 @@ class remove_code_block:
     FUNCTION = "process"
     CATEGORY = "llama-cpp-vulkan"
 
-    def process(self, input, label=""):
-        return (strip_code_fence(input, label),)
+    def process(self, input):
+        return (strip_code_fence(input),)

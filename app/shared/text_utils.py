@@ -31,10 +31,10 @@ def split_image_results(text):
     return parts
 
 
-def strip_code_fence(text, label=""):
+def strip_code_fence(text):
     """去除 LLM 输出首尾的 ```label ... ``` 代码块标记。
 
-    label 仅为语义提示,实际兼容任意标签和裸 ``` 围栏:
+    兼容任意标签和裸 ``` 围栏:
     模型即使被要求输出 json 也可能给出不带标签的围栏。
     模型输出 "好的, 结果如下:" 之类前导说明时首部不是围栏,
     此时回退为提取文本中第一个完整围栏块的内容。
@@ -51,7 +51,7 @@ def strip_code_fence(text, label=""):
 
 def parse_json(json_str):
     try:
-        parsed = json.loads(strip_code_fence(json_str, "json"))
+        parsed = json.loads(strip_code_fence(json_str))
     except Exception as e:
         raise ValueError(f"Unable to load JSON data!\n{e}")
     return parsed
