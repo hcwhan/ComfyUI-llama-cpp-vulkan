@@ -67,10 +67,11 @@ def _estimate_vram_bytes(model_path, mmproj_path, n_gpu_layers, n_ctx):
 
 
 def resolve_config(config):
-    """校验 loader 配置并解析出 (model_path, mmproj_path, handler_cls, think_param)。
+    """校验 loader 配置并解析出 (model_path, mmproj_path, handler_cls)。
 
     loader 节点用它做快速失败校验(不实际加载模型),
     load_model 用它取得路径与 handler 类,两处共享同一套报错。
+    handler_cls 已由注册表预绑定构造期固定参数(thinking 开关等)。
     """
     model = config["model"]
     mmproj = config["mmproj"]
@@ -81,10 +82,10 @@ def resolve_config(config):
         raise FileNotFoundError(f"Model '{model}' not found in any llm/LLM folder")
 
     if chat_handler == "None":
-        handler_cls = think_param = None
+        handler_cls = None
     else:
         try:
-            handler_cls, think_param = HANDLERS[chat_handler]
+            handler_cls = HANDLERS[chat_handler]
         except KeyError:
             raise ValueError(f'Unknown chat handler: "{chat_handler}"') from None
 
@@ -103,7 +104,7 @@ def resolve_config(config):
             'Select the matching mmproj file, or set chat_handler to "None" for text-only models.'
         )
 
-    return model_path, mmproj_path, handler_cls, think_param
+    return model_path, mmproj_path, handler_cls
 
 
 class LLAMA_CPP_STORAGE:
@@ -134,12 +135,11 @@ class LLAMA_CPP_STORAGE:
     @classmethod
     def load_model(cls, config):
         # 先校验再卸载旧模型:无效配置不影响当前已加载的模型
-        model_path, mmproj_path, handler_cls, think_param = resolve_config(config)
+        model_path, mmproj_path, handler_cls = resolve_config(config)
 
         cls.clean()
         model = config["model"]
         mmproj = config["mmproj"]
-        chat_handler = config["chat_handler"]
         gpu_device = config.get("gpu_device", AUTO_LABEL)
         main_gpu, split_mode = resolve_device_selection(gpu_device)
 
@@ -164,6 +164,7 @@ class LLAMA_CPP_STORAGE:
         if mmproj_path:
             logger.info(f"[llama-cpp-vulkan] Loading mmproj: {mmproj}")
 
+            # thinking 开关等构造期固定参数已由注册表经 functools.partial 预绑定
             kwargs = {
                 "mmproj_path": mmproj_path,
                 "verbose": False,
@@ -174,8 +175,6 @@ class LLAMA_CPP_STORAGE:
                 # mtmd 只有 use_gpu 布尔开关,无法指定设备(见 AGENTS.md 已知问题)
                 "use_gpu": config["vram_limit"] != 0,
             }
-            if think_param:
-                kwargs[think_param] = "Thinking" in chat_handler
 
             try:
                 cls.chat_handler = handler_cls(**kwargs)

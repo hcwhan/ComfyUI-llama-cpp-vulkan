@@ -152,7 +152,7 @@ image 逐张模式的多图结果以 "====== Image N ======" 分隔行拼接
 
 ### Chat Handler 注册表
 
-`app/core/handlers.py` 中的 `_HANDLER_SPECS` 表集中定义全部 handler：显示名 -> (类名, thinking 开关参数名)。启动时 `_resolve_handlers()` 用 `getattr` 对照 `llama_cpp.llama_multimodal` 模块解析类名，缺失的类打 warning 并从下拉框剔除（防御未来 wheel 升级时的类变动，不静默）。覆盖 Qwen/Gemma/GLM/MiniCPM/LLaVA 等数十种 VLM 模型格式，另有 `Generic-MTMD` 兜底 handler（渲染 GGUF 内置 chat template）适配无专用 handler 的模型。构造时需固定注入参数的 handler（如 Generic 的 `chat_format=None`）在 `_FIXED_KWARGS` 表声明，解析时包成 `functools.partial`。
+`app/core/handlers.py` 中的 `_HANDLER_SPECS` 表集中定义全部 handler：显示名 -> (类名, 构造 kwargs)。kwargs 是构造 handler 时固定注入的参数（thinking 开关、Generic 的 `chat_format=None` 等），解析时经 `functools.partial` 预绑定，`HANDLERS` 的值即可直接调用的构造器，`storage.py` 不再感知 thinking 逻辑。启动时 `_resolve_handlers()` 用 `getattr` 对照 `llama_cpp.llama_multimodal` 模块解析类名，缺失的类打 warning 并从下拉框剔除（防御未来 wheel 升级时的类变动，不静默）。覆盖 Qwen/Gemma/GLM/MiniCPM/LLaVA 等数十种 VLM 模型格式，另有 `Generic-MTMD` 兜底 handler（渲染 GGUF 内置 chat template）适配无专用 handler 的模型。带 `-Thinking` 后缀的显示名与基名共享同一个类、仅 thinking kwargs 值不同，后缀与开关值的一致性由 `tests/test_handlers.py` 契约测试锁定。
 
 ### 多模态输入
 
@@ -197,7 +197,7 @@ Instruct 子类的字段顺序约定：模型端口 -> 媒体输入 -> `prompt_i
 
 ### 新增 Chat Handler
 
-改 `app/core/handlers.py` 的 `_HANDLER_SPECS` 表。两个坑点：显示名含 "-Thinking" 后缀时加载器自动把 thinking 开关参数设为 True；thinking 参数名必须被该 handler 类 `__init__` 接受（基类会对未知 kwargs 抛 TypeError），如 GLM41VChatHandler 不接受 `enable_thinking`。
+改 `app/core/handlers.py` 的 `_HANDLER_SPECS` 表，thinking 开关等构造期参数直接写进条目的 kwargs。坑点：kwargs 的每个 key 必须被该 handler 类 `__init__` 显式接受（基类对未知 kwargs 抛 TypeError），如 GLM41VChatHandler 不接受 `enable_thinking`。类签名带 thinking 开关的条目必须显式声明开关值（否则库侧默认值静默生效）、`-Thinking` 后缀必须与开关值一致——这两条不变式由 `tests/test_handlers.py` 拦截，新增后跑一遍测试即可。
 
 ### Wheel 构建与发布 (CI)
 
