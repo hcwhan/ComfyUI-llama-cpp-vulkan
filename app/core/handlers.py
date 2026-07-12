@@ -22,8 +22,12 @@ _HANDLER_SPECS = {
     "llama3-Vision-Alpha": ("Llama3VisionAlphaChatHandler", None),
     "MiniCPM-v2.6": ("MiniCPMv26ChatHandler", None),
     "DeepSeek-OCR": ("MTMDChatHandler", None),
+    # Gemma3ChatHandler 没有自己的 __init__(基类对未知 kwargs 抛 TypeError),
+    # 不能配 thinking 参数;Gemma4 的 enable_thinking 按 wheel 说明仅
+    # 31B/26BA4B 支持, E2B/E4B 输出异常时建议选 -Thinking 变体(等于旧行为)
     "Gemma3": ("Gemma3ChatHandler", None),
-    "Gemma4": ("Gemma4ChatHandler", None),
+    "Gemma4": ("Gemma4ChatHandler", "enable_thinking"),
+    "Gemma4-Thinking": ("Gemma4ChatHandler", "enable_thinking"),
     "Qwen2.5-VL": ("Qwen25VLChatHandler", None),
     "MinerU2.5-Pro": ("Qwen25VLChatHandler", None),
     "Qwen3-VL": ("Qwen3VLChatHandler", "force_reasoning"),
@@ -34,7 +38,7 @@ _HANDLER_SPECS = {
     "Qwen3.6-Thinking": ("Qwen35ChatHandler", "enable_thinking"),
     "GLM-4.6V": ("GLM46VChatHandler", "enable_thinking"),
     "GLM-4.6V-Thinking": ("GLM46VChatHandler", "enable_thinking"),
-    # GLM41VChatHandler 不接受 enable_thinking(模板固定输出 thinking 块)
+    # GLM41VChatHandler 不接受 enable_thinking参数 (模板固定输出 thinking 块)
     "GLM-4.1V-Thinking": ("GLM41VChatHandler", None),
     "LFM2-VL": ("LFM2VLChatHandler", None),
     "LFM2.5-VL": ("LFM25VLChatHandler", None),
@@ -45,7 +49,8 @@ _HANDLER_SPECS = {
     "MiniCPM-v4.6-Thinking": ("MiniCPMV46ChatHandler", "enable_thinking"),
     "PaddleOCR-VL-1.5": ("PaddleOCRChatHandler", None),
     "Qwen3-ASR": ("Qwen3ASRChatHandler", None),
-    "Step3-VL": ("Step3VLChatHandler", None),
+    "Step3-VL": ("Step3VLChatHandler", "enable_thinking"),
+    "Step3-VL-Thinking": ("Step3VLChatHandler", "enable_thinking"),
     # 兜底 handler:渲染 GGUF 内置 chat template 并归一化媒体占位符,
     # 适配上表没有专用 handler 的 VLM;需要特殊 stop token/生成参数的
     # 模型仍应优先用专用 handler
