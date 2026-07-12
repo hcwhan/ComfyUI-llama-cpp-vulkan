@@ -1,6 +1,7 @@
 """llama.cpp image Instruct 节点, 图片推理.
 
-- 逐张模式: 逐张推理, 每张各得一条结果(output_list 供下游列表节点消费)
+- 逐张模式: 逐张推理, 多图结果用 "====== Image N ======" 分隔行拼接输出
+  (下游用 Split Instruct Output 拆回列表, JSON to BBoxes 会自动拆分)
 - 批量模式: 全部图片并入同一条 user 消息, 一次推理; 多图时缩放到 max_size
 """
 
@@ -46,20 +47,18 @@ class llama_cpp_image_instruct(llama_cpp_media_instruct_base):
         messages.append({"role": "user", "content": user_content})
         logger.info(f"[llama-cpp-vulkan] Start processing {len(images)} images")
 
-        out_list = []
         tmp_list = []
         for i, image in enumerate(cqdm(images)):
             if watcher.interrupted or mm.processing_interrupted():
                 raise mm.InterruptProcessingException()
             image_content["image_url"] = image_content_item(tensor_to_uint8(image))["image_url"]
             output = LLAMA_CPP_STORAGE.llm.create_chat_completion(messages=messages, seed=seed, **params)
-            text = extract_text(output)
-            out_list.append(text)
+            # 分隔行格式与 shared/text_utils 的 split_image_results 约定一致
             if len(images) > 1:
                 tmp_list.append(f"====== Image {i+1} ======")
-            tmp_list.append(text)
+            tmp_list.append(extract_text(output))
 
-        return "\n\n".join(tmp_list), out_list
+        return "\n\n".join(tmp_list)
 
     def _infer_batch(self, messages, user_content, images, max_size, seed, params, extract_text):
         for image in images:

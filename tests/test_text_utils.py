@@ -1,8 +1,8 @@
-"""app/shared/text_utils.py 的单元测试: 代码围栏剥离, JSON 解析, 嵌套取值."""
+"""app/shared/text_utils.py 的单元测试: 代码围栏剥离, 逐张结果拆分, JSON 解析, 嵌套取值."""
 
 import unittest
 
-from app.shared.text_utils import strip_code_fence, parse_json, get_nested_value
+from app.shared.text_utils import strip_code_fence, split_image_results, parse_json, get_nested_value
 
 
 class TestStripCodeFence(unittest.TestCase):
@@ -30,6 +30,33 @@ class TestStripCodeFence(unittest.TestCase):
 
     def test_surrounding_whitespace(self):
         self.assertEqual(strip_code_fence("  ```\nx\n```  "), "x")
+
+
+class TestSplitImageResults(unittest.TestCase):
+    def test_multi_image_output_split(self):
+        text = "====== Image 1 ======\n\n结果1\n\n====== Image 2 ======\n\n结果2\n\n====== Image 3 ======\n\n结果3"
+        self.assertEqual(split_image_results(text), ["结果1", "结果2", "结果3"])
+
+    def test_plain_text_returns_single_element(self):
+        self.assertEqual(split_image_results("普通文本"), ["普通文本"])
+
+    def test_json_with_escaped_newline_not_split(self):
+        # JSON 文本中的换行是 \n 转义, 不存在真实分隔行, 不应被拆分
+        text = '[{"label": "====== Image 1 ======\\n"}]'
+        self.assertEqual(split_image_results(text), [text])
+
+    def test_separator_inside_line_not_matched(self):
+        # 分隔样式出现在行中间(非独占一行)时不拆分
+        text = "前缀 ====== Image 1 ====== 后缀"
+        self.assertEqual(split_image_results(text), [text])
+
+    def test_crlf_separator(self):
+        text = "====== Image 1 ======\r\n\r\nA\r\n\r\n====== Image 2 ======\r\n\r\nB"
+        self.assertEqual(split_image_results(text), ["A", "B"])
+
+    def test_fenced_json_segments(self):
+        text = '====== Image 1 ======\n\n```json\n[{"a": 1}]\n```\n\n====== Image 2 ======\n\n```json\n[{"b": 2}]\n```'
+        self.assertEqual(split_image_results(text), ['```json\n[{"a": 1}]\n```', '```json\n[{"b": 2}]\n```'])
 
 
 class TestParseJson(unittest.TestCase):

@@ -15,6 +15,7 @@ from .type.media.bbox.node_bbox import (
 )
 from .util.node_parse_json import parse_json_node
 from .util.node_remove_code_block import remove_code_block
+from .util.node_split_output import split_instruct_output
 from .util.node_system_prompt import system_prompt_preset
 
 NODE_CLASS_MAPPINGS = {
@@ -32,6 +33,7 @@ NODE_CLASS_MAPPINGS = {
     "bboxes_to_mask": bboxes_to_mask,
     "bboxes_to_bbox": bboxes_to_bbox,
     "remove_code_block": remove_code_block,
+    "split_instruct_output": split_instruct_output,
     "system_prompt_preset": system_prompt_preset,
 }
 
@@ -50,5 +52,6 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "bboxes_to_mask": "BBoxes to MASK",
     "bboxes_to_bbox": "BBoxes to BBox",
     "remove_code_block": "Unpack Code Block",
+    "split_instruct_output": "Split Instruct Output",
     "system_prompt_preset": "System Prompt Preset",
 }

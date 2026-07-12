@@ -1,4 +1,4 @@
-"""LLM 输出文本处理: 代码围栏剥离, JSON 解析, 嵌套取值. 被 util 文本节点与 bbox 节点共同使用."""
+"""LLM 输出文本处理: 代码围栏剥离, 逐张结果拆分, JSON 解析, 嵌套取值. 被 util 文本节点与 bbox 节点共同使用."""
 
 import re
 import json
@@ -8,6 +8,21 @@ import json
 # 标签不能用 [^\s`]* 之类的宽匹配:围栏后无换行直接跟正文时会把正文吞掉
 _FENCE_OPEN_RE = re.compile(r"^```[\w+.-]*[ \t]*\r?\n?")
 _FENCE_CLOSE_RE = re.compile(r"\r?\n?```$")
+
+# image Instruct 逐张模式在多图结果间插入的分隔行(独占一行, 行首行尾锚定,
+# 降低正文文本误匹配的概率; JSON 文本中换行均为 \n 转义, 不会产生真实分隔行)
+_IMAGE_SEP_RE = re.compile(r"^====== Image \d+ ======[ \t]*\r?$", re.MULTILINE)
+
+
+def split_image_results(text):
+    """把 image Instruct 逐张模式的拼接输出按分隔行拆回逐张结果列表。
+
+    无分隔行时返回单元素列表(整段原文), 普通文本 / 单图结果可安全通过。
+    """
+    if not _IMAGE_SEP_RE.search(text):
+        return [text]
+    parts = [p.strip() for p in _IMAGE_SEP_RE.split(text)]
+    return [p for p in parts if p]
 
 
 def strip_code_fence(text, label=""):

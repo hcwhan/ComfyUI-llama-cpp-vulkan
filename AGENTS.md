@@ -32,10 +32,10 @@ ComfyUI-llama-cpp-vulkan/
       gguf_layers.py          #   GGUF 文件解析：读取模型层数 (block_count)
       cqdm.py                 #   进度条封装：同时驱动 ComfyUI ProgressBar 和 tqdm
     shared/                   # 跨领域纯工具（非节点）
-      text_utils.py           #   代码围栏剥离、JSON 解析、嵌套取值
+      text_utils.py           #   代码围栏剥离、逐张结果拆分、JSON 解析、嵌套取值
       types.py                #   AnyType 万能透传类型
     nodes/                    # 只放节点声明
-      __init__.py             #   节点注册表（15 个节点的映射）
+      __init__.py             #   节点注册表（16 个节点的映射）
       model/
         node_loaders.py       #   llm / vlm 两个 Model Loader
         node_parameters.py    #   llama.cpp Parameters
@@ -57,6 +57,7 @@ ComfyUI-llama-cpp-vulkan/
       util/
         node_parse_json.py    #   Parse JSON
         node_remove_code_block.py  # Unpack Code Block
+        node_split_output.py       # Split Instruct Output
         node_system_prompt.py      # System Prompt Preset
         system_prompt_presets.py   # 12 个中文 Prompt 增强系统提示词模板
   scripts/
@@ -81,6 +82,7 @@ ComfyUI-llama-cpp-vulkan/
 | `bboxes_to_mask` | BBoxes to MASK | BBox 转遮罩图 |
 | `bboxes_to_bbox` | BBoxes to BBox | 从多组 BBox 中选取特定索引 |
 | `remove_code_block` | Unpack Code Block | 去除 LLM 输出中的代码块标记 |
+| `split_instruct_output` | Split Instruct Output | 把 image Instruct 逐张模式的拼接输出拆回 STRING 列表 |
 | `system_prompt_preset` | System Prompt Preset | 12 种中文 Prompt 增强系统提示词预设 |
 
 ### 数据流
@@ -92,10 +94,13 @@ llama_cpp_vlm_model_loader --> LLAMACPPVLM --+---> llama_cpp_image_instruct
 llama_cpp_parameters ----> LLAMACPPARAMS ----+---> llama_cpp_audio_instruct
                         (全部 Instruct 的可选输入)
 
-全部 Instruct 输出 STRING (output) / STRING[] (output_list)
+全部 Instruct 输出单端口 STRING (output);
+image 逐张模式的多图结果以 "====== Image N ======" 分隔行拼接
     |
-    +--> parse_json_node / json_to_bboxes / remove_code_block
-              |
+    +--> parse_json_node / json_to_bboxes / remove_code_block / split_instruct_output
+              |                  |                                   |
+              |                  |            (拆回 STRING 列表, 接第三方列表语义节点)
+              |                  +--> 内建同款拆分, output 可直连
               +--> bboxes_to_segs / bboxes_to_mask  (下游图像处理)
 ```
 
@@ -148,7 +153,7 @@ llama_cpp_parameters ----> LLAMACPPARAMS ----+---> llama_cpp_audio_instruct
 
 ### 多模态输入
 
-- image Instruct：`batch_images` 开关切换逐张推理（每张一条结果）与批量单请求；批量多图时缩放到 `max_size`，单图保持原分辨率
+- image Instruct：`batch_images` 开关切换逐张推理（多图结果以 `====== Image N ======` 分隔行拼接，`split_instruct_output` 节点与 `json_to_bboxes` 的内建拆分均可还原为逐张列表）与批量单请求；批量多图时缩放到 `max_size`，单图保持原分辨率
 - video Instruct：`frames` 输入为 IMAGE 帧批次（ComfyUI 生态的视频通行形态），按 `max_frames` linspace 均匀抽帧后缩放，并在 system prompt 前注入"连续视频"语义提示
 - audio Instruct：ComfyUI `AUDIO` dict 由 `media/encoding.py` 的 `audio2base64()` 均值混为单声道 16-bit WAV，以 `input_audio` 内容项注入（重采样由 llama.cpp 的 mtmd 解码端完成），服务 Qwen3-ASR 等音频 handler；音频是否被 mmproj 支持由 llama-cpp-python 侧校验
 

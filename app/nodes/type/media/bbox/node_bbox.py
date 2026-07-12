@@ -4,7 +4,7 @@ import torch
 import numpy as np
 
 from .....shared.logger import logger
-from .....shared.text_utils import parse_json
+from .....shared.text_utils import parse_json, split_image_results
 from .bbox_utils import (
     QWEN_BBOX_MODES,
     bbox_label,
@@ -58,6 +58,10 @@ class json_to_bboxes:
         # INPUT_IS_LIST 下 widget 参数也会被包成列表
         mode = mode[0]
         label = label[0]
+
+        # image Instruct 逐张模式的 output 是分隔行拼接的整段文本,
+        # 自动拆回逐张 JSON;合法 JSON 文本中不存在真实分隔行,不会被误拆
+        json = [part for text in json for part in split_image_results(text)]
 
         # 拆平为 [1,H,W,C] 单帧列表,记录每个输入元素的批次大小以便还原结构
         flat_images = []

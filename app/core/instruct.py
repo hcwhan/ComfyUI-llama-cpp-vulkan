@@ -79,9 +79,8 @@ class InterruptWatcher:
 class llama_cpp_instruct_base:
     CATEGORY = "llama-cpp-vulkan"
     FUNCTION = "process"
-    RETURN_TYPES = ("STRING", "STRING")
-    RETURN_NAMES = ("output", "output_list")
-    OUTPUT_IS_LIST = (False, True)
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("output",)
 
     # 子类覆盖:模型端口类型(llm_model/vlm_model) / 预设模板 @@@ 占位符替换词 /
     # 模态标识(按预设的 use 字段过滤下拉框名单, 列表第一项即默认预设)
@@ -162,17 +161,17 @@ class llama_cpp_instruct_base:
         return extract_text
 
     def _single_completion(self, messages, user_content, seed, params, extract_text):
-        """把 user_content 作为单条 user 消息发起一次补全。"""
+        """把 user_content 作为单条 user 消息发起一次补全,返回生成文本。"""
         messages.append({"role": "user", "content": user_content})
         output = LLAMA_CPP_STORAGE.llm.create_chat_completion(messages=messages, seed=seed, **params)
-        out1 = extract_text(output)
-        return out1, [out1]
+        return extract_text(output)
 
     def _run(self, llama_model, preset_prompt, custom_prompt, system_prompt, seed, force_offload, strip_thinking, parameters, runner):
         """通用执行骨架:组消息 -> 中断监视下执行 runner -> 收尾清理。
 
         runner(messages, user_content, seed, params, extract_text, watcher)
-        由子类提供,返回 (output, output_list)。
+        由子类提供,返回输出文本(image 逐张模式为按分隔行拼接的整段文本,
+        下游可用 Split Instruct Output 节点或 JSON to BBoxes 的内建拆分还原)。
         """
         messages = self._prepare_messages(llama_model, system_prompt)
         user_content = [self._build_user_prompt(preset_prompt, custom_prompt)]
@@ -184,7 +183,7 @@ class llama_cpp_instruct_base:
         # 收尾放 finally:中断/异常路径同样需要 force_offload 释放显存与 hybrid 重置
         try:
             with InterruptWatcher(LLAMA_CPP_STORAGE.llm) as watcher:
-                out1, out2 = runner(messages, user_content, seed, params, extract_text, watcher)
+                out = runner(messages, user_content, seed, params, extract_text, watcher)
             if watcher.interrupted:
                 # abort_event 使生成提前返回了截断结果,丢弃并走标准中断流程
                 raise mm.InterruptProcessingException()
@@ -201,7 +200,7 @@ class llama_cpp_instruct_base:
                 if llm._hybrid_cache_mgr is not None:
                     llm._hybrid_cache_mgr.clear()
 
-        return (out1, out2)
+        return (out,)
 
 
 class llama_cpp_media_instruct_base(llama_cpp_instruct_base):
