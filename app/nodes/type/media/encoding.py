@@ -61,7 +61,7 @@ def audio2base64(audio):
     return _encode_wav_base64(pcm.tobytes(), int(audio["sample_rate"]))
 
 
-def scale_image(image: torch.Tensor, max_size: int = 128):
+def scale_image(image: torch.Tensor, max_size: int):
     img_pil = Image.fromarray(tensor_to_uint8(image))
 
     w, h = img_pil.size
