@@ -16,6 +16,11 @@ from .bbox_utils import (
     valid_int_bbox,
 )
 
+def _normalized_label(value):
+    """label 匹配归一化: 忽略大小写与首尾空格,非字符串视为不匹配。"""
+    return value.strip().casefold() if isinstance(value, str) else None
+
+
 # 与 Impact Pack 的 SEG 保持同定义(modules/impact/core.py),字段名与顺序不能改:
 # 其部分节点依赖 namedtuple 语义(如 SEGSLabelAssign 调用 seg._replace)
 SEG = namedtuple(
@@ -35,7 +40,7 @@ class json_to_bboxes:
                 "label": ("STRING", {
                     "default":"",
                     "multiline": False,
-                    "tooltip": "只保留指定 label 的 BBox."
+                    "tooltip": "只保留指定 label 的 BBox.\n(匹配忽略大小写与首尾空格)"
                 }),
             },
             "optional": {
@@ -53,7 +58,7 @@ class json_to_bboxes:
     def process(self, json, mode, label, image=None):
         # INPUT_IS_LIST 下 widget 参数也会被包成列表
         mode = mode[0]
-        label = label[0]
+        wanted_label = _normalized_label(label[0])
 
         # image Instruct 逐张模式的 output 是分隔行拼接的整段文本,
         # 自动拆回逐张 JSON;合法 JSON 文本中不存在真实分隔行,不会被误拆
@@ -83,9 +88,9 @@ class json_to_bboxes:
                 items = [items]
             if not isinstance(items, list):
                 raise ValueError(f'Expected a JSON list of {{"bbox_2d": [...], "label": "..."}} objects, got: {type(items).__name__}')
-            if label != "":
+            if wanted_label:
                 # 兼容 label / text_content 混用的输出,任一字段匹配即保留
-                items = [b for b in items if label in (b.get("label"), b.get("text_content"))]
+                items = [b for b in items if wanted_label in (_normalized_label(b.get("label")), _normalized_label(b.get("text_content")))]
 
             if flat_images:
                 curr_img = flat_images[min(i, len(flat_images) - 1)]
