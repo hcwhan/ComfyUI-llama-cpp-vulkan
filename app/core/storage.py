@@ -15,7 +15,7 @@ from .model_paths import get_llm_full_path
 
 # GGUF 文件体积 -> 运行时显存占用的经验放大系数,按 n_ctx=8192 校准拆成两项:
 # 与上下文无关的计算缓冲等固定开销 + 随 n_ctx 线性增长的 KV/激活开销
-# (8192 时合计 1.55,与旧版单一系数保持一致)
+# (8192 时合计 1.55)
 _BASE_OVERHEAD = 0.15
 _KV_OVERHEAD_AT_8K = 0.40
 _KV_CALIBRATION_CTX = 8192

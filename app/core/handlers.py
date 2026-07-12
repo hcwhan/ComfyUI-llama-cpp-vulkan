@@ -33,7 +33,7 @@ _HANDLER_SPECS = {
     # ---- GLM ----
     "GLM-4.6V": ("GLM46VChatHandler", {"enable_thinking": False}),
     "GLM-4.6V-Thinking": ("GLM46VChatHandler", {"enable_thinking": True}),
-    # GLM41VChatHandler 不接受 enable_thinking参数 (模板固定输出 thinking 块)
+    # GLM41VChatHandler 不接受 enable_thinking 参数 (模板固定输出 thinking 块)
     "GLM-4.1V-Thinking": ("GLM41VChatHandler", None),
 
     # ---- Gemma ----
