@@ -5,6 +5,8 @@ llama_multimodal 模块. 缺失的类只会让对应选项从下拉框消失
 (启动日志给出 warning), 不会静默吞掉错误.
 """
 
+import functools
+
 import llama_cpp.llama_multimodal as _handler_module
 
 from ..shared.logger import logger
@@ -44,6 +46,16 @@ _HANDLER_SPECS = {
     "PaddleOCR-VL-1.5": ("PaddleOCRChatHandler", None),
     "Qwen3-ASR": ("Qwen3ASRChatHandler", None),
     "Step3-VL": ("Step3VLChatHandler", None),
+    # 兜底 handler:渲染 GGUF 内置 chat template 并归一化媒体占位符,
+    # 适配上表没有专用 handler 的 VLM;需要特殊 stop token/生成参数的
+    # 模型仍应优先用专用 handler
+    "Generic-MTMD": ("GenericMTMDChatHandler", None),
+}
+
+# 构造时需要固定注入的参数:Generic 的 chat_format 是必填位置参数,
+# None 表示沿用模型内置 chat template
+_FIXED_KWARGS = {
+    "Generic-MTMD": {"chat_format": None},
 }
 
 
@@ -55,6 +67,9 @@ def _resolve_handlers():
         if handler_cls is None:
             missing.append(f"{label} ({cls_name})")
             continue
+        fixed = _FIXED_KWARGS.get(label)
+        if fixed:
+            handler_cls = functools.partial(handler_cls, **fixed)
         available[label] = (handler_cls, think_param)
     if missing:
         logger.warning(f"[llama-cpp-vulkan] chat handler(s) unavailable in this llama-cpp-python build: {', '.join(missing)}")

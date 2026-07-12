@@ -27,7 +27,7 @@ ComfyUI-llama-cpp-vulkan/
       instruct.py             #   Instruct 基类（text 骨架）+ media 基类（VLM 校验）+ 中断/thinking/hybrid 工具
       prompts.py              #   任务预设模板池（@@@/### 占位符，use 字段声明适用模态）
       devices.py              #   Vulkan GPU 设备检测与选择（ggml C API / ctypes）
-      handlers.py             #   Chat handler 注册表（30 种 VLM 格式）
+      handlers.py             #   Chat handler 注册表（数十种 VLM 格式）
       model_paths.py          #   llm/LLM 模型目录注册与路径查找
       gguf_layers.py          #   GGUF 文件解析：读取模型层数 (block_count)
       cqdm.py                 #   进度条封装：同时驱动 ComfyUI ProgressBar 和 tqdm
@@ -152,7 +152,7 @@ image 逐张模式的多图结果以 "====== Image N ======" 分隔行拼接
 
 ### Chat Handler 注册表
 
-`app/core/handlers.py` 中的 `_HANDLER_SPECS` 表集中定义全部 handler：显示名 -> (类名, thinking 开关参数名)。启动时 `_resolve_handlers()` 用 `getattr` 对照 `llama_cpp.llama_multimodal` 模块解析类名，缺失的类打 warning 并从下拉框剔除（防御未来 wheel 升级时的类变动，不静默）。支持 30 种 VLM 模型格式（Qwen/Gemma/GLM/MiniCPM/LLaVA 等）。
+`app/core/handlers.py` 中的 `_HANDLER_SPECS` 表集中定义全部 handler：显示名 -> (类名, thinking 开关参数名)。启动时 `_resolve_handlers()` 用 `getattr` 对照 `llama_cpp.llama_multimodal` 模块解析类名，缺失的类打 warning 并从下拉框剔除（防御未来 wheel 升级时的类变动，不静默）。覆盖 Qwen/Gemma/GLM/MiniCPM/LLaVA 等数十种 VLM 模型格式，另有 `Generic-MTMD` 兜底 handler（渲染 GGUF 内置 chat template）适配无专用 handler 的模型。构造时需固定注入参数的 handler（如 Generic 的 `chat_format=None`）在 `_FIXED_KWARGS` 表声明，解析时包成 `functools.partial`。
 
 ### 多模态输入
 
