@@ -79,7 +79,13 @@ class json_to_bboxes:
         if mode in QWEN_BBOX_MODES and not flat_images:
             raise ValueError("Image required for Qwen mode")
         if flat_images and len(json) != len(flat_images):
-            logger.warning(f"[llama-cpp-vulkan] {len(json)} JSON result(s) but {len(flat_images)} image frame(s); pairing by index, extra entries reuse the last frame")
+            # 按当前实际行为分方向描述: 多出的 JSON 在末帧上画框但重组阶段被丢弃
+            # (bboxes 仍输出全部组), JSON 不足时尾部未配对的帧不进入 image_list
+            if len(json) > len(flat_images):
+                detail = "extra JSON entries draw on the last frame but their frames are dropped from image_list (bboxes keeps all groups)"
+            else:
+                detail = "unpaired trailing frames are dropped from image_list"
+            logger.warning(f"[llama-cpp-vulkan] {len(json)} JSON result(s) but {len(flat_images)} image frame(s); pairing by index, {detail}")
 
         output_bboxes = []
         drawn_images = []

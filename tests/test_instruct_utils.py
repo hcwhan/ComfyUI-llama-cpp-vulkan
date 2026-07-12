@@ -71,7 +71,7 @@ class TestBuildUserPrompt(unittest.TestCase):
             self._text("视觉 - BBox 目标检测 (需custom_prompt)", "  ")
 
     def test_rewrite_preset_keeps_instruction_and_custom(self):
-        # H1 回归: 改写增强预设必须同时保留改写指令与待改写的用户提示词
+        # 回归: 改写增强预设必须同时保留改写指令与待改写的用户提示词
         text = self._text("创意 - 提示词增强 (需custom_prompt)", "一只猫")
         self.assertIn("改写并增强", text)
         self.assertIn('"一只猫"', text)
@@ -83,7 +83,7 @@ class TestBuildUserPrompt(unittest.TestCase):
 
 
 class TestSingleCompletionContentFlattening(unittest.TestCase):
-    """H1 回归: 纯文本 user content 必须扁平化为字符串。
+    """回归: 纯文本 user content 必须扁平化为字符串。
 
     无 chat handler 的文本路径由 GGUF 内嵌 chat template 渲染消息,
     旧式模板(ChatML/Llama-3/Mistral 等)假定 content 是字符串,

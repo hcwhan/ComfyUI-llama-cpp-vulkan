@@ -2,11 +2,16 @@
 name = "comfyui-llama-cpp-vulkan"
 description = "Run LLM/VLM models natively in ComfyUI based on llama.cpp with Vulkan GPU acceleration"
 version = "2.0.0"
+# ABI3 Vulkan wheel 面向 CPython 3.10+
+requires-python = ">=3.10"
 classifiers = [
      "Operating System :: Microsoft :: Windows",
      "Operating System :: POSIX :: Linux",
 ]
 
+# llama-cpp-python 有意不在此声明: Comfy Registry 不接受 URL 依赖,
+# 平台条件的 Vulkan wheel URL 以 requirements.txt 为准, 安装时必须执行
+# pip install -r requirements.txt (README 安装节第 2 步)
 dependencies = ["scipy", "numpy", "pillow", "tqdm"]
 
 [project.urls]

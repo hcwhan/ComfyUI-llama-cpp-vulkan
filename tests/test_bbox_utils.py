@@ -79,7 +79,7 @@ class TestFeatheredRectMask(unittest.TestCase):
 
 
 class TestQwen25SmartResize(unittest.TestCase):
-    """M3 回归: smart_resize 复现值须与 Qwen2.5-VL-3B GGUF 的 mtmd 实测一致。
+    """回归: smart_resize 复现值须与 Qwen2.5-VL-3B GGUF 的 mtmd 实测一致。
 
     以下期望值全部来自真实模型推理时 mtmd 日志反推(image chunk token 数),
     并经模型输出坐标逐值印证。
@@ -98,7 +98,7 @@ class TestQwen25SmartResize(unittest.TestCase):
 
 
 class TestQwen25ModeConversion(unittest.TestCase):
-    """M3 回归: Qwen2.5-VL 模式把 resize 空间绝对坐标还原为原图坐标。
+    """回归: Qwen2.5-VL 模式把 resize 空间绝对坐标还原为原图坐标。
 
     用例数据为实测: 3200x2400 原图中方块位于 (2400, 1200)-(2800, 1600),
     模型输出 [1534, 769, 1789, 1025] (resize 后 2044x1540 空间)。
@@ -121,7 +121,7 @@ class TestQwen25ModeConversion(unittest.TestCase):
 
 
 class TestSEGNamedtupleCompat(unittest.TestCase):
-    """H2 回归: SEG 必须保持 Impact Pack 的 namedtuple 语义。
+    """回归: SEG 必须保持 Impact Pack 的 namedtuple 语义。
 
     Impact Pack 的 SEGSLabelAssign 节点对 SEG 调用 _replace,
     字段名与顺序须与其 modules/impact/core.py 的定义一致。

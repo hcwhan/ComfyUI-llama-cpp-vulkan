@@ -2,7 +2,7 @@
 
 Run LLM/VLM models natively in ComfyUI based on llama.cpp with **Vulkan** GPU acceleration.
 
-**[[📃中文版](./README_zh.md)]**
+**[[中文版](./README_zh.md)]**
 
 ## Why Vulkan?
 
@@ -24,11 +24,12 @@ Vulkan provides near-native GPU performance without requiring CUDA or ROCm toolk
 | Qwen3.5 / Qwen3.6 | Yes |
 | Qwen3-VL | Yes |
 | Qwen2.5-VL | - |
-| Gemma3 / Gemma4 | - |
+| Gemma3 | - |
+| Gemma4 | Yes |
 | GLM-4.6V / GLM-4.1V | Yes |
 | LFM2-VL / LFM2.5-VL | - |
 | MiniCPM-v4.5 / v4.6 | Yes |
-| Step3-VL | - |
+| Step3-VL | Yes |
 
 Legacy handlers (LLaVA-1.5 / 1.6, Moondream2, nanoLLaVA, llama3-Vision-Alpha, MiniCPM-v2.6) are also available; the dropdown of `vlm Model Loader` is the authoritative list.
 
@@ -41,8 +42,9 @@ Legacy handlers (LLaVA-1.5 / 1.6, Moondream2, nanoLLaVA, llama3-Vision-Alpha, Mi
 | PaddleOCR-VL-1.5 | OCR |
 | MinerU2.5-Pro | Document |
 | Qwen3-ASR | Speech |
+| Generic-MTMD | Fallback (renders the model's built-in chat template) |
 
-> Any GGUF model without a specific handler will run in generic text mode.
+> VLMs without a dedicated handler can use the `Generic-MTMD` fallback handler. Text-only GGUF models need no handler at all and run in generic text mode via `llm Model Loader`.
 
 ## Installation
 
@@ -58,6 +60,8 @@ git clone https://github.com/hcwhan/ComfyUI-llama-cpp-vulkan.git
 ```bash
 pip install -r ComfyUI-llama-cpp-vulkan/requirements.txt
 ```
+
+> This step is required no matter how the node was installed (git clone, ComfyUI-Manager or Comfy Registry): the `llama-cpp-python` Vulkan wheel is only declared in `requirements.txt`, not in the registry metadata.
 
 Pre-built Vulkan wheels are available for:
 - Windows x86_64: CPython 3.10+ (ABI3 universal wheel)
@@ -86,6 +90,7 @@ CMAKE_ARGS="-DGGML_VULKAN=on" pip install llama-cpp-python --no-cache-dir --forc
 - Custom paths via `extra_model_paths.yaml` are also supported.
 
   > If you need a VLM model to process image input, don't forget to download the `mmproj` weights.
+  > The loaders tell mmproj weights apart from main models by file name: only files whose name contains `mmproj` (case-insensitive) show up in the mmproj dropdown, so keep `mmproj` in the file name when renaming.
 
 ## Nodes (v2.0)
 
