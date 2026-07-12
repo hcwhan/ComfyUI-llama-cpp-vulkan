@@ -8,6 +8,7 @@ comfy_stubs.install()
 
 from app.core.instruct import strip_thinking_blocks, llama_cpp_instruct_base  # noqa: E402
 from app.core.prompts import instruct_presets, preset_content  # noqa: E402
+from app.core.storage import LLAMA_CPP_STORAGE  # noqa: E402
 from app.nodes.type.text.node_instruct import llama_cpp_text_instruct  # noqa: E402
 from app.nodes.type.media.image.node_instruct import llama_cpp_image_instruct  # noqa: E402
 from app.nodes.type.media.video.node_instruct import llama_cpp_video_instruct  # noqa: E402
@@ -79,6 +80,46 @@ class TestBuildUserPrompt(unittest.TestCase):
     def test_rewrite_preset_requires_custom(self):
         with self.assertRaises(ValueError):
             self._text("创意 - 提示词增强 (需custom_prompt)", "")
+
+
+class TestSingleCompletionContentFlattening(unittest.TestCase):
+    """H1 回归: 纯文本 user content 必须扁平化为字符串。
+
+    无 chat handler 的文本路径由 GGUF 内嵌 chat template 渲染消息,
+    旧式模板(ChatML/Llama-3/Mistral 等)假定 content 是字符串,
+    收到 content-part 列表会 TypeError 或渲染出 Python repr 垃圾。
+    """
+
+    class _FakeLlm:
+        def __init__(self):
+            self.captured_messages = None
+
+        def create_chat_completion(self, messages, seed, **params):
+            self.captured_messages = messages
+            return {"choices": [{"message": {"content": "ok"}}]}
+
+    def setUp(self):
+        self.node = llama_cpp_instruct_base()
+        self.fake = self._FakeLlm()
+        self._orig_llm = LLAMA_CPP_STORAGE.llm
+        LLAMA_CPP_STORAGE.llm = self.fake
+        self.addCleanup(setattr, LLAMA_CPP_STORAGE, "llm", self._orig_llm)
+
+    @staticmethod
+    def _extract(output):
+        return output["choices"][0]["message"]["content"]
+
+    def test_single_text_item_flattened_to_string(self):
+        self.node._single_completion([], [{"type": "text", "text": "hello"}], 0, {}, self._extract)
+        self.assertEqual(self.fake.captured_messages[-1]["content"], "hello")
+
+    def test_media_content_list_passed_through(self):
+        content = [
+            {"type": "text", "text": "hi"},
+            {"type": "image_url", "image_url": {"url": "data:image/png;base64,x"}},
+        ]
+        self.node._single_completion([], content, 0, {}, self._extract)
+        self.assertIs(self.fake.captured_messages[-1]["content"], content)
 
 
 class TestPresetConfig(unittest.TestCase):

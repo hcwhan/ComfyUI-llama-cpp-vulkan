@@ -161,7 +161,15 @@ class llama_cpp_instruct_base:
         return extract_text
 
     def _single_completion(self, messages, user_content, seed, params, extract_text):
-        """把 user_content 作为单条 user 消息发起一次补全,返回生成文本。"""
+        """把 user_content 作为单条 user 消息发起一次补全,返回生成文本。
+
+        content 只含单个 text 项时扁平化为纯字符串:无 chat handler 的纯文本路径
+        由 GGUF 内嵌 chat template 渲染消息,旧式模板(ChatML/Llama-3/Mistral 等)
+        假定 content 是字符串,收到 content-part 列表会报错或渲染出 Python repr。
+        媒体路径的 content 必然追加了媒体项(长度 > 1),不受影响。
+        """
+        if len(user_content) == 1 and user_content[0].get("type") == "text":
+            user_content = user_content[0]["text"]
         messages.append({"role": "user", "content": user_content})
         output = LLAMA_CPP_STORAGE.llm.create_chat_completion(messages=messages, seed=seed, **params)
         return extract_text(output)
