@@ -83,6 +83,22 @@ ComfyUI-llama-cpp-vulkan/
 | `remove_code_block` | Unpack Code Block | 去除 LLM 输出中的代码块标记 |
 | `system_prompt_preset` | System Prompt Preset | 12 种中文 Prompt 增强系统提示词预设 |
 
+### 数据流
+
+```
+llama_cpp_llm_model_loader --> LLAMACPPLLM ------> llama_cpp_text_instruct
+llama_cpp_vlm_model_loader --> LLAMACPPVLM --+---> llama_cpp_image_instruct
+                                             +---> llama_cpp_video_instruct
+llama_cpp_parameters ----> LLAMACPPARAMS ----+---> llama_cpp_audio_instruct
+                        (全部 Instruct 的可选输入)
+
+全部 Instruct 输出 STRING (output) / STRING[] (output_list)
+    |
+    +--> parse_json_node / json_to_bboxes / remove_code_block
+              |
+              +--> bboxes_to_segs / bboxes_to_mask  (下游图像处理)
+```
+
 ### 类型隔离
 
 `LLAMACPPLLM`（llm Loader 输出）与 `LLAMACPPVLM`（vlm Loader 输出）完全独立：llm 配置只能连 text Instruct，vlm 配置只能连 image/video/audio Instruct，连错在连线阶段即被 ComfyUI 类型系统拦截。两种配置 dict 结构相同（llm 侧 mmproj/chat_handler 固定为 "None"），底层共用 `core/storage.py` 的加载路径。
@@ -96,6 +112,7 @@ ComfyUI-llama-cpp-vulkan/
 关键函数链：`_detect_gpu_devices()` -> `_selectable_devices()` -> `gpu_device_choices` / `resolve_device_selection()`
 
 选择语义（与 llama.cpp 构建 `model->devices` 的规则对齐）：
+
 - llama.cpp 只把独显按枚举顺序收入设备列表，仅当无独显时才收第一个核显，其余设备无法通过 `main_gpu` 到达，因此下拉框只展示可达设备
 - `Auto (独显优先)`：走 llama.cpp 默认行为（`LLAMA_SPLIT_MODE_LAYER`，独显优先，多独显按层切分）
 - 显式选择某设备：传 `LLAMA_SPLIT_MODE_NONE` + 该设备在可选列表中的索引，整个模型加载到单卡；`main_gpu` 在 LAYER 模式下会被 llama.cpp 忽略，这是显式选择必须切 NONE 的原因
@@ -103,6 +120,7 @@ ComfyUI-llama-cpp-vulkan/
 ### 模型生命周期
 
 `app/core/storage.py` 的 `LLAMA_CPP_STORAGE` 类管理全局单例模型状态：
+
 - 懒加载：两个 Loader 只调用 `resolve_config()` 做快速失败校验（模型/mmproj 路径存在、mmproj 与 chat_handler 配对合法）并返回 config，实际加载由 Instruct 节点按需触发；多组 loader+instruct 交错时避免全局单例被 loader 反复挤占
 - `load_model()`: 先 `resolve_config()` 校验再卸载旧模型（无效配置不影响已加载的模型），随后加载 GGUF 模型 + 可选的 mmproj（视觉编码器）
 - `clean()`: 释放模型和 chat_handler 资源
@@ -112,9 +130,17 @@ ComfyUI-llama-cpp-vulkan/
 ### Instruct 继承体系
 
 `app/core/instruct.py` 提供两级基类，四个 Instruct 节点只声明 `INPUT_TYPES` 与模态专属的 runner 闭包：
+
 - `llama_cpp_instruct_base`：通用骨架。`_run()` 负责组消息（system + user）、复制采样参数、`InterruptWatcher` 监视、force_offload / hybrid KV 重置收尾；`prompt_inputs()/runtime_inputs()/optional_inputs()` 是 INPUT_TYPES 字段组装块
 - `llama_cpp_media_instruct_base`：多模态骨架，`MODEL_TYPE = "LLAMACPPVLM"`，附 `require_mmproj()` 兜底校验
-- 预设的显示范围由 `core/prompts.py` 中每个预设的 `use` 字段声明（dict 声明顺序即 UI 下拉框顺序，各模态过滤结果的第一项即该节点的默认预设），节点类通过 `MODALITY` 类属性对号入座；`MEDIA_WORD` 决定模板中 `@@@` 占位符的替换词（text/image -> 图像、video -> 视频、audio -> 音频）；`###` 占位符由 custom_prompt 填充（模板含 `###` 时必填，否则非空 custom_prompt 整体覆盖预设）；任务预设与增强预设文本均为中文
+
+### 任务预设系统
+
+预设模板池在 `core/prompts.py`，任务预设与增强预设文本均为中文：
+
+- 显示范围由每个预设的 `use` 字段声明（text/image/video/audio），节点类通过 `MODALITY` 类属性对号入座；dict 声明顺序即 UI 下拉框顺序，各模态过滤结果的第一项即该节点的默认预设
+- `@@@` 占位符替换为节点类的 `MEDIA_WORD`（text/image -> 图像、video -> 视频、audio -> 音频）
+- `###` 占位符由 custom_prompt 填充：模板含 `###` 时必填，否则非空 custom_prompt 整体覆盖预设
 
 ### Chat Handler 注册表
 
@@ -133,42 +159,27 @@ ComfyUI-llama-cpp-vulkan/
 - `InterruptWatcher`：推理期间守护线程每 200ms 轮询 `mm.processing_interrupted()`，命中后调用 `Llama.abort()` 使生成立即停止；llama-cpp-python 在每次请求开始会 clear abort 事件，因此监视线程命中后持续重复 set 以抗竞态
 - 每次请求结束后按 `is_hybrid_arch()`（`_model.is_hybrid()`/`is_recurrent()` C API）判断是否整体重置 KV cache：hybrid/recurrent 架构（Qwen3.5、LFM2 系等）的线性注意力状态无法跨请求前缀复用；纯 SWA 模型（Gemma3）不受影响
 
-## 数据流
-
-```
-llama_cpp_llm_model_loader --> LLAMACPPLLM   ----> llama_cpp_text_instruct
-llama_cpp_vlm_model_loader --> LLAMACPPVLM   --+-> llama_cpp_image_instruct
-                                               +-> llama_cpp_video_instruct
-llama_cpp_parameters --> LLAMACPPARAMS --------+-> llama_cpp_audio_instruct
-                                  (全部 Instruct 的可选输入)
-                       |         |
-                    STRING    STRING[]
-                   (output)  (output_list)
-                       |
-                       v
-              parse_json_node / json_to_bboxes / remove_code_block
-                       |
-                       v
-              bboxes_to_segs / bboxes_to_mask  (下游图像处理)
-```
-
 ## 修改代码须知
+
+### 文档维护原则
+
+- 本文件只记录无法从代码直接看出的内容：架构决策、跨文件约束、易踩的坑。一般性内容（如"在某个 dict 加一行"式的操作步骤、读代码即可自然得出的说明）不要写入本文件
+- 本地笔记类文件（如 `TODO.md`）不入仓库（已在 `.gitignore` 中）
 
 ### Commit message 规范
 
 - 一律使用中文书写（标题与正文），保留 conventional commits 类型前缀（`feat:` / `fix:` / `refactor:` / `docs:` / `chore:` / `ci:` / `test:`，破坏性变更加 `!`）
 - 代码标识符、文件名、API 名等专有名词保持原文，不翻译
-- 本地笔记类文件（如 `TODO.md`）不入仓库（已在 `.gitignore` 中）
+
+### Python 文件规范
+
+- 每个 .py 文件顶部必须有描述整个文件用途的模块 docstring, docstring 之后空一行再写代码
+- docstring 内的标点: 逗号使用英文逗号加一个空格 ", ", 句号使用英文句号 "."
+- 无实际代码的包不创建 `__init__.py`（子包走 Python 隐式命名空间包），全项目只有根入口与 `app/nodes/__init__.py` 注册表两个 `__init__.py`
 
 ### 依赖版本对接原则
 
 项目代码只对接 `requirements.txt` 中固定的依赖版本（特别是 llama-cpp-python 的 JamePeng Vulkan wheel），不为历史版本或官方构建编写兼容/回退代码。mmproj 路径统一用 `mmproj_path` 键传入 handler。
-
-### 文件顶部注释规范
-
-- 每个 .py 文件顶部必须有描述整个文件用途的模块 docstring, docstring 之后空一行再写代码
-- 无实际代码的包不创建 `__init__.py`（子包走 Python 隐式命名空间包），全项目只有根入口与 `app/nodes/__init__.py` 注册表两个 `__init__.py`
-- docstring 内的标点: 逗号使用英文逗号加一个空格 ", ", 句号使用英文句号 "."
 
 ### INPUT_TYPES 字段顺序
 
@@ -178,15 +189,7 @@ Instruct 子类的字段顺序约定：模型端口 -> 媒体输入 -> `prompt_i
 
 ### 新增 Chat Handler
 
-在 `app/core/handlers.py` 的 `_HANDLER_SPECS` 表中加一行：`"显示名": ("类名", thinking开关参数名或None)`。显示名含 "-Thinking" 后缀时加载器自动把开关参数设为 True。注意 thinking 参数名必须被该类 `__init__` 接受（基类会对未知 kwargs 抛 TypeError），如 GLM41VChatHandler 不接受 `enable_thinking`。
-
-### 新增任务预设
-
-只改 `app/core/prompts.py` 一个文件：在 `user_prompt_presets` 加一个条目，`use` 声明适用模态（text/image/video/audio），`content` 为模板文本。dict 声明顺序即各模态 UI 下拉框顺序（按 use 过滤后），插入位置决定排序。`use` 中的模态名拼写错误会在模块加载时报错。
-
-### Prompt 增强预设
-
-在 `app/nodes/util/system_prompt_presets.py` 中添加新常量，并在文件末尾的 `PRESETS` dict 中加一行（dict 顺序即 UI 下拉框顺序）。
+改 `app/core/handlers.py` 的 `_HANDLER_SPECS` 表。两个坑点：显示名含 "-Thinking" 后缀时加载器自动把 thinking 开关参数设为 True；thinking 参数名必须被该 handler 类 `__init__` 接受（基类会对未知 kwargs 抛 TypeError），如 GLM41VChatHandler 不接受 `enable_thinking`。
 
 ### Wheel 构建与发布 (CI)
 
@@ -198,16 +201,6 @@ Instruct 子类的字段顺序约定：模型端口 -> 媒体输入 -> `prompt_i
 - Linux：Vulkan 头文件/glslc/loader 来自 conda-forge（不下载 LunarG SDK tarball）；`CMAKE_PREFIX_PATH=/opt/vulkan` 是 `find_package(SPIRV-Headers)` 的必需项，不能删
 - Linux repair 目标为 `manylinux_2_31`（gcc-toolset-14 产物引用 GLIBCXX_3.4.25，超出 2_28 白名单），且 repair 的 `LD_LIBRARY_PATH` 不能包含 `/opt/vulkan/lib`（避免 auditwheel 解析到 conda 的新版 libstdc++）
 - 发布新 wheel 后需同步更新 `requirements.txt` 的两个 URL 和两个 README 的平台说明
-
-## 依赖
-
-| 包 | 用途 |
-|----|------|
-| llama-cpp-python | llama.cpp Python 绑定（自编译 Vulkan wheel） |
-| scipy | `gaussian_filter` 用于 BBox 遮罩羽化（在局部窗口上计算，非全图） |
-| numpy | 图像数组操作 |
-| pillow | 图像编解码、BBox 绘制 |
-| tqdm | 终端进度条 |
 
 ## 已知问题
 
