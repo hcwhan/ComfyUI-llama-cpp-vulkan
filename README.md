@@ -4,10 +4,6 @@ Run LLM/VLM models natively in ComfyUI based on llama.cpp with **Vulkan** GPU ac
 
 **[[📃中文版](./README_zh.md)]**
 
-## Preview
-
-![](./img/preview.jpg)
-
 ## Why Vulkan?
 
 | Backend | AMD GPU | NVIDIA GPU | Intel GPU | Install Difficulty |

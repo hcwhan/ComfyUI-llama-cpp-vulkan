@@ -4,10 +4,6 @@
 
 **[[📃English](./README.md)]**
 
-## 预览
-
-![](./img/preview.jpg)
-
 ## 为什么选择 Vulkan?
 
 | 后端 | AMD GPU | NVIDIA GPU | Intel GPU | 安装难度 |
