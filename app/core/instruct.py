@@ -102,7 +102,9 @@ class llama_cpp_instruct_base:
     @classmethod
     def runtime_inputs(cls):
         return {
-            "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffff, "step": 1, "tooltip": "llama.cpp 使用 32 位种子, 更大的值会被截断."}),
+            # 上限取 0xFFFFFFFE: 0xFFFFFFFF 是 llama.cpp 的 LLAMA_DEFAULT_SEED
+            # 哨兵值(随机种子), 落在该值会静默失去可复现性
+            "seed": ("INT", {"default": 0, "min": 0, "max": 0xfffffffe, "step": 1, "tooltip": "llama.cpp 使用 32 位种子, 更大的值会被截断."}),
             "force_offload": ("BOOLEAN", {
                 "default": False,
                 "tooltip": "推理结束后立即卸载模型, 释放显存."
