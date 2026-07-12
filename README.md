@@ -21,27 +21,30 @@ Vulkan provides near-native GPU performance without requiring CUDA or ROCm toolk
 
 | Handler | Thinking Mode |
 |---------|:------------:|
-| Qwen3.5 / Qwen3.6 | Yes |
+| Qwen3.6 / Qwen3.5 | Yes |
 | Qwen3-VL | Yes |
 | Qwen2.5-VL | - |
-| Gemma3 | - |
+| GLM-4.6V | Yes |
+| GLM-4.1V | Always on |
 | Gemma4 | Yes |
-| GLM-4.6V / GLM-4.1V | Yes |
-| LFM2-VL / LFM2.5-VL | - |
-| MiniCPM-v4.5 / v4.6 | Yes |
+| Gemma3 | - |
+| MiniCPM-v4.6 / v4.5 | Yes |
 | Step3-VL | Yes |
+| LFM2.5-VL / LFM2-VL | - |
 
-Legacy handlers (LLaVA-1.5 / 1.6, Moondream2, nanoLLaVA, llama3-Vision-Alpha, MiniCPM-v2.6) are also available; the dropdown of `vlm Model Loader` is the authoritative list.
+> Handlers marked "Yes" appear twice in the dropdown: the plain entry disables thinking, the `-Thinking` variant enables it. GLM-4.1V is a thinking-only model with no toggle. The dropdown groups handlers by family (newest first) and is the authoritative list.
+
+Legacy handlers (LLaVA-1.6 / 1.5, llama3-Vision-Alpha, nanoLLaVA, Moondream2, Obsidian, MiniCPM-v2.6) are also available.
 
 ### Specialized Handlers
 
 | Handler | Type |
 |---------|------|
-| DeepSeek-OCR | OCR |
-| Granite-Docling | Document |
-| PaddleOCR-VL-1.5 | OCR |
-| MinerU2.5-Pro | Document |
 | Qwen3-ASR | Speech |
+| DeepSeek-OCR | OCR |
+| PaddleOCR-VL-1.5 | OCR |
+| MinerU2.5-Pro | Document (based on Qwen2.5-VL) |
+| Granite-Docling | Document |
 | Generic-MTMD | Fallback (renders the model's built-in chat template) |
 
 > VLMs without a dedicated handler can use the `Generic-MTMD` fallback handler. Text-only GGUF models need no handler at all and run in generic text mode via `llm Model Loader`.
