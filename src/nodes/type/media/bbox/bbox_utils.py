@@ -17,7 +17,8 @@ QWEN_BBOX_MODES = ("Qwen3-VL", "Qwen2.5-VL")
 # Qwen2.5-VL 输出的是 mtmd smart_resize 后图像空间的绝对像素坐标(官方语义,
 # 实测 Qwen2.5-VL-3B GGUF 逐值吻合), 换算回原图需要复现 resize 尺寸。
 # 三个常量对接 requirements.txt 固定 wheel 的 mtmd 默认值(经 5 组不同尺寸
-# 实测反推并完全复现): patch 28, 下限 8 token, 上限 4096 token。
+# 实测反推并完全复现): 有效 patch 28 (patch 14 x merge 2), 下限 8 token,
+# 上限 4096 token。
 # 注意 loader 的 image_min/max_tokens > 0 会改变上下限, 此时换算不再精确。
 _QWEN25_FACTOR = 28
 _QWEN25_MIN_PIXELS = 8 * 28 * 28

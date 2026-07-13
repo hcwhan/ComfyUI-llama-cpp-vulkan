@@ -76,7 +76,7 @@ pip install -r ComfyUI-llama-cpp-vulkan/requirements.txt
 
 #### 3. 模型路径:
 
-- 请将下载的 `.gguf` 模型放置在 `ComfyUI/models/LLM` 目录中。
+- 请将下载的 `.gguf` 模型放置在 `ComfyUI/models/LLM` 目录中 (`llm` 与 `LLM` 两个目录名均已注册, Linux 大小写敏感文件系统下任选其一)。
 - 也支持通过 `extra_model_paths.yaml` 配置自定义路径。
 
   > 在使用 VLM 模型进行图像推理之前, 请确保已经下载并选择了主模型对应的 `mmproj` 权重文件。

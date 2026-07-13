@@ -101,6 +101,9 @@ def resolve_device_selection(gpu_device):
         for i, dev in enumerate(_selectable_devices()):
             if _device_label(dev) == gpu_device:
                 return i, SPLIT_MODE_NONE
+        # 防御分支: 选项列表与 _selectable_devices 同源且进程内静态, 跨进程的
+        # 过期 label(硬件/驱动变更后的旧工作流)会先被 ComfyUI 对 combo 输入的
+        # 前置校验(value_not_in_list)拒绝, 正常执行走不到这里
         logger.warning(f"[llama-cpp-vulkan] device '{gpu_device}' is not selectable, falling back to Auto")
     return 0, SPLIT_MODE_LAYER
 

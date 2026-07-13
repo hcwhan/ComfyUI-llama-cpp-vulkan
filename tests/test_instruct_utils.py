@@ -1,4 +1,4 @@
-"""src/core/instruct.py 纯函数的单元测试: thinking 块剥离, 预设/自定义提示词组装, 预设配置一致性."""
+"""src/core/instruct.py 的单元测试: thinking 块剥离, 预设/自定义提示词组装, 预设配置一致性, 以及 FakeLlm 打桩的 content 扁平化与 REQUIRE_USER_TEXT 守卫 (走 _run)."""
 
 import unittest
 
@@ -201,7 +201,9 @@ class TestPresetConfig(unittest.TestCase):
             self.assertTrue(instruct_presets(node_cls.MODALITY))
 
     def test_default_preset_needs_no_custom_prompt(self):
-        # 各模态列表第一项即默认预设, 默认选中就必填 custom_prompt 会造成开箱即报错
+        # 各模态列表第一项即默认预设, 默认选中就必填 custom_prompt 会造成开箱即报错。
+        # text 模态的默认空白预设 + 空 custom_prompt 自 05e03d8 起同样开箱报错
+        # (REQUIRE_USER_TEXT 空文本拦截, 报错不同), 本约束对 media 模态仍是开箱保证
         for node_cls in _INSTRUCT_NODES:
             first = instruct_presets(node_cls.MODALITY)[0]
             self.assertNotIn(

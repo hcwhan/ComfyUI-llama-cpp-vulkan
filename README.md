@@ -76,7 +76,7 @@ One wheel per platform covers all Python versions. Download from [Releases](http
 
 #### 3. Download models:
 
-- Place your `.gguf` model files in the `ComfyUI/models/LLM` folder.
+- Place your `.gguf` model files in the `ComfyUI/models/LLM` folder (both `llm` and `LLM` folder names are registered — on case-sensitive Linux filesystems either directory works).
 - Custom paths via `extra_model_paths.yaml` are also supported.
 
   > If you need a VLM model to process image input, don't forget to download the `mmproj` weights.
