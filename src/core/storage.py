@@ -79,7 +79,9 @@ def _estimate_n_gpu_layers(model_path, mmproj_path, vram_limit, n_ctx):
 
     -1 透传给 llama.cpp 的 auto 语义(自动按空闲显存适配,通常为全部层);
     0 表示纯 CPU 推理;mmproj 只能整只进显存,体积先从预算中扣除,
-    预算连 mmproj 都装不下时两者全留 CPU,严格遵守 vram_limit 上限。
+    预算连 mmproj 都装不下时两者全留 CPU,扣除后不足主模型 1 层时
+    主模型全留 CPU(mmproj 照常进显存)。全部分支严格遵守 vram_limit 上限,
+    层体积为估算值,实际占用可能略有偏差。
     """
     if vram_limit == -1:
         return -1, mmproj_path is not None
@@ -96,7 +98,11 @@ def _estimate_n_gpu_layers(model_path, mmproj_path, vram_limit, n_ctx):
             logger.warning(f"[llama-cpp-vulkan] vram_limit ({vram_limit} GB) cannot fit the mmproj file (~{mmproj_gb:.1f} GB), keeping the main model and mmproj on CPU to honor the budget")
             return 0, False
         usable -= mmproj_gb
-    return max(1, int(usable / layer_size)), mmproj_path is not None
+    n_layers = int(usable / layer_size)
+    if n_layers < 1:
+        logger.warning(f"[llama-cpp-vulkan] vram_limit ({vram_limit} GB) leaves no room for even one model layer (~{layer_size:.1f} GB/layer), keeping the main model on CPU to honor the budget")
+        return 0, mmproj_path is not None
+    return n_layers, mmproj_path is not None
 
 
 def _estimate_vram_bytes(model_path, mmproj_path, n_gpu_layers, n_ctx):

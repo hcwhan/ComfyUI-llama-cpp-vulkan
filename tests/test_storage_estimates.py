@@ -57,6 +57,17 @@ class TestEstimateNGpuLayers(unittest.TestCase):
         self.addCleanup(os.remove, path)
         return path
 
+    def _sparse_model(self, block_count, size):
+        """带 GGUF 头的稀疏大模型文件: 层数可控, 体积由 getsize 决定."""
+        data = _minimal_gguf_bytes(block_count)
+        fd, path = tempfile.mkstemp(suffix=".gguf")
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+            f.seek(size - 1)
+            f.write(b"\x00")
+        self.addCleanup(os.remove, path)
+        return path
+
     def test_minus_one_passthrough_auto(self):
         self.assertEqual(_estimate_n_gpu_layers(self._model_path(), None, -1, 8192), (-1, False))
 
@@ -83,10 +94,17 @@ class TestEstimateNGpuLayers(unittest.TestCase):
         self.assertGreaterEqual(n_layers, 1)
         self.assertTrue(mmproj_on_gpu)
 
-    def test_tiny_positive_budget_keeps_at_least_one_layer(self):
-        path = self._model_path(block_count=32, pad_to_bytes=64 * 1024 * 1024)
-        n_layers, _mmproj_on_gpu = _estimate_n_gpu_layers(path, None, 1, 8192)
-        self.assertGreaterEqual(n_layers, 1)
+    def test_budget_below_one_layer_stays_on_cpu(self):
+        # 回归 (严格守预算): 预算低于单层折算体积时返回 0 层,
+        # 不再强制 1 层突破 vram_limit 上限
+        path = self._sparse_model(block_count=2, size=2 * _GB)  # 每层折算约 1.55 GB
+        self.assertEqual(_estimate_n_gpu_layers(path, None, 1, 8192), (0, False))
+
+    def test_mmproj_fits_but_no_layer_budget_keeps_model_on_cpu(self):
+        # mmproj 在预算内照常进显存, 扣除后不足主模型 1 层时主模型留 CPU
+        model = self._sparse_model(block_count=2, size=2 * _GB)
+        mmproj = self._write_sparse(_GB // 2)  # 折算约 0.575 GB, 预算剩 1.425 GB < 1 层
+        self.assertEqual(_estimate_n_gpu_layers(model, mmproj, 2, 8192), (0, True))
 
 
 class TestEstimateKvBytes(unittest.TestCase):

@@ -118,7 +118,7 @@ image 逐张模式的多图结果以 "====== Image N ======" 分隔行拼接
 - `load_model()`: 先 `resolve_config()` 校验再卸载旧模型（无效配置不影响已加载的模型），随后加载 GGUF 模型；可选的 mmproj（视觉编码器）在此处只构造 chat_handler（校验路径），真正加载进显存由 mtmd 在首次推理时惰性初始化（与加载前的 `mm.free_memory` 腾挪同在一次节点执行内，时序有效）
 - `clean()`: 释放模型和 chat_handler 资源
 - 通过 monkey-patch `mm.unload_all_models` 实现 ComfyUI 模型卸载（前端 Free 按钮 / OOM 处理）时自动清理
-- `vram_limit` 折算 `n_gpu_layers` 集中在 `_estimate_n_gpu_layers()`：每层显存 =（文件体积 x (1 + 固定开销系数) + KV cache 字节数）/ 层数。KV 按 `core/gguf_layers.py` 解析的注意力元数据（`head_count_kv`/`embedding_length` 等，hybrid 模型的逐层数组取均值）精确计算，与权重量化无关；元数据不全时回退 `_vram_factor(n_ctx)` 体积折算经验系数（n_ctx=8192 时合计 1.55，对强量化模型会低估 KV）。mmproj 体积先从预算中扣除，预算装不下 mmproj 时两者全留 CPU
+- `vram_limit` 折算 `n_gpu_layers` 集中在 `_estimate_n_gpu_layers()`：每层显存 =（文件体积 x (1 + 固定开销系数) + KV cache 字节数）/ 层数。KV 按 `core/gguf_layers.py` 解析的注意力元数据（`head_count_kv`/`embedding_length` 等，hybrid 模型的逐层数组取均值）精确计算，与权重量化无关；元数据不全时回退 `_vram_factor(n_ctx)` 体积折算经验系数（n_ctx=8192 时合计 1.55，对强量化模型会低估 KV）。mmproj 体积先从预算中扣除，预算装不下 mmproj 时两者全留 CPU；扣除后不足主模型 1 层时主模型留 CPU、mmproj 照常进显存（全部分支严格守预算，不足 1 层不强制上卡）
 
 ### Instruct 继承体系
 

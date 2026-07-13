@@ -29,7 +29,7 @@ _N_CTX_FIELD = ("INT", {
 _VRAM_LIMIT_FIELD = ("INT", {
     "default": -1,
     "min": -1, "max": 1024, "step": 1,
-    "tooltip": "显存占用上限, 单位 GB.\n-1 = 自动 (llama.cpp 按空闲显存适配层数), 0 = 纯 CPU 推理.\n参考值, 实际占用可能略微超出."
+    "tooltip": "显存占用上限, 单位 GB.\n-1 = 自动 (llama.cpp 按空闲显存适配层数), 0 = 纯 CPU 推理.\n预算不足模型 1 层时全部留在 CPU (严格守上限);\n层体积为估算值, 实际占用可能略有偏差."
 })
 
 
