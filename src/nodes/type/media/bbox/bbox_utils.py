@@ -131,11 +131,17 @@ def draw_bbox(image, pixel_bboxes, labels):
 
     for (x0, y0, x1, y1), label in zip(pixel_bboxes, labels):
         color = _label_color(label)
-        draw.rectangle((x0, y0, x1, y1), outline=color, width=line_width)
-        text_y = max(0, y0 - font_size - 4)
-        text_size = draw.textbbox((x0, text_y), label, font=font)
-        draw.rectangle([text_size[0], text_size[1]-2, text_size[2]+4, text_size[3]+2], fill=color)
-        draw.text((x0+2, text_y), label, fill=(255,255,255), font=font)
+        try:
+            draw.rectangle((x0, y0, x1, y1), outline=color, width=line_width)
+            text_y = max(0, y0 - font_size - 4)
+            text_size = draw.textbbox((x0, text_y), label, font=font)
+            draw.rectangle([text_size[0], text_size[1]-2, text_size[2]+4, text_size[3]+2], fill=color)
+            draw.text((x0+2, text_y), label, fill=(255,255,255), font=font)
+        except Exception as e:
+            # 反向坐标(x1 < x0,LLM 常见错误)或非有限值会让 PIL 抛错;
+            # 逐框跳过,与 SEGS/MASK 路径的逐框容错粒度一致,
+            # 单个坏框不放弃整张图的其余框
+            logger.warning(f"[llama-cpp-vulkan] Skipping bbox that failed to draw ({label!r}: ({x0}, {y0}, {x1}, {y1})): {e}")
     return torch.from_numpy(np.array(img).astype(np.float32) / 255.0).unsqueeze(0)
 
 

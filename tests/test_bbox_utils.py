@@ -2,11 +2,14 @@
 
 import unittest
 
+import torch
+
 from tests import comfy_stubs
 
 comfy_stubs.install()
 
 from src.nodes.type.media.bbox.bbox_utils import (  # noqa: E402
+    draw_bbox,
     json_to_pixel_bboxes,
     qwen25_smart_resize,
     valid_int_bbox,
@@ -47,6 +50,24 @@ class TestJsonToPixelBboxes(unittest.TestCase):
     def test_non_dict_item_raises_value_error(self):
         with self.assertRaises(ValueError):
             json_to_pixel_bboxes(["not a dict"], "simple")
+
+
+class TestDrawBbox(unittest.TestCase):
+    def test_bad_box_skipped_other_boxes_drawn(self):
+        # 回归: 单个坏框(反向坐标使 PIL 抛 ValueError)只跳过该框,
+        # 不放弃整张图 —— 与 SEGS/MASK 路径的逐框容错粒度一致
+        image = torch.zeros(32, 32, 3)
+        boxes = [(20.0, 10.0, 5.0, 15.0), (2.0, 2.0, 12.0, 12.0)]
+        out = draw_bbox(image, boxes, ["bad", "good"])
+        self.assertEqual(tuple(out.shape), (1, 32, 32, 3))
+        # 正常框已画出: 全黑输入的输出不再全零
+        self.assertGreater(out.sum().item(), 0)
+
+    def test_all_valid_boxes_drawn(self):
+        image = torch.zeros(32, 32, 3)
+        out = draw_bbox(image, [(2.0, 2.0, 12.0, 12.0)], ["cat"])
+        self.assertEqual(tuple(out.shape), (1, 32, 32, 3))
+        self.assertGreater(out.sum().item(), 0)
 
 
 class TestValidIntBbox(unittest.TestCase):
