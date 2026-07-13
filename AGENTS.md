@@ -198,3 +198,4 @@ Instruct 子类的字段顺序约定：模型端口 -> 媒体输入 -> `prompt_i
 2. **核显不可选（有独显时）**: llama.cpp 的设备收集规则决定了有独显时核显无法通过 `main_gpu` 选中；如需强制核显推理，只能在进程启动前设置 `GGML_VK_VISIBLE_DEVICES` 环境变量（devices.py import 时即初始化 Vulkan，之后设置无效）
 3. **import 时初始化 Vulkan**: 设备枚举在插件加载时同步执行（约几百 ms），属有意设计（UI 下拉框需要启动期确定设备列表）
 4. **mmproj 不跟随显式选卡**: mtmd 的 `mtmd_context_params` 只有 `use_gpu` 布尔开关、无设备索引字段，多卡下显式选择非默认 GPU 时视觉编码器仍落在 mtmd 默认挑选的设备上（上游限制）；插件仅在 `vram_limit=0`（纯 CPU）时传 `use_gpu=False` 让 mmproj 一并留在 CPU
+5. **多分片 GGUF (split shards) 不支持**: 显存折算用 `os.path.getsize` 只计所选文件体积、层数却是全模型 `block_count`，选首分片加载（llama.cpp 会自动带上其余分片）时 `n_gpu_layers` 会被高估；模型下拉框也会列出 `-00002-of-00003.gguf` 等非首分片，选中会加载失败。按不支持处理，如需使用请先以 `llama-gguf-split --merge` 合并为单文件
