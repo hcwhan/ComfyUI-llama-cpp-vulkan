@@ -233,11 +233,13 @@ jobs:
           BUILD_DATE=$(date +%Y%m%d)
           echo "BUILD_DATE=$BUILD_DATE" >> $GITHUB_ENV
 
-          # 从全部 wheel 文件名提取版本并要求一致, 避免 "取第一个" 的脆弱写法
-          VERSIONS=$(ls dist/*.whl | grep -oP '(?<=-)\d+\.\d+\.\d+(?=\+vulkan)' | sort -u)
-          if [ "$(echo "$VERSIONS" | wc -l)" -ne 1 ]; then
-            echo "Inconsistent wheel versions across platforms:"
-            echo "$VERSIONS"
+          # 从全部 wheel 文件名提取版本并要求一致, 避免 "取第一个" 的脆弱写法;
+          # [0-9.]+ 兼容未来的 4 段版本号, 提取为空 (文件名形态变化) 时显式报错
+          # 而非放行出 "v-vulkan-abi3-<日期>" 这类缺版本号的 tag
+          VERSIONS=$(ls dist/*.whl | grep -oP '(?<=python-)[0-9.]+(?=\+vulkan)' | sort -u)
+          if [ -z "$VERSIONS" ] || [ "$(echo "$VERSIONS" | wc -l)" -ne 1 ]; then
+            echo "Cannot extract a single consistent version from wheel filenames:"
+            ls dist/*.whl
             exit 1
           fi
           echo "TAG_VERSION=$VERSIONS" >> $GITHUB_ENV
