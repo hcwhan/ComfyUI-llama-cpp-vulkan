@@ -30,28 +30,29 @@ _MMPROJ_FACTOR = 1.0 + _BASE_OVERHEAD
 
 
 def _estimate_n_gpu_layers(model_path, mmproj_path, vram_limit, n_ctx):
-    """按 GGUF 层数把 vram_limit (GB) 折算成 n_gpu_layers。
+    """按 GGUF 层数把 vram_limit (GB) 折算成 (n_gpu_layers, mmproj 是否进显存)。
 
     -1 透传给 llama.cpp 的 auto 语义(自动按空闲显存适配,通常为全部层);
-    0 表示纯 CPU 推理;mmproj 常驻显存,先从预算中扣除。
+    0 表示纯 CPU 推理;mmproj 只能整只进显存,体积先从预算中扣除,
+    预算连 mmproj 都装不下时两者全留 CPU,严格遵守 vram_limit 上限。
     """
     if vram_limit == -1:
-        return -1
+        return -1, mmproj_path is not None
     if vram_limit == 0:
-        return 0
+        return 0, False
     factor = _vram_factor(n_ctx)
     layers = get_layer_count(model_path) or 32
     layer_size = os.path.getsize(model_path) * factor / (1024 ** 3) / layers
     if layer_size <= 0:
-        return -1
+        return -1, mmproj_path is not None
     usable = vram_limit
     if mmproj_path:
-        usable -= os.path.getsize(mmproj_path) * _MMPROJ_FACTOR / (1024 ** 3)
-    if usable <= 0:
-        # mmproj 只能整只进显存,预算无法满足时主模型全留 CPU 以免雪上加霜
-        logger.warning(f"[llama-cpp-vulkan] vram_limit ({vram_limit} GB) is fully consumed by the mmproj file, keeping all main model layers on CPU")
-        return 0
-    return max(1, int(usable / layer_size))
+        mmproj_gb = os.path.getsize(mmproj_path) * _MMPROJ_FACTOR / (1024 ** 3)
+        if mmproj_gb >= vram_limit:
+            logger.warning(f"[llama-cpp-vulkan] vram_limit ({vram_limit} GB) cannot fit the mmproj file (~{mmproj_gb:.1f} GB), keeping the main model and mmproj on CPU to honor the budget")
+            return 0, False
+        usable -= mmproj_gb
+    return max(1, int(usable / layer_size)), mmproj_path is not None
 
 
 def _estimate_vram_bytes(model_path, mmproj_path, n_gpu_layers, n_ctx):
@@ -148,7 +149,7 @@ class LLAMA_CPP_STORAGE:
         gpu_device = config.get("gpu_device", AUTO_LABEL)
         main_gpu, split_mode = resolve_device_selection(gpu_device)
 
-        n_gpu_layers = _estimate_n_gpu_layers(model_path, mmproj_path, config["vram_limit"], config["n_ctx"])
+        n_gpu_layers, mmproj_on_gpu = _estimate_n_gpu_layers(model_path, mmproj_path, config["vram_limit"], config["n_ctx"])
 
         # Vulkan 与 PyTorch 共享同一张物理卡但分配器互不感知,先请求 ComfyUI
         # 卸载 torch 侧模型腾出显存,否则 SD 模型占满显存时 Vulkan 分配直接失败;
@@ -156,11 +157,10 @@ class LLAMA_CPP_STORAGE:
         # 只腾挪 torch 主设备:假设 Vulkan 推理与 torch 在同一张卡(单 dGPU 环境
         # 天然成立);多卡下显式选择其他 Vulkan 卡时,该卡与 torch 分配器无关,
         # 腾挪主设备无效但也无害
-        mmproj_on_gpu = mmproj_path is not None and config["vram_limit"] != 0
         if n_gpu_layers != 0 or mmproj_on_gpu:
             try:
                 mm.free_memory(
-                    _estimate_vram_bytes(model_path, mmproj_path, n_gpu_layers, config["n_ctx"]),
+                    _estimate_vram_bytes(model_path, mmproj_path if mmproj_on_gpu else None, n_gpu_layers, config["n_ctx"]),
                     mm.get_torch_device(),
                 )
             except Exception as e:
@@ -179,9 +179,10 @@ class LLAMA_CPP_STORAGE:
                 # <=0 视为未设置,与库内默认值 -1 语义一致
                 "image_max_tokens": config["image_max_tokens"],
                 "image_min_tokens": config["image_min_tokens"],
-                # vram_limit=0 表示纯 CPU 推理,mmproj(mtmd 编码器)同样留在 CPU;
-                # mtmd 只有 use_gpu 布尔开关,无法指定设备(见 AGENTS.md 已知问题)
-                "use_gpu": config["vram_limit"] != 0,
+                # vram_limit=0(纯 CPU)或预算装不下 mmproj 时,mmproj(mtmd 编码器)
+                # 留在 CPU 以严格遵守显存预算;mtmd 只有 use_gpu 布尔开关,
+                # 无法指定设备(见 AGENTS.md 已知问题)
+                "use_gpu": mmproj_on_gpu,
             }
 
             try:
