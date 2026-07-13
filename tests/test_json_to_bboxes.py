@@ -77,6 +77,12 @@ class TestJsonToBBoxesLabelFilter(unittest.TestCase):
         bboxes, _ = self.node.process([_JSON_LABELED], ["simple"], ["bird"], None)
         self.assertEqual(bboxes[0], [])
 
+    def test_non_dict_item_with_filter_reports_structure_error(self):
+        # 回归: label 过滤开启时非 dict 项(如坐标数组)不得抛裸 AttributeError,
+        # 应留给结构校验报出带期望格式的 ValueError
+        with self.assertRaises(ValueError):
+            self.node.process(['[[10, 20, 30, 40]]'], ["simple"], ["cat"], None)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -96,8 +96,11 @@ class json_to_bboxes:
             if not isinstance(items, list):
                 raise ValueError(f'Expected a JSON list of {{"bbox_2d": [...], "label": "..."}} objects, got: {type(items).__name__}')
             if wanted_label:
-                # 兼容 label / text_content 混用的输出,任一字段匹配即保留
-                items = [b for b in items if wanted_label in (_normalized_label(b.get("label")), _normalized_label(b.get("text_content")))]
+                # 兼容 label / text_content 混用的输出,任一字段匹配即保留;
+                # 非 dict 项原样保留, 由 json_to_pixel_bboxes 的结构校验给出
+                # 带期望格式的报错, 而非在此抛裸 AttributeError
+                items = [b for b in items if not isinstance(b, dict)
+                         or wanted_label in (_normalized_label(b.get("label")), _normalized_label(b.get("text_content")))]
 
             if flat_images:
                 curr_img = flat_images[min(i, len(flat_images) - 1)]
