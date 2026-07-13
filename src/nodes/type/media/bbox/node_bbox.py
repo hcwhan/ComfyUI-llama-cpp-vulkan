@@ -255,7 +255,9 @@ class bboxes_to_mask:
     def process(self, bboxes, image, dilation, feather):
         _batch_size, height, width, _channels = image.shape
         mask_shape = (height, width)
-        combined_full_mask = torch.zeros(mask_shape, dtype=torch.float32, device=image.device)
+        # 恒在 CPU 上构建与输出, 与 json_to_bboxes 的 image_list 策略一致:
+        # --gpu-only 下跟随 image.device 会让直接 .numpy() 的下游第三方节点报错
+        combined_full_mask = torch.zeros(mask_shape, dtype=torch.float32)
         # gaussian_filter 默认 truncate=4.0,窗口向外留 4 sigma 即可覆盖全部有效衰减,
         # 在局部窗口内做羽化,避免每个 bbox 都在全图尺寸上跑一次 filter
         margin = int(4 * feather) + 1 if feather > 0 else 0
@@ -287,7 +289,7 @@ class bboxes_to_mask:
                 min(width, x2_exp) - wx1, min(height, y2_exp) - wy1,
             )
             local_mask_np = feathered_rect_mask(wy2 - wy1, wx2 - wx1, inner_rect, feather)
-            local_mask_tensor = torch.from_numpy(local_mask_np).to(image.device)
+            local_mask_tensor = torch.from_numpy(local_mask_np)
             region = combined_full_mask[wy1:wy2, wx1:wx2]
             combined_full_mask[wy1:wy2, wx1:wx2] = torch.maximum(region, local_mask_tensor)
 
