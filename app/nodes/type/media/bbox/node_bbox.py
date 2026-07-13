@@ -135,15 +135,16 @@ class bboxes_to_segs:
     @classmethod
     def INPUT_TYPES(s):
         # label/confidence 是检测结果本身的元数据(紧跟 bboxes 输入),
-        # dilation/feather 是区域后处理参数, 按此语义分组排序
+        # dilation/feather 作用于掩码矩形, crop_factor 决定上下文窗口, 按此语义分组排序
         return {
             "required": {
                 "bboxes": ("BBOX",),
                 "image": ("IMAGE",),
                 "label": ("STRING", {"default": "bbox", "tooltip": "写入每个 SEG 的 label, 供下游按 label 过滤/赋值 (如 Impact Pack 的 SEGS Filter)."}),
                 "confidence": ("FLOAT", {"default": 0.9, "min": 0.0, "max": 1.0, "step": 0.01, "tooltip": "写入每个 SEG 的置信度, 供下游按阈值过滤."}),
-                "dilation": ("INT", {"default": 10, "min": 0, "max": 200, "step": 1}),
-                "feather": ("INT", {"default": 0, "min": 0, "max": 100, "step": 1}),
+                "dilation": ("INT", {"default": 10, "min": 0, "max": 200, "step": 1, "tooltip": "掩码矩形向外扩张的像素数, 直接扩大下游的重绘区域.\n(与 Impact Pack 检测器及 BBoxes to MASK 的 dilation 语义一致)"}),
+                "feather": ("INT", {"default": 0, "min": 0, "max": 100, "step": 1, "tooltip": "掩码边缘高斯羽化的 sigma (像素)."}),
+                "crop_factor": ("FLOAT", {"default": 3.0, "min": 1.0, "max": 10.0, "step": 0.1, "tooltip": "crop_region 相对掩码矩形的放大倍数, 为下游 Detailer 提供重绘上下文.\n(Impact Pack 惯例, 1.0 = 不外扩)"}),
             }
         }
 
@@ -152,7 +153,7 @@ class bboxes_to_segs:
     FUNCTION = "process"
     CATEGORY = "llama-cpp-vulkan"
 
-    def process(self, bboxes, image, label, confidence, dilation, feather):
+    def process(self, bboxes, image, label, confidence, dilation, feather, crop_factor):
         batch_size, height, width, _channels = image.shape
         mask_shape = (height, width)
 
@@ -175,21 +176,30 @@ class bboxes_to_segs:
                 logger.warning(f"[llama-cpp-vulkan] Skipping bbox outside image bounds: {bbox}")
                 continue
 
-            # 扩张区域同样限制在图像内，保证 crop_region 不含负坐标（Impact Pack 约定）
-            x1_exp = max(0, x1 - dilation)
-            y1_exp = max(0, y1 - dilation)
-            x2_exp = min(width, x2 + dilation)
-            y2_exp = min(height, y2 + dilation)
+            # dilation 直接外扩掩码矩形（重绘区域），与 bboxes_to_mask 及
+            # Impact Pack 检测器的 dilation 语义一致；限制在图像内，
+            # 保证坐标不为负（Impact Pack 约定）
+            mx1 = max(0, x1 - dilation)
+            my1 = max(0, y1 - dilation)
+            mx2 = min(width, x2 + dilation)
+            my2 = min(height, y2 + dilation)
 
-            crop_region = [x1_exp, y1_exp, x2_exp, y2_exp]
-            crop_w = x2_exp - x1_exp
-            crop_h = y2_exp - y1_exp
+            # crop_region 以掩码矩形为中心按 crop_factor 放大（Impact Pack 惯例），
+            # 供下游 Detailer 携带周边上下文重绘
+            pad_x = int((mx2 - mx1) * (crop_factor - 1.0) / 2)
+            pad_y = int((my2 - my1) * (crop_factor - 1.0) / 2)
+            cx1 = max(0, mx1 - pad_x)
+            cy1 = max(0, my1 - pad_y)
+            cx2 = min(width, mx2 + pad_x)
+            cy2 = min(height, my2 + pad_y)
 
-            # 原始 bbox 在扩张窗口坐标系中的位置
-            inner_rect = (x1 - x1_exp, y1 - y1_exp, x2 - x1_exp, y2 - y1_exp)
-            cropped_mask_np = feathered_rect_mask(crop_h, crop_w, inner_rect, feather)
+            crop_region = [cx1, cy1, cx2, cy2]
+
+            # 掩码矩形在 crop 窗口坐标系中的位置
+            inner_rect = (mx1 - cx1, my1 - cy1, mx2 - cx1, my2 - cy1)
+            cropped_mask_np = feathered_rect_mask(cy2 - cy1, cx2 - cx1, inner_rect, feather)
             # Impact Pack 的 SEG 约定 cropped_image 为 [1, H, W, C]
-            cropped_image_tensor = image_for_cropping[y1_exp:y2_exp, x1_exp:x2_exp, :].unsqueeze(0)
+            cropped_image_tensor = image_for_cropping[cy1:cy2, cx1:cx2, :].unsqueeze(0)
 
             seg = SEG(
                 cropped_image=cropped_image_tensor,
@@ -197,6 +207,7 @@ class bboxes_to_segs:
                 # Impact Pack 约定 confidence 为标量
                 confidence=confidence,
                 crop_region=crop_region,
+                # bbox 保留原始检测框（Impact Pack 约定 dilation 不改变 seg.bbox）
                 bbox=np.array([x1, y1, x2, y2], dtype=np.float32),
                 label=label,
             )
@@ -215,8 +226,8 @@ class bboxes_to_mask:
             "required": {
                 "bboxes": ("BBOX",),
                 "image": ("IMAGE",),
-                "dilation": ("INT", {"default": 10, "min": 0, "max": 200, "step": 1}),
-                "feather": ("INT", {"default": 0, "min": 0, "max": 100, "step": 1}),
+                "dilation": ("INT", {"default": 10, "min": 0, "max": 200, "step": 1, "tooltip": "掩码矩形向外扩张的像素数.\n(与 BBoxes to SEGS 的 dilation 语义一致)"}),
+                "feather": ("INT", {"default": 0, "min": 0, "max": 100, "step": 1, "tooltip": "掩码边缘高斯羽化的 sigma (像素)."}),
             }
         }
 
