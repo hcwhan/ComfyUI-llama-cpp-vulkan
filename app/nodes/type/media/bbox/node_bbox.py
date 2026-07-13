@@ -108,15 +108,18 @@ class json_to_bboxes:
                     drawn_images.append(draw_bbox(curr_img[0], pixel_bboxes, [bbox_label(b) for b in items]))
                 except Exception as e:
                     logger.warning(f"[llama-cpp-vulkan] Error drawing bboxes for JSON #{i}: {e}")
-                    drawn_images.append(curr_img)
+                    # draw_bbox 经 numpy 往返恒输出 CPU 张量, 回退帧统一 .cpu(),
+                    # 避免 --gpu-only 下与画框帧 torch.cat 混拼报 device mismatch
+                    drawn_images.append(curr_img.cpu())
             else:
                 pixel_bboxes = json_to_pixel_bboxes(items, mode)
 
             output_bboxes.append(pixel_bboxes)
 
         # JSON 少于帧时, 尾部未配对的帧原样进入输出(不画框), 保持批次结构完整
+        # (透传帧同样统一 .cpu(), 理由同上; CPU 张量的 .cpu() 是零拷贝 no-op)
         if flat_images and len(drawn_images) < len(flat_images):
-            drawn_images.extend(flat_images[len(drawn_images):])
+            drawn_images.extend(f.cpu() for f in flat_images[len(drawn_images):])
 
         # 画框结果按输入图像的批次结构重新分组
         restructured_images = []
