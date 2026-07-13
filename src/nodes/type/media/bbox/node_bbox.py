@@ -95,7 +95,11 @@ class json_to_bboxes:
         drawn_images = []
 
         for i, json_str in enumerate(json):
-            items = parse_json(json_str)
+            try:
+                items = parse_json(json_str)
+            except ValueError as e:
+                # 逐张模式拆出几十段结果时定位坏段,与画框失败分支的 JSON #{i} 对齐
+                raise ValueError(f"JSON #{i}: {e}") from None
             # 模型只检出单个目标时可能直接输出对象而非单元素列表
             if isinstance(items, dict):
                 items = [items]
