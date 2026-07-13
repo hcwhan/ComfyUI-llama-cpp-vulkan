@@ -3,13 +3,14 @@
 import re
 import json
 
-# 开头的 ```label(标签限单词类字符,可无,如 json/python/c++);结尾的 ```。
+# 开头的 ```label(标签限单词类字符,可无,如 json/python/c++;CommonMark
+# 允许标签前有空格,少数模型会输出 "``` json" 形态);结尾的 ```。
 # 两端独立匹配,生成被截断导致围栏未闭合时,开头的标记仍能剥离。
 # 标签不能用 [^\s`]* 之类的宽匹配:围栏后无换行直接跟正文时会把正文吞掉
-_FENCE_OPEN_RE = re.compile(r"^```[\w+.-]*[ \t]*\r?\n?")
+_FENCE_OPEN_RE = re.compile(r"^```[ \t]*[\w+.-]*[ \t]*\r?\n?")
 _FENCE_CLOSE_RE = re.compile(r"\r?\n?```$")
 # 文本中部的完整围栏块(用于 "前导说明 + 围栏块" 形态的回退提取)
-_FENCE_BLOCK_RE = re.compile(r"```[\w+.-]*[ \t]*\r?\n(.*?)\r?\n?```", re.DOTALL)
+_FENCE_BLOCK_RE = re.compile(r"```[ \t]*[\w+.-]*[ \t]*\r?\n(.*?)\r?\n?```", re.DOTALL)
 
 # image Instruct 逐张模式在多图结果间插入的分隔行(独占一行, 行首行尾锚定,
 # 降低正文文本误匹配的概率; JSON 文本中换行均为 \n 转义, 不会产生真实分隔行)

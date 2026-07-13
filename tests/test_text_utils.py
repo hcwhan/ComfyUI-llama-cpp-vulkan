@@ -9,6 +9,14 @@ class TestStripCodeFence(unittest.TestCase):
     def test_labeled_fence(self):
         self.assertEqual(strip_code_fence('```json\n{"a": 1}\n```'), '{"a": 1}')
 
+    def test_labeled_fence_with_space_before_label(self):
+        # 回归: CommonMark 允许 info string 前有空格, 少数模型输出 "``` json"
+        self.assertEqual(strip_code_fence('``` json\n{"a": 1}\n```'), '{"a": 1}')
+
+    def test_leading_prose_block_with_spaced_label(self):
+        text = '说明:\n``` json\n{"a": 1}\n```'
+        self.assertEqual(strip_code_fence(text), '{"a": 1}')
+
     def test_bare_fence(self):
         self.assertEqual(strip_code_fence("```\nhello\n```"), "hello")
 
