@@ -36,6 +36,14 @@ class TestWheelPrivateApiContract(unittest.TestCase):
         for attr in ("self.n_tokens", "self._ctx", "self._model", "self._hybrid_cache_mgr"):
             self.assertIn(attr, source)
 
+    def test_mmproj_path_instance_attribute_in_handler_source(self):
+        # instruct.require_mmproj 经 getattr(handler, "mmproj_path", None) 判定
+        # mmproj 是否配置: 属性被 wheel 重命名不会立刻报错, 而是恒判 "未配置"
+        # 使全部媒体 Instruct 误报, 静态锁定基类源码中的属性赋值
+        import llama_cpp.llama_multimodal as multimodal
+        source = inspect.getsource(multimodal.MTMDChatHandler)
+        self.assertIn("self.mmproj_path", source)
+
     def test_ggml_device_symbols(self):
         from llama_cpp import _ggml
         for name in (
