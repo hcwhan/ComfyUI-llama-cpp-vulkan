@@ -43,8 +43,10 @@ def _model_list():
 
 
 def _mmproj_list():
-    # 无 mmproj 文件时保留 "None" 占位,避免空下拉框;运行期校验会给出明确报错
-    return [f for f in get_llm_filename_list() if _is_mmproj(f)] or ["None"]
+    # "None" 占位在首位作为默认值, 强制用户显式选择与主模型配对的 mmproj
+    # (loadmodel 做非空校验), 与 model / chat_handler 的显式选择原则统一:
+    # 静默选中首个文件时, 错配要到 mtmd 首次推理才报错, 距配置点太远
+    return ["None"] + [f for f in get_llm_filename_list() if _is_mmproj(f)]
 
 
 class llama_cpp_llm_model_loader:
