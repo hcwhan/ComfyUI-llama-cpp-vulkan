@@ -38,7 +38,7 @@ class json_to_bboxes:
                 "json": ("STRING", {"forceInput": True}),
                 "mode": (["simple","Qwen3-VL", "Qwen2.5-VL"], {
                     "default": "simple",
-                    "tooltip": "坐标系换算:\nsimple = 原样透传 (模型输出即原图像素坐标)\nQwen3-VL = 0-1000 归一化坐标\nQwen2.5-VL = 内部 resize 空间的绝对坐标 (自动还原到原图;\n  loader 修改过 image_min/max_tokens 时换算会有偏差)"
+                    "tooltip": "坐标系换算:\nsimple = 原样透传 (模型输出即原图像素坐标)\nQwen3-VL = 0-1000 归一化坐标\nQwen2.5-VL = 内部 resize 空间的绝对坐标 (自动还原到原图;\n  loader 修改过 image_min/max_tokens 时换算会有偏差;\n  需配合 image Instruct 逐张模式使用, 批量模式的 max_size 缩放会破坏换算)"
                 }),
                 "label": ("STRING", {
                     "default":"",

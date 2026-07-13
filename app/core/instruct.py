@@ -140,7 +140,7 @@ class llama_cpp_instruct_base:
             }),
             "strip_thinking": ("BOOLEAN", {
                 "default": True,
-                "tooltip": "移除输出中的 <think>...</think> 推理块.\n(适用于 Thinking 模型)"
+                "tooltip": "移除输出中的思考/推理块\n(适用于 Thinking 模型)"
             }),
         }
 

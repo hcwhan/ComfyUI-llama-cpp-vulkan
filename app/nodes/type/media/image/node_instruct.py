@@ -27,7 +27,7 @@ class llama_cpp_image_instruct(llama_cpp_media_instruct_base):
                 **cls.prompt_inputs(),
                 "batch_images": ("BOOLEAN", {
                     "default": False,
-                    "tooltip": "关: 逐张推理, 每张图各得一条结果.\n开: 全部图片并入单次请求, 图片会缩放到 max_size."
+                    "tooltip": "关: 逐张推理, 每张图各得一条结果.\n开: 全部图片并入单次请求 (多图时缩放到 max_size, 单图保持原分辨率)."
                 }),
                 "max_size": ("INT", {
                     "default": 256,
