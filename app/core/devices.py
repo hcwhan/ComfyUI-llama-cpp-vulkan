@@ -12,6 +12,7 @@ from pathlib import Path
 
 import llama_cpp.llama_cpp as _llama_cpp_lib
 from llama_cpp._ggml import (
+    GGMLBackendDevType,
     libggml_base,
     ggml_backend_dev_count,
     ggml_backend_dev_get,
@@ -27,9 +28,13 @@ libggml_base.ggml_backend_dev_description.restype = ctypes.c_char_p
 libggml_base.ggml_backend_dev_type.argtypes = [ctypes.c_void_p]
 libggml_base.ggml_backend_dev_type.restype = ctypes.c_int32
 
-_GGML_BACKEND_DEVICE_TYPE_GPU = 1
-_GGML_BACKEND_DEVICE_TYPE_IGPU = 2
-_DEV_TYPE_NAMES = {1: "GPU", 2: "IGPU"}
+# 设备类型取 wheel 导出的枚举, 消除魔法数与 wheel 升级时的漂移面
+_GGML_BACKEND_DEVICE_TYPE_GPU = int(GGMLBackendDevType.GGML_BACKEND_DEVICE_TYPE_GPU)
+_GGML_BACKEND_DEVICE_TYPE_IGPU = int(GGMLBackendDevType.GGML_BACKEND_DEVICE_TYPE_IGPU)
+_DEV_TYPE_NAMES = {
+    _GGML_BACKEND_DEVICE_TYPE_GPU: "GPU",
+    _GGML_BACKEND_DEVICE_TYPE_IGPU: "IGPU",
+}
 
 AUTO_LABEL = "Auto (独显优先)"
 

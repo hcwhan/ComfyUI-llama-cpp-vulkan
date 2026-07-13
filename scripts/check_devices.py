@@ -5,6 +5,7 @@ from pathlib import Path
 
 import llama_cpp.llama_cpp as _llama_cpp_lib
 from llama_cpp._ggml import (
+    GGMLBackendDevType,
     libggml_base,
     ggml_backend_dev_count,
     ggml_backend_dev_get,
@@ -12,7 +13,8 @@ from llama_cpp._ggml import (
     ggml_backend_reg_count,
 )
 
-DEV_TYPES = {0: "CPU", 1: "GPU", 2: "IGPU", 3: "ACCEL", 4: "META"}
+# 由 wheel 导出的枚举生成 {0: "CPU", 1: "GPU", ...}, 随 wheel 升级自动同步
+DEV_TYPES = {int(t): t.name.removeprefix("GGML_BACKEND_DEVICE_TYPE_") for t in GGMLBackendDevType}
 
 lib_dir = Path(_llama_cpp_lib.__file__).resolve().parent / "lib"
 print(f"Loading backends from: {lib_dir}\n")
