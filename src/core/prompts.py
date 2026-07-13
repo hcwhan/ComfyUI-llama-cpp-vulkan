@@ -96,5 +96,13 @@ def instruct_presets(modality):
 
 
 def preset_content(name):
-    """按预设名取模板文本."""
-    return user_prompt_presets[name]["content"]
+    """按预设名取模板文本, 未知名字抛带指引的 ValueError.
+
+    预设改名/删除后, 经连线传入的旧工作流值可能失配 (widget 常量会先被
+    ComfyUI 的 combo 前置校验拦截), 报错与 resolve_config 的 unknown
+    handler 风格对齐, 不暴露裸 KeyError.
+    """
+    try:
+        return user_prompt_presets[name]["content"]
+    except KeyError:
+        raise ValueError(f'Unknown preset_prompt: "{name}". Re-select a preset from the dropdown (the workflow may reference a renamed or removed preset).') from None

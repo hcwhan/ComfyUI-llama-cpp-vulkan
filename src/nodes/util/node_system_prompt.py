@@ -18,4 +18,8 @@ class system_prompt_preset:
     CATEGORY = "llama-cpp-vulkan"
 
     def main(self, preset):
-        return (PRESETS[preset],)
+        # 经连线传入的失配预设名不暴露裸 KeyError (widget 常量有 combo 前置校验)
+        try:
+            return (PRESETS[preset],)
+        except KeyError:
+            raise ValueError(f'Unknown preset: "{preset}". Re-select a preset from the dropdown.') from None

@@ -216,6 +216,11 @@ class TestPresetConfig(unittest.TestCase):
             for name in instruct_presets(node_cls.MODALITY):
                 preset_content(name)
 
+    def test_unknown_preset_raises_value_error(self):
+        # 预设改名/删除后经连线传入的旧值: 带指引的 ValueError 而非裸 KeyError
+        with self.assertRaisesRegex(ValueError, "Unknown preset_prompt"):
+            preset_content("不存在的预设")
+
 
 if __name__ == "__main__":
     unittest.main()
