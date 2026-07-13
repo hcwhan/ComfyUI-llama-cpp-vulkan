@@ -16,6 +16,7 @@ from src.nodes.type.media.bbox.bbox_utils import (  # noqa: E402
     feathered_rect_mask,
     bbox_label,
     _label_color,
+    _label_font,
 )
 from src.nodes.type.media.bbox.node_bbox import SEG  # noqa: E402
 
@@ -68,6 +69,11 @@ class TestDrawBbox(unittest.TestCase):
         out = draw_bbox(image, [(2.0, 2.0, 12.0, 12.0)], ["cat"])
         self.assertEqual(tuple(out.shape), (1, 32, 32, 3))
         self.assertGreater(out.sum().item(), 0)
+
+    def test_label_font_loads_any_size(self):
+        # 正向断言: 字体加载链 (CJK 候选或 PIL 默认回退) 在任意字号下可用
+        for size in (12, 48):
+            self.assertIsNotNone(_label_font(size))
 
 
 class TestValidIntBbox(unittest.TestCase):

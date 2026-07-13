@@ -97,5 +97,23 @@ class TestJsonToBBoxesLabelFilter(unittest.TestCase):
         self.assertEqual(bboxes[0], [(1, 1, 4, 4)])
 
 
+class TestJsonToBBoxesQwenMode(unittest.TestCase):
+    def setUp(self):
+        self.node = json_to_bboxes()
+
+    def test_qwen_mode_requires_image(self):
+        # Qwen 坐标系换算依赖原图尺寸, 未连 image 时须明确报错
+        with self.assertRaisesRegex(ValueError, "Image required"):
+            self.node.process(['[{"bbox_2d": [0, 0, 500, 1000]}]'], ["Qwen3-VL"], [""], None)
+
+    def test_qwen3_normalized_coords_scaled_to_frame(self):
+        # Qwen3-VL 输出 0-1000 归一化坐标, 按帧尺寸 (w=200, h=100) 换算
+        frames = [torch.zeros(1, 100, 200, 3)]
+        bboxes, image_list = self.node.process(
+            ['[{"bbox_2d": [0, 0, 500, 1000], "label": "x"}]'], ["Qwen3-VL"], [""], frames)
+        self.assertEqual(bboxes[0], [(0.0, 0.0, 100.0, 100.0)])
+        self.assertEqual(tuple(image_list[0].shape), (1, 100, 200, 3))
+
+
 if __name__ == "__main__":
     unittest.main()
