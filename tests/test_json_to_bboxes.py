@@ -52,5 +52,31 @@ class TestJsonToBBoxesRestructure(unittest.TestCase):
         self.assertEqual(image_list, [])
 
 
+_JSON_LABELED = (
+    '[{"bbox_2d": [1, 1, 4, 4], "label": "Cat"},'
+    ' {"bbox_2d": [2, 2, 5, 5], "label": "dog"},'
+    ' {"bbox_2d": [3, 3, 6, 6], "text_content": " cat "}]'
+)
+
+
+class TestJsonToBBoxesLabelFilter(unittest.TestCase):
+    def setUp(self):
+        self.node = json_to_bboxes()
+
+    def test_filter_ignores_case_and_matches_text_content(self):
+        # label 匹配忽略大小写与首尾空格, label / text_content 任一字段命中即保留
+        bboxes, _ = self.node.process([_JSON_LABELED], ["simple"], ["cat"], None)
+        self.assertEqual(len(bboxes), 1)
+        self.assertEqual(bboxes[0], [(1, 1, 4, 4), (3, 3, 6, 6)])
+
+    def test_empty_label_keeps_all(self):
+        bboxes, _ = self.node.process([_JSON_LABELED], ["simple"], [""], None)
+        self.assertEqual(len(bboxes[0]), 3)
+
+    def test_no_match_returns_empty_group(self):
+        bboxes, _ = self.node.process([_JSON_LABELED], ["simple"], ["bird"], None)
+        self.assertEqual(bboxes[0], [])
+
+
 if __name__ == "__main__":
     unittest.main()

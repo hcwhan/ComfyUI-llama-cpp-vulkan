@@ -11,6 +11,12 @@ from .....core.instruct import llama_cpp_media_instruct_base
 from ..encoding import image_content_item, scale_image, tensor_to_uint8
 
 
+def sample_frame_indices(total_frames, max_frames):
+    """均匀采样的帧索引; clamp 到实际帧数, 避免 linspace 重复采样同一帧浪费上下文."""
+    n_frames = min(max_frames, total_frames)
+    return np.linspace(0, total_frames - 1, n_frames, dtype=int)
+
+
 class llama_cpp_video_instruct(llama_cpp_media_instruct_base):
     MEDIA_WORD = "视频"
     MODALITY = "video"
@@ -48,10 +54,7 @@ class llama_cpp_video_instruct(llama_cpp_media_instruct_base):
 
         def runner(messages, user_content, seed, params, extract_text, watcher):
             self.require_mmproj("Video")
-            # clamp 到实际帧数,避免 linspace 重复采样同一帧浪费上下文
-            n_frames = min(max_frames, len(frames))
-            indices = np.linspace(0, len(frames) - 1, n_frames, dtype=int)
-            sampled = [frames[i] for i in indices]
+            sampled = [frames[i] for i in sample_frame_indices(len(frames), max_frames)]
 
             for frame in sampled:
                 if len(sampled) > 1:
