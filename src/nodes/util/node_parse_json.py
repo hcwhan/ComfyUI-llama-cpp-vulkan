@@ -42,10 +42,11 @@ class parse_json_node:
 
         # 转换失败时回退类型零值,保证输出与声明的 INT/FLOAT 类型一致,
         # 不能把原始值(可能是 str/dict)透传给下游节点。
-        # int 不经 float 中转:超过 2^53 的大整数(如雪花 ID)会在 float 中丢精度
+        # int 不经 float 中转:超过 2^53 的大整数(如雪花 ID)会在 float 中丢精度。
+        # OverflowError: json.loads 接受 Infinity 字面量返回 float('inf')
         try:
             integer = int(val)
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             try:
                 integer = int(float(val))  # "1.5" 之类的数字字符串
             except (TypeError, ValueError, OverflowError):

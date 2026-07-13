@@ -60,6 +60,14 @@ class TestParseJsonNodeConversions(unittest.TestCase):
         self.assertEqual(integer, 0)
         self.assertEqual(number, 0.0)
 
+    def test_infinity_int_falls_back_to_zero(self):
+        # 回归: json.loads 接受 Infinity 字面量, int(inf) 抛 OverflowError
+        # 须按 DESCRIPTION 契约回退 0 而非裸报错; float 输出保留 inf 原值
+        any_val, _, integer, number, _ = self._run('{"v": Infinity}', "v")
+        self.assertEqual(any_val, float("inf"))
+        self.assertEqual(integer, 0)
+        self.assertEqual(number, float("inf"))
+
     def test_missing_key_string_falls_back_to_empty(self):
         # 回归: key 未命中且未连 default 时 string 输出空串而非字面 "None"
         any_val, string, integer, number, boolean = self._run('{"a": 1}', "missing")
