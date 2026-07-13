@@ -93,8 +93,14 @@ class llama_cpp_vlm_model_loader:
             "chat_handler": (["None"] + list(HANDLERS),),
             "n_ctx": _N_CTX_FIELD,
             "vram_limit": _VRAM_LIMIT_FIELD,
-            "image_min_tokens": ("INT", {"default": 0, "min": 0, "max": 4096, "step": 32}),
-            "image_max_tokens": ("INT", {"default": 0, "min": 0, "max": 4096, "step": 32}),
+            "image_min_tokens": ("INT", {
+                "default": 0, "min": 0, "max": 4096, "step": 32,
+                "tooltip": "mmproj 视觉编码的最小 token 数.\n0 = 使用模型默认 (<=0 视为未设置).\n修改后 Qwen2.5-VL 的 bbox 坐标换算会有偏差."
+            }),
+            "image_max_tokens": ("INT", {
+                "default": 0, "min": 0, "max": 4096, "step": 32,
+                "tooltip": "mmproj 视觉编码的最大 token 数, 可限制高分辨率图片的显存与耗时.\n0 = 使用模型默认 (<=0 视为未设置).\n修改后 Qwen2.5-VL 的 bbox 坐标换算会有偏差."
+            }),
         }}
 
     RETURN_TYPES = ("LLAMACPPVLM",)
