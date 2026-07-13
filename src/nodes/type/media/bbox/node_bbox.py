@@ -17,8 +17,14 @@ from .bbox_utils import (
 )
 
 def _normalized_label(value):
-    """label 匹配归一化: 忽略大小写与首尾空格,非字符串视为不匹配。"""
-    return value.strip().casefold() if isinstance(value, str) else None
+    """label 匹配归一化: 忽略大小写与首尾空格; None(字段缺失)视为不匹配。
+
+    LLM 可能输出数字等非字符串标签,与 bbox_label 的显示路径一致地强转 str,
+    保证画得出的标签在过滤框中也能匹配到。
+    """
+    if value is None:
+        return None
+    return str(value).strip().casefold()
 
 
 # 与 Impact Pack 的 SEG 保持同定义(modules/impact/core.py),字段名与顺序不能改:

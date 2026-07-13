@@ -83,6 +83,13 @@ class TestJsonToBBoxesLabelFilter(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.node.process(['[[10, 20, 30, 40]]'], ["simple"], ["cat"], None)
 
+    def test_numeric_label_matched_by_string_filter(self):
+        # 回归: LLM 输出数字标签时画框显示 "5" (bbox_label 强转 str),
+        # 过滤框填 "5" 须能匹配到该框, 匹配与显示路径行为一致
+        json_str = '[{"bbox_2d": [1, 1, 4, 4], "label": 5}, {"bbox_2d": [2, 2, 5, 5], "label": "cat"}]'
+        bboxes, _ = self.node.process([json_str], ["simple"], ["5"], None)
+        self.assertEqual(bboxes[0], [(1, 1, 4, 4)])
+
 
 if __name__ == "__main__":
     unittest.main()
