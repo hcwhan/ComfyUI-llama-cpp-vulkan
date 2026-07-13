@@ -18,11 +18,11 @@ _IMAGE_SEP_RE = re.compile(r"^====== Image \d+ ======[ \t]*\r?$", re.MULTILINE)
 
 
 def split_image_results(text):
-    """把 image Instruct 逐张模式的拼接输出按分隔行拆回逐张结果列表。
+    """把 image Instruct 逐张模式的拼接输出按分隔行拆回逐张结果列表.
 
-    无分隔行时返回单元素列表(整段原文), 普通文本 / 单图结果可安全通过。
+    无分隔行时返回单元素列表(整段原文), 普通文本 / 单图结果可安全通过.
     只丢弃首个分隔行之前的空首段; 中间/末尾的空结果保留为空字符串占位,
-    维持 "第 i 段对应第 i 张图" 的索引对齐(下游按索引配对画框/拆列表)。
+    维持 "第 i 段对应第 i 张图" 的索引对齐(下游按索引配对画框/拆列表).
     """
     if not _IMAGE_SEP_RE.search(text):
         return [text]
@@ -33,12 +33,12 @@ def split_image_results(text):
 
 
 def strip_code_fence(text):
-    """去除 LLM 输出首尾的 ```label ... ``` 代码块标记。
+    """去除 LLM 输出首尾的 ```label ... ``` 代码块标记.
 
     兼容任意标签和裸 ``` 围栏:
-    模型即使被要求输出 json 也可能给出不带标签的围栏。
+    模型即使被要求输出 json 也可能给出不带标签的围栏.
     模型输出 "好的, 结果如下:" 之类前导说明时首部不是围栏,
-    此时回退为提取文本中第一个完整围栏块的内容。
+    此时回退为提取文本中第一个完整围栏块的内容.
     """
     text = text.strip()
     stripped = _FENCE_OPEN_RE.sub("", text)

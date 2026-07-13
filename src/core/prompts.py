@@ -91,10 +91,10 @@ for _name, _spec in user_prompt_presets.items():
 
 
 def instruct_presets(modality):
-    """返回某模态可用的预设名列表, dict 声明顺序即 UI 下拉框顺序。"""
+    """返回某模态可用的预设名列表, dict 声明顺序即 UI 下拉框顺序."""
     return [name for name, spec in user_prompt_presets.items() if modality in spec["use"]]
 
 
 def preset_content(name):
-    """按预设名取模板文本。"""
+    """按预设名取模板文本."""
     return user_prompt_presets[name]["content"]

@@ -83,7 +83,7 @@ class TestStripThinkingBlocks(unittest.TestCase):
 
 
 class TestBuildUserPrompt(unittest.TestCase):
-    """覆盖/填充分支按模板是否含 "###" 判定(预设名的 "(需custom_prompt)" 仅为 UI 提示)。"""
+    """覆盖/填充分支按模板是否含 "###" 判定(预设名的 "(需custom_prompt)" 仅为 UI 提示)."""
 
     def setUp(self):
         self.node = llama_cpp_instruct_base()
@@ -119,11 +119,11 @@ class TestBuildUserPrompt(unittest.TestCase):
 
 
 class TestSingleCompletionContentFlattening(unittest.TestCase):
-    """回归: 纯文本 user content 必须扁平化为字符串。
+    """回归: 纯文本 user content 必须扁平化为字符串.
 
     无 chat handler 的文本路径由 GGUF 内嵌 chat template 渲染消息,
     旧式模板(ChatML/Llama-3/Mistral 等)假定 content 是字符串,
-    收到 content-part 列表会 TypeError 或渲染出 Python repr 垃圾。
+    收到 content-part 列表会 TypeError 或渲染出 Python repr 垃圾.
     """
 
     class _FakeLlm:
@@ -159,9 +159,9 @@ class TestSingleCompletionContentFlattening(unittest.TestCase):
 
 
 class TestRequireUserText(unittest.TestCase):
-    """text 路径空 user 文本拦截: 无媒体载荷的空请求在模型加载前报错。
+    """text 路径空 user 文本拦截: 无媒体载荷的空请求在模型加载前报错.
 
-    media 路径不拦截(空文本 + 媒体内容是有意设计)。
+    media 路径不拦截(空文本 + 媒体内容是有意设计).
     """
 
     def test_text_node_requires_user_text(self):
@@ -194,7 +194,7 @@ class TestRequireUserText(unittest.TestCase):
 
 
 class TestPresetConfig(unittest.TestCase):
-    """预设 use 配置与节点类属性的一致性。"""
+    """预设 use 配置与节点类属性的一致性."""
 
     def test_every_node_modality_has_presets(self):
         for node_cls in _INSTRUCT_NODES:

@@ -64,10 +64,10 @@ _META_SUFFIXES = {
 
 
 def _parse_metadata(path):
-    """顺序扫描 GGUF KV 区, 返回 {字段名: 值}, 字段集齐即提前返回。
+    """顺序扫描 GGUF KV 区, 返回 {字段名: 值}, 字段集齐即提前返回.
 
     架构键通常排在 tokenizer 数组之前; 关键的 block_count 到手后一旦扫到
-    tokenizer 区即停止, 不为可选字段解析几十万条 token 元数据(慢且占内存)。
+    tokenizer 区即停止, 不为可选字段解析几十万条 token 元数据(慢且占内存).
     """
     found = {}
     with open(path, "rb") as f:
@@ -98,7 +98,7 @@ def _parse_metadata(path):
 
 
 def get_model_meta(path):
-    """读取显存折算所需的 GGUF 元数据 dict, 解析失败返回空 dict(调用方走回退路径)。"""
+    """读取显存折算所需的 GGUF 元数据 dict, 解析失败返回空 dict(调用方走回退路径)."""
     try:
         meta = _parse_metadata(path)
         if "block_count" not in meta:
@@ -110,5 +110,5 @@ def get_model_meta(path):
 
 
 def get_layer_count(path):
-    """读取 GGUF 模型层数,失败返回 None(调用方回退默认值)。"""
+    """读取 GGUF 模型层数,失败返回 None(调用方回退默认值)."""
     return get_model_meta(path).get("block_count")

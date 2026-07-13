@@ -74,11 +74,11 @@ else:
 
 
 def _selectable_devices():
-    """按 llama.cpp 收集 model->devices 的规则,返回 main_gpu 实际可选的设备。
+    """按 llama.cpp 收集 model->devices 的规则,返回 main_gpu 实际可选的设备.
 
     llama.cpp 只把独显 (type==GPU) 按枚举顺序加入设备列表;
-    仅当系统没有任何独显时,才加入第一个核显 (IGPU)。
-    其余设备无法通过 main_gpu 参数选中,因此不在下拉框中展示。
+    仅当系统没有任何独显时,才加入第一个核显 (IGPU).
+    其余设备无法通过 main_gpu 参数选中,因此不在下拉框中展示.
     """
     dgpus = [d for d in _gpu_devices if d["type"] == "GPU"]
     if dgpus:
@@ -91,11 +91,11 @@ def _device_label(dev):
 
 
 def resolve_device_selection(gpu_device):
-    """把下拉框选项翻译为 (main_gpu, split_mode)。
+    """把下拉框选项翻译为 (main_gpu, split_mode).
 
     main_gpu 仅在 split_mode=NONE 时生效,且索引是相对 llama.cpp 的
-    model->devices 列表(即 _selectable_devices 的顺序),不是 ggml 全局设备序号。
-    Auto 保持 llama.cpp 默认行为:LAYER 模式,独显优先,多独显按层切分。
+    model->devices 列表(即 _selectable_devices 的顺序),不是 ggml 全局设备序号.
+    Auto 保持 llama.cpp 默认行为:LAYER 模式,独显优先,多独显按层切分.
     """
     if gpu_device != AUTO_LABEL:
         for i, dev in enumerate(_selectable_devices()):

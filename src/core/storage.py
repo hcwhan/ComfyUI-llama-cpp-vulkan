@@ -32,17 +32,17 @@ _MMPROJ_FACTOR = 1.0 + _BASE_OVERHEAD
 
 
 def _as_number(value):
-    """元数据值归一为数值: 数组(hybrid 模型的逐层 head_count_kv)取均值。"""
+    """元数据值归一为数值: 数组(hybrid 模型的逐层 head_count_kv)取均值."""
     if isinstance(value, (list, tuple)):
         return sum(value) / len(value) if value else None
     return value if isinstance(value, (int, float)) else None
 
 
 def _estimate_kv_bytes(meta, layers, n_ctx):
-    """按 GGUF 注意力元数据精确计算 KV cache 字节数(f16), 字段不全时返回 None。
+    """按 GGUF 注意力元数据精确计算 KV cache 字节数(f16), 字段不全时返回 None.
 
     每 token 每层 KV = head_count_kv * (key_dim + value_dim) * 2 字节;
-    hybrid 模型(线性注意力层的 head_count_kv 为 0)经数组均值自然折算。
+    hybrid 模型(线性注意力层的 head_count_kv 为 0)经数组均值自然折算.
     """
     kv_heads = _as_number(meta.get("head_count_kv"))
     if not layers or not kv_heads:
@@ -61,7 +61,7 @@ def _estimate_kv_bytes(meta, layers, n_ctx):
 
 
 def _estimate_per_layer_bytes(model_path, n_ctx):
-    """估算每层显存占用(权重+固定开销+KV), 返回 (per_layer_bytes, layers)。"""
+    """估算每层显存占用(权重+固定开销+KV), 返回 (per_layer_bytes, layers)."""
     meta = get_model_meta(model_path)
     layers = _as_number(meta.get("block_count")) or 32
     size = os.path.getsize(model_path)
@@ -75,13 +75,13 @@ def _estimate_per_layer_bytes(model_path, n_ctx):
 
 
 def _estimate_n_gpu_layers(model_path, mmproj_path, vram_limit, n_ctx):
-    """按 GGUF 层数把 vram_limit (GB) 折算成 (n_gpu_layers, mmproj 是否进显存)。
+    """按 GGUF 层数把 vram_limit (GB) 折算成 (n_gpu_layers, mmproj 是否进显存).
 
     -1 透传给 llama.cpp 的 auto 语义(自动按空闲显存适配,通常为全部层);
     0 表示纯 CPU 推理;mmproj 只能整只进显存,体积先从预算中扣除,
     预算连 mmproj 都装不下时两者全留 CPU,扣除后不足主模型 1 层时
-    主模型全留 CPU(mmproj 照常进显存)。全部分支严格遵守 vram_limit 上限,
-    层体积为估算值,实际占用可能略有偏差。
+    主模型全留 CPU(mmproj 照常进显存). 全部分支严格遵守 vram_limit 上限,
+    层体积为估算值,实际占用可能略有偏差.
     """
     if vram_limit == -1:
         return -1, mmproj_path is not None
@@ -106,7 +106,7 @@ def _estimate_n_gpu_layers(model_path, mmproj_path, vram_limit, n_ctx):
 
 
 def _estimate_vram_bytes(model_path, mmproj_path, n_gpu_layers, n_ctx):
-    """估算本次加载的显存需求(字节),用于请求 ComfyUI 先腾挪 torch 侧显存。"""
+    """估算本次加载的显存需求(字节),用于请求 ComfyUI 先腾挪 torch 侧显存."""
     per_layer_bytes, layers = _estimate_per_layer_bytes(model_path, n_ctx)
     gpu_layers = layers if n_gpu_layers < 0 else min(n_gpu_layers, layers)
     size = per_layer_bytes * gpu_layers
@@ -116,11 +116,11 @@ def _estimate_vram_bytes(model_path, mmproj_path, n_gpu_layers, n_ctx):
 
 
 def resolve_config(config):
-    """校验 loader 配置并解析出 (model_path, mmproj_path, handler_cls)。
+    """校验 loader 配置并解析出 (model_path, mmproj_path, handler_cls).
 
     loader 节点用它做快速失败校验(不实际加载模型),
-    load_model 用它取得路径与 handler 类,两处共享同一套报错。
-    handler_cls 已由注册表预绑定构造期固定参数(thinking 开关等)。
+    load_model 用它取得路径与 handler 类,两处共享同一套报错.
+    handler_cls 已由注册表预绑定构造期固定参数(thinking 开关等).
     """
     model = config["model"]
     mmproj = config["mmproj"]

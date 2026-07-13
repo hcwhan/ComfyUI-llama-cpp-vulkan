@@ -17,10 +17,10 @@ from .bbox_utils import (
 )
 
 def _normalized_label(value):
-    """label 匹配归一化: 忽略大小写与首尾空格; None(字段缺失)视为不匹配。
+    """label 匹配归一化: 忽略大小写与首尾空格; None(字段缺失)视为不匹配.
 
     LLM 可能输出数字等非字符串标签,与 bbox_label 的显示路径一致地强转 str,
-    保证画得出的标签在过滤框中也能匹配到。
+    保证画得出的标签在过滤框中也能匹配到.
     """
     if value is None:
         return None

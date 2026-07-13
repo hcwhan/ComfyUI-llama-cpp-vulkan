@@ -12,10 +12,10 @@ from ....shared.logger import logger
 
 
 def tensor_to_uint8(image: torch.Tensor):
-    """ComfyUI IMAGE 张量 ([H,W,C] 或 [1,H,W,C]) 转 uint8 数组。
+    """ComfyUI IMAGE 张量 ([H,W,C] 或 [1,H,W,C]) 转 uint8 数组.
 
-    只剥离批次维，不用 squeeze()：squeeze 会把 H=1/W=1 的边缘尺寸也压掉，
-    导致 PIL 把 [W,C] 误解析为灰度图。
+    只剥离批次维, 不用 squeeze(): squeeze 会把 H=1/W=1 的边缘尺寸也压掉,
+    导致 PIL 把 [W,C] 误解析为灰度图.
     """
     arr = image.cpu().numpy()
     if arr.ndim == 4:
@@ -44,10 +44,10 @@ def _encode_wav_base64(pcm_bytes, sample_rate):
 
 
 def audio2base64(audio):
-    """ComfyUI AUDIO dict ({"waveform": [B,C,T], "sample_rate": int}) 转 WAV base64。
+    """ComfyUI AUDIO dict ({"waveform": [B,C,T], "sample_rate": int}) 转 WAV base64.
 
     只负责打包成 16-bit PCM WAV;重采样和声道适配由 llama.cpp 的 mtmd
-    解码端完成,多声道先均值混为单声道以减小 base64 载荷。
+    解码端完成,多声道先均值混为单声道以减小 base64 载荷.
     """
     waveform = audio["waveform"]
     if waveform.ndim == 3:
@@ -77,5 +77,5 @@ def scale_image(image: torch.Tensor, max_size: int):
 
 
 def image_content_item(uint8_image):
-    """uint8 数组 -> chat 消息里的 image_url 内容项。"""
+    """uint8 数组 -> chat 消息里的 image_url 内容项."""
     return {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{image2base64(uint8_image)}"}}

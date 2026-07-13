@@ -48,12 +48,12 @@ _ANSWER_CLOSE = "</answer>"
 
 
 def _unwrap_answer(text):
-    """剥离 GLM-4.1V 形态的 <answer>...</answer> 包裹。
+    """剥离 GLM-4.1V 形态的 <answer>...</answer> 包裹.
 
     GLM-4.1V-Thinking 的输出为 <think>...</think>\\n<answer>正文</answer>
     (官方推理代码按 <answer>(.*?)</answer> 提取正文); 本插件的 handler 以
-    </answer> 为 stop token, 闭合标签通常不进入文本, 因此开标签会残留。
-    仅在文本以 <answer> 开头时剥离, 避免误伤正文中的同名字样。
+    </answer> 为 stop token, 闭合标签通常不进入文本, 因此开标签会残留.
+    仅在文本以 <answer> 开头时剥离, 避免误伤正文中的同名字样.
     """
     stripped = text.lstrip()
     if not stripped.startswith(_ANSWER_OPEN):
@@ -65,11 +65,11 @@ def _unwrap_answer(text):
 
 
 def strip_thinking_blocks(text):
-    """移除思考块: <think>...</think>、Gemma4 的 channel 格式、GLM-4.1V 的 <answer> 包裹。
+    """移除思考块: <think>...</think>、Gemma4 的 channel 格式、GLM-4.1V 的 <answer> 包裹.
 
     Thinking 模型的 generation prompt 通常已注入开头的 <think>,
-    此时输出只含闭合标签,需要取最后一个 </think> 之后的内容。
-    Gemma4 同理只认闭合 token <channel|>; 未闭合(生成截断)时保持原样。
+    此时输出只含闭合标签,需要取最后一个 </think> 之后的内容.
+    Gemma4 同理只认闭合 token <channel|>; 未闭合(生成截断)时保持原样.
     """
     if "</think>" in text:
         cleaned = _THINK_BLOCK_RE.sub("", text)
@@ -82,19 +82,19 @@ def strip_thinking_blocks(text):
 
 
 def is_hybrid_arch(llm):
-    """判断模型是否为 hybrid/recurrent 架构(如 Qwen3.5 的线性注意力、Mamba 类)。
+    """判断模型是否为 hybrid/recurrent 架构(如 Qwen3.5 的线性注意力、Mamba 类).
 
     纯 SWA 模型(如 Gemma3)不算:其前缀缓存由 llama-cpp-python 内置的
-    checkpoint 机制处理,无需请求后整体重置。
+    checkpoint 机制处理,无需请求后整体重置.
     """
     return llm._model.is_hybrid() or llm._model.is_recurrent()
 
 
 class InterruptWatcher:
-    """推理期间轮询 ComfyUI 的中断标志,命中时触发 llama 的 abort_event。
+    """推理期间轮询 ComfyUI 的中断标志,命中时触发 llama 的 abort_event.
 
     create_completion 在每次请求开始时会 clear abort_event,
-    因此命中后持续重复 set 而不是设置一次就退出,避免竞态丢失中断。
+    因此命中后持续重复 set 而不是设置一次就退出,避免竞态丢失中断.
     """
 
     def __init__(self, llm, poll_interval=0.2):
@@ -177,10 +177,10 @@ class llama_cpp_instruct_base:
     # ---- 执行核心 ----
 
     def _prepare_messages(self, llama_model, system_prompt):
-        """确保目标模型已加载,并构建本次请求的初始消息列表(无跨执行状态)。
+        """确保目标模型已加载,并构建本次请求的初始消息列表(无跨执行状态).
 
         多组 loader+instruct 交错执行时,全局单例可能已被切换成其他模型,
-        因此按 current_config 比对后按需(重新)加载。
+        因此按 current_config 比对后按需(重新)加载.
         """
         if not LLAMA_CPP_STORAGE.llm or LLAMA_CPP_STORAGE.current_config != llama_model:
             LLAMA_CPP_STORAGE.load_model(llama_model)
@@ -191,12 +191,12 @@ class llama_cpp_instruct_base:
         return messages
 
     def _build_user_prompt(self, preset_prompt, custom_prompt):
-        """构建 user 消息的文本内容项(模板取自 user_prompt_presets)。
+        """构建 user 消息的文本内容项(模板取自 user_prompt_presets).
 
         覆盖/填充按模板内容判定:
         - 模板含 "###":custom_prompt 是填充物(必填),替换 "###" 占位符
         - 模板不含 "###":非空 custom_prompt 整体覆盖预设,为空则用模板原文
-        预设名的 "(需custom_prompt)" 标注仅为 UI 提示,不参与判定。
+        预设名的 "(需custom_prompt)" 标注仅为 UI 提示,不参与判定.
         """
         template = preset_content(preset_prompt)
         if "###" not in template:
@@ -218,12 +218,12 @@ class llama_cpp_instruct_base:
         return extract_text
 
     def _single_completion(self, messages, user_content, seed, params, extract_text):
-        """把 user_content 作为单条 user 消息发起一次补全,返回生成文本。
+        """把 user_content 作为单条 user 消息发起一次补全,返回生成文本.
 
         content 只含单个 text 项时扁平化为纯字符串:无 chat handler 的纯文本路径
         由 GGUF 内嵌 chat template 渲染消息,旧式模板(ChatML/Llama-3/Mistral 等)
-        假定 content 是字符串,收到 content-part 列表会报错或渲染出 Python repr。
-        媒体路径的 content 必然追加了媒体项(长度 > 1),不受影响。
+        假定 content 是字符串,收到 content-part 列表会报错或渲染出 Python repr.
+        媒体路径的 content 必然追加了媒体项(长度 > 1),不受影响.
         """
         if len(user_content) == 1 and user_content[0].get("type") == "text":
             user_content = user_content[0]["text"]
@@ -232,11 +232,11 @@ class llama_cpp_instruct_base:
         return extract_text(output)
 
     def _run(self, llama_model, preset_prompt, custom_prompt, system_prompt, seed, force_offload, strip_thinking, parameters, runner):
-        """通用执行骨架:组消息 -> 中断监视下执行 runner -> 收尾清理。
+        """通用执行骨架:组消息 -> 中断监视下执行 runner -> 收尾清理.
 
         runner(messages, user_content, seed, params, extract_text, watcher)
         由子类提供,返回输出文本(image 逐张模式为按分隔行拼接的整段文本,
-        下游可用 Split Instruct Output 节点或 JSON to BBoxes 的内建拆分还原)。
+        下游可用 Split Instruct Output 节点或 JSON to BBoxes 的内建拆分还原).
         """
         # 先做零成本的 prompt 校验(占位符预设缺 custom_prompt 时直接 ValueError),
         # 再触发可能长达数 GB 的模型加载, 避免漏填时白白完成一次全量加载才报错

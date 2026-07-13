@@ -30,10 +30,10 @@ _EPS = 1e-6
 
 
 def qwen25_smart_resize(width, height):
-    """复现 Qwen2.5-VL 预处理的 smart_resize, 返回 mtmd 实际送入模型的 (宽, 高)。
+    """复现 Qwen2.5-VL 预处理的 smart_resize, 返回 mtmd 实际送入模型的 (宽, 高).
 
     与官方参考实现一致: 宽高先四舍五入到 28 倍数; 面积超上限时按 beta 缩小后
-    向下取整到 28 倍数; 低于下限时放大后向上取整到 28 倍数。
+    向下取整到 28 倍数; 低于下限时放大后向上取整到 28 倍数.
     """
     f = _QWEN25_FACTOR
     w_bar = max(f, round(width / f) * f)
@@ -61,7 +61,7 @@ _CJK_FONT_CANDIDATES = (
 
 @lru_cache(maxsize=8)
 def _label_font(size):
-    """按字号加载 CJK 字体,全部候选缺失时回退 PIL 默认字体(中文会显示为方块)。"""
+    """按字号加载 CJK 字体,全部候选缺失时回退 PIL 默认字体(中文会显示为方块)."""
     for name in _CJK_FONT_CANDIDATES:
         try:
             return ImageFont.truetype(name, size)
@@ -72,16 +72,16 @@ def _label_font(size):
 
 
 def bbox_label(item):
-    """取 bbox JSON 项的标签,兼容 label / text_content 两种字段。
+    """取 bbox JSON 项的标签,兼容 label / text_content 两种字段.
 
     LLM 可能输出数字等非字符串标签,强转 str 保证下游
-    _label_color(label.encode) 与 PIL draw.text 不因单个标签放弃整张图。
+    _label_color(label.encode) 与 PIL draw.text 不因单个标签放弃整张图.
     """
     return str(item.get("label") or item.get("text_content") or "bbox")
 
 
 def json_to_pixel_bboxes(json_items, mode, width=0, height=0):
-    """把 LLM 输出的 bbox JSON 项换算为原图像素坐标 [(x0, y0, x1, y1), ...]。
+    """把 LLM 输出的 bbox JSON 项换算为原图像素坐标 [(x0, y0, x1, y1), ...].
 
     - Qwen3-VL:   输出 0-1000 归一化坐标, 按原图尺寸换算
     - Qwen2.5-VL: 输出 smart_resize 后图像空间的绝对坐标, 按 原图/resize 比例还原
@@ -146,10 +146,10 @@ def draw_bbox(image, pixel_bboxes, labels):
 
 
 def valid_int_bbox(bbox):
-    """校验 bbox 结构并取整为 (x1, y1, x2, y2),非法时打 warning 返回 None。
+    """校验 bbox 结构并取整为 (x1, y1, x2, y2),非法时打 warning 返回 None.
 
     Qwen 归一化坐标换算后是浮点数,四舍五入比截断更贴近原框;
-    坐标值来自 LLM 输出,非数字时按无效项跳过。
+    坐标值来自 LLM 输出,非数字时按无效项跳过.
     """
     if not isinstance(bbox, (list, tuple)) or len(bbox) < 4:
         logger.warning(f"[llama-cpp-vulkan] Skipping invalid bbox item: {bbox}")
@@ -162,10 +162,10 @@ def valid_int_bbox(bbox):
 
 
 def feathered_rect_mask(window_h, window_w, inner_rect, feather):
-    """在 (window_h, window_w) 局部窗口内构建矩形 mask,feather > 0 时做高斯羽化。
+    """在 (window_h, window_w) 局部窗口内构建矩形 mask,feather > 0 时做高斯羽化.
 
-    inner_rect 是窗口坐标系下的 (x1, y1, x2, y2)。
-    在局部窗口而非全图上跑 gaussian_filter,避免每个 bbox 的羽化代价随图像尺寸增长。
+    inner_rect 是窗口坐标系下的 (x1, y1, x2, y2).
+    在局部窗口而非全图上跑 gaussian_filter,避免每个 bbox 的羽化代价随图像尺寸增长.
     """
     mask = np.zeros((window_h, window_w), dtype=np.float32)
     x1, y1, x2, y2 = inner_rect
