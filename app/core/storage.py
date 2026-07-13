@@ -2,6 +2,7 @@
 
 import os
 import gc
+import time
 
 from llama_cpp import Llama
 
@@ -235,8 +236,28 @@ class LLAMA_CPP_STORAGE:
 
         logger.info(f"[llama-cpp-vulkan] Loading model: {model}")
         logger.info(f"[llama-cpp-vulkan] n_gpu_layers = {n_gpu_layers}, main_gpu = {main_gpu}, split_mode = {split_mode}")
+        def _create_llama():
+            return Llama(model_path, chat_handler=cls.chat_handler, n_gpu_layers=n_gpu_layers, main_gpu=main_gpu, split_mode=split_mode, n_ctx=config["n_ctx"], verbose=False)
+
         try:
-            cls.llm = Llama(model_path, chat_handler=cls.chat_handler, n_gpu_layers=n_gpu_layers, main_gpu=main_gpu, split_mode=split_mode, n_ctx=config["n_ctx"], verbose=False)
+            try:
+                cls.llm = _create_llama()
+            except Exception as e:
+                if n_gpu_layers == 0 and not mmproj_on_gpu:
+                    raise
+                # Windows WDDM 归还显存有延迟,估算偏低时 Vulkan 分配仍可能失败;
+                # 再腾挪一次并稍作等待后重试一轮。失败原因无法可靠区分是否为
+                # 显存不足,统一重试一次:非显存错误(文件损坏等)会再次快速失败
+                logger.warning(f"[llama-cpp-vulkan] model load failed ({e}), freeing torch VRAM and retrying once")
+                try:
+                    mm.free_memory(
+                        _estimate_vram_bytes(model_path, mmproj_path if mmproj_on_gpu else None, n_gpu_layers, config["n_ctx"]),
+                        mm.get_torch_device(),
+                    )
+                except Exception as free_err:
+                    logger.warning(f"[llama-cpp-vulkan] failed to free torch VRAM before retry: {free_err}")
+                time.sleep(1.0)
+                cls.llm = _create_llama()
         except Exception:
             # 主模型加载失败时立即回收已创建的 chat_handler,避免半初始化状态
             # 残留到下一次 load/unload;此时 mmproj 尚未进显存(mtmd 首次推理时
