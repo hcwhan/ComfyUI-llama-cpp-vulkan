@@ -1,4 +1,4 @@
-"""app/core/storage.py resolve_config 的单元测试: loader 快速失败校验的报错路径."""
+"""src/core/storage.py resolve_config 的单元测试: loader 快速失败校验的报错路径."""
 
 import unittest
 from unittest import mock
@@ -7,7 +7,7 @@ from tests import comfy_stubs
 
 comfy_stubs.install()
 
-import app.core.storage as storage  # noqa: E402
+import src.core.storage as storage  # noqa: E402
 
 
 def _config(model="model.gguf", mmproj="None", chat_handler="None"):

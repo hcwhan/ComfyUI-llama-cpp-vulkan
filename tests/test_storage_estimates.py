@@ -1,4 +1,4 @@
-"""app/core/storage.py 显存折算函数的单元测试: n_gpu_layers 折算与显存需求估算的边界行为."""
+"""src/core/storage.py 显存折算函数的单元测试: n_gpu_layers 折算与显存需求估算的边界行为."""
 
 import os
 import struct
@@ -9,7 +9,7 @@ from tests import comfy_stubs
 
 comfy_stubs.install()
 
-from app.core.storage import (  # noqa: E402
+from src.core.storage import (  # noqa: E402
     _BASE_OVERHEAD,
     _estimate_kv_bytes,
     _estimate_n_gpu_layers,

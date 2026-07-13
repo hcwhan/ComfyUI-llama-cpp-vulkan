@@ -1,4 +1,4 @@
-"""app/nodes/util/node_parse_json.py 的单元测试: 五种输出类型的转换边缘语义."""
+"""src/nodes/util/node_parse_json.py 的单元测试: 五种输出类型的转换边缘语义."""
 
 import unittest
 
@@ -6,7 +6,7 @@ from tests import comfy_stubs
 
 comfy_stubs.install()
 
-from app.nodes.util.node_parse_json import parse_json_node  # noqa: E402
+from src.nodes.util.node_parse_json import parse_json_node  # noqa: E402
 
 
 class TestParseJsonNodeConversions(unittest.TestCase):

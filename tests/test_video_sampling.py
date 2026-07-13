@@ -6,7 +6,7 @@ from tests import comfy_stubs
 
 comfy_stubs.install()
 
-from app.nodes.type.media.video.node_instruct import sample_frame_indices  # noqa: E402
+from src.nodes.type.media.video.node_instruct import sample_frame_indices  # noqa: E402
 
 
 class TestSampleFrameIndices(unittest.TestCase):

@@ -1,4 +1,4 @@
-"""app/nodes/type/media/bbox/node_bbox.py json_to_bboxes 的单元测试: JSON 条数与帧数不匹配时的重组对齐."""
+"""src/nodes/type/media/bbox/node_bbox.py json_to_bboxes 的单元测试: JSON 条数与帧数不匹配时的重组对齐."""
 
 import unittest
 
@@ -8,7 +8,7 @@ from tests import comfy_stubs
 
 comfy_stubs.install()
 
-from app.nodes.type.media.bbox.node_bbox import json_to_bboxes  # noqa: E402
+from src.nodes.type.media.bbox.node_bbox import json_to_bboxes  # noqa: E402
 
 _JSON_ONE_BOX = '[{"bbox_2d": [1, 1, 4, 4], "label": "a"}]'
 

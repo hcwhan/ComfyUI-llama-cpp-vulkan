@@ -15,7 +15,7 @@ comfy_stubs.install()
 from llama_cpp import Llama  # noqa: E402
 import llama_cpp._internals as _internals  # noqa: E402
 
-from app.core.instruct import DEFAULT_SAMPLING_PARAMS  # noqa: E402
+from src.core.instruct import DEFAULT_SAMPLING_PARAMS  # noqa: E402
 
 
 class TestWheelPrivateApiContract(unittest.TestCase):

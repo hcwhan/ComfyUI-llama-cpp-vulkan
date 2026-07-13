@@ -1,4 +1,4 @@
-"""app/core/handlers.py 注册表契约的单元测试: 类名存在性, kwargs 合法性, thinking 后缀一致性."""
+"""src/core/handlers.py 注册表契约的单元测试: 类名存在性, kwargs 合法性, thinking 后缀一致性."""
 
 import inspect
 import unittest
@@ -9,7 +9,7 @@ comfy_stubs.install()
 
 import llama_cpp.llama_multimodal as _handler_module  # noqa: E402
 
-from app.core.handlers import _HANDLER_SPECS  # noqa: E402
+from src.core.handlers import _HANDLER_SPECS  # noqa: E402
 
 _THINK_PARAM_NAMES = ("enable_thinking", "force_reasoning")
 

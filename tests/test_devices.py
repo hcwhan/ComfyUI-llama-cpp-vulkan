@@ -1,4 +1,4 @@
-"""app/core/devices.py resolve_device_selection 的单元测试: 显式选卡翻译与回退."""
+"""src/core/devices.py resolve_device_selection 的单元测试: 显式选卡翻译与回退."""
 
 import unittest
 
@@ -6,7 +6,7 @@ from tests import comfy_stubs
 
 comfy_stubs.install()
 
-import app.core.devices as devices  # noqa: E402
+import src.core.devices as devices  # noqa: E402
 
 _FAKE_DGPU = {"name": "Vulkan0", "desc": "Fake dGPU", "type": "GPU"}
 _FAKE_IGPU = {"name": "Vulkan1", "desc": "Fake iGPU", "type": "IGPU"}

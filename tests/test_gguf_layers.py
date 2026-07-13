@@ -1,11 +1,11 @@
-"""app/core/gguf_layers.py 的单元测试: 用手工构造的最小 GGUF 文件验证解析."""
+"""src/core/gguf_layers.py 的单元测试: 用手工构造的最小 GGUF 文件验证解析."""
 
 import os
 import struct
 import tempfile
 import unittest
 
-from app.core.gguf_layers import get_layer_count
+from src.core.gguf_layers import get_layer_count
 
 # GGUF value type 编号(与被测模块一致)
 _T_UINT32 = 4

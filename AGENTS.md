@@ -11,11 +11,11 @@
 
 ## 目录结构
 
-组织原则：`app/nodes/` 只放节点声明（文件名一律 `node_` 前缀），与某个节点强相关的工具放在该节点文件旁边（如 `bbox_utils.py`、`system_prompt_presets.py`、media 共用的 `encoding.py`）；跨领域复用的逻辑放 `app/core/`（模型生命周期、推理骨架、基础设施）与 `app/shared/`（纯工具）。
+组织原则：`src/nodes/` 只放节点声明（文件名一律 `node_` 前缀），与某个节点强相关的工具放在该节点文件旁边（如 `bbox_utils.py`、`system_prompt_presets.py`、media 共用的 `encoding.py`）；跨领域复用的逻辑放 `src/core/`（模型生命周期、推理骨架、基础设施）与 `src/shared/`（纯工具）。
 
 ```
 ComfyUI-llama-cpp-vulkan/
-  __init__.py                 # 入口：from .app.nodes 导出 NODE_CLASS_MAPPINGS
+  __init__.py                 # 入口：from .src.nodes 导出 NODE_CLASS_MAPPINGS
   pyproject.toml              # 项目元数据、依赖声明
   requirements.txt            # pip 依赖（含平台条件 llama-cpp-python wheel URL）
   复核结论.md                 # 复核结论存档（见"文档维护原则"）
@@ -23,7 +23,7 @@ ComfyUI-llama-cpp-vulkan/
     build-vulkan-wheels-abi3.yml  # CI：构建/发布双平台 Vulkan ABI3 wheel
   docs/
     项目分析.html             # 历史快照（页头已注明生成 commit，仅供历史参考）
-  app/
+  src/
     core/                     # 核心逻辑（非节点）
       storage.py              #   模型生命周期：全局单例、resolve_config 校验、显存折算、unload 钩子
       instruct.py             #   Instruct 基类（text 骨架）+ media 基类（VLM 校验）+ 中断/thinking/hybrid 工具
@@ -63,7 +63,7 @@ ComfyUI-llama-cpp-vulkan/
         node_split_output.py       # Split Instruct Output
         node_system_prompt.py      # System Prompt Preset
         system_prompt_presets.py   # 中文 Prompt 增强系统提示词模板池（Qwen-Image/Z-Image/Flux.2/Wan）
-  scripts/
+  tools/
     check_devices.py          # 独立诊断脚本：列出 GGML 后端检测到的所有设备
   tests/                      # 单元测试（标准库 unittest，用 ComfyUI 嵌入式 Python 运行）
     comfy_stubs.py            #   comfy/folder_paths 最小替身，满足 import 期依赖
@@ -71,7 +71,7 @@ ComfyUI-llama-cpp-vulkan/
 
 ## 数据流与类型隔离
 
-节点全集见 `app/nodes/__init__.py` 注册表。
+节点全集见 `src/nodes/__init__.py` 注册表。
 
 ```
 llama_cpp_llm_model_loader --> LLAMACPPLLM ------> llama_cpp_text_instruct
@@ -100,7 +100,7 @@ image 逐张模式的多图结果以 "====== Image N ======" 分隔行拼接
 
 ### GPU 设备管理
 
-`app/core/devices.py` 通过 ggml C API (ctypes) 直接枚举 Vulkan GPU 设备，区分独显 (GPU) 和核显 (IGPU)。这是独立于 PyTorch/CUDA 的 Vulkan 推理路径。
+`src/core/devices.py` 通过 ggml C API (ctypes) 直接枚举 Vulkan GPU 设备，区分独显 (GPU) 和核显 (IGPU)。这是独立于 PyTorch/CUDA 的 Vulkan 推理路径。
 
 关键函数链：`_detect_gpu_devices()` -> `_selectable_devices()` -> `gpu_device_choices` / `resolve_device_selection()`
 
@@ -112,7 +112,7 @@ image 逐张模式的多图结果以 "====== Image N ======" 分隔行拼接
 
 ### 模型生命周期
 
-`app/core/storage.py` 的 `LLAMA_CPP_STORAGE` 类管理全局单例模型状态：
+`src/core/storage.py` 的 `LLAMA_CPP_STORAGE` 类管理全局单例模型状态：
 
 - 懒加载：两个 Loader 只调用 `resolve_config()` 做快速失败校验（模型/mmproj 路径存在、mmproj 与 chat_handler 配对合法）并返回 config，实际加载由 Instruct 节点按需触发；多组 loader+instruct 交错时避免全局单例被 loader 反复挤占
 - `load_model()`: 先 `resolve_config()` 校验再卸载旧模型（无效配置不影响已加载的模型），随后加载 GGUF 模型；可选的 mmproj（视觉编码器）在此处只构造 chat_handler（校验路径），真正加载进显存由 mtmd 在首次推理时惰性初始化（与加载前的 `mm.free_memory` 腾挪同在一次节点执行内，时序有效）
@@ -122,7 +122,7 @@ image 逐张模式的多图结果以 "====== Image N ======" 分隔行拼接
 
 ### Instruct 继承体系
 
-`app/core/instruct.py` 提供两级基类，四个 Instruct 节点只声明 `INPUT_TYPES` 与模态专属的 runner 闭包：
+`src/core/instruct.py` 提供两级基类，四个 Instruct 节点只声明 `INPUT_TYPES` 与模态专属的 runner 闭包：
 
 - `llama_cpp_instruct_base`：通用骨架。`_run()` 负责组消息（system + user）、复制采样参数、`InterruptWatcher` 监视、force_offload / hybrid KV 重置收尾；`prompt_inputs()/runtime_inputs()/optional_inputs()` 是 INPUT_TYPES 字段组装块
 - `llama_cpp_media_instruct_base`：多模态骨架，`MODEL_TYPE = "LLAMACPPVLM"`，附 `require_mmproj()` 兜底校验
@@ -137,7 +137,7 @@ image 逐张模式的多图结果以 "====== Image N ======" 分隔行拼接
 
 ### Chat Handler 注册表
 
-`app/core/handlers.py` 的 `_HANDLER_SPECS` 表集中定义全部 handler，数据形态、排序约定与新增须知见该表头注释。要点：构造期固定参数（thinking 开关、Generic-MTMD 兜底的 `chat_format` 等）经 `functools.partial` 预绑定进 `HANDLERS` 的构造器，`storage.py` 因此不感知 thinking 逻辑；启动时解析失败的类只从下拉框剔除并打 warning（防御 wheel 升级时的类变动，不静默、不阻断 import）；`-Thinking` 后缀与开关值的一致性由 `tests/test_handlers.py` 契约测试锁定。
+`src/core/handlers.py` 的 `_HANDLER_SPECS` 表集中定义全部 handler，数据形态、排序约定与新增须知见该表头注释。要点：构造期固定参数（thinking 开关、Generic-MTMD 兜底的 `chat_format` 等）经 `functools.partial` 预绑定进 `HANDLERS` 的构造器，`storage.py` 因此不感知 thinking 逻辑；启动时解析失败的类只从下拉框剔除并打 warning（防御 wheel 升级时的类变动，不静默、不阻断 import）；`-Thinking` 后缀与开关值的一致性由 `tests/test_handlers.py` 契约测试锁定。
 
 ### 多模态输入
 
@@ -169,7 +169,7 @@ image 逐张模式的多图结果以 "====== Image N ======" 分隔行拼接
 
 - 每个 .py 文件顶部必须有描述整个文件用途的模块 docstring, docstring 之后空一行再写代码
 - docstring 内的标点: 逗号使用英文逗号加一个空格 ", ", 句号使用英文句号 "."
-- 无实际代码的包不创建 `__init__.py`（子包走 Python 隐式命名空间包）；仅根入口、`app/nodes/__init__.py` 注册表与 `tests/__init__.py`（测试导入引导）三处有 `__init__.py`
+- 无实际代码的包不创建 `__init__.py`（子包走 Python 隐式命名空间包）；仅根入口、`src/nodes/__init__.py` 注册表与 `tests/__init__.py`（测试导入引导）三处有 `__init__.py`
 
 ### 依赖版本对接原则
 

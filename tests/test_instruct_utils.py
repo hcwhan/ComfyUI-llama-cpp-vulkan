@@ -1,4 +1,4 @@
-"""app/core/instruct.py 纯函数的单元测试: thinking 块剥离, 预设/自定义提示词组装, 预设配置一致性."""
+"""src/core/instruct.py 纯函数的单元测试: thinking 块剥离, 预设/自定义提示词组装, 预设配置一致性."""
 
 import unittest
 
@@ -6,13 +6,13 @@ from tests import comfy_stubs
 
 comfy_stubs.install()
 
-from app.core.instruct import strip_thinking_blocks, llama_cpp_instruct_base  # noqa: E402
-from app.core.prompts import instruct_presets, preset_content  # noqa: E402
-from app.core.storage import LLAMA_CPP_STORAGE  # noqa: E402
-from app.nodes.type.text.node_instruct import llama_cpp_text_instruct  # noqa: E402
-from app.nodes.type.media.image.node_instruct import llama_cpp_image_instruct  # noqa: E402
-from app.nodes.type.media.video.node_instruct import llama_cpp_video_instruct  # noqa: E402
-from app.nodes.type.media.audio.node_instruct import llama_cpp_audio_instruct  # noqa: E402
+from src.core.instruct import strip_thinking_blocks, llama_cpp_instruct_base  # noqa: E402
+from src.core.prompts import instruct_presets, preset_content  # noqa: E402
+from src.core.storage import LLAMA_CPP_STORAGE  # noqa: E402
+from src.nodes.type.text.node_instruct import llama_cpp_text_instruct  # noqa: E402
+from src.nodes.type.media.image.node_instruct import llama_cpp_image_instruct  # noqa: E402
+from src.nodes.type.media.video.node_instruct import llama_cpp_video_instruct  # noqa: E402
+from src.nodes.type.media.audio.node_instruct import llama_cpp_audio_instruct  # noqa: E402
 
 _INSTRUCT_NODES = (
     llama_cpp_text_instruct,

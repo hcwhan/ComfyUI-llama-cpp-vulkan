@@ -1,8 +1,8 @@
-"""app/shared/text_utils.py 的单元测试: 代码围栏剥离, 逐张结果拆分, JSON 解析, 嵌套取值."""
+"""src/shared/text_utils.py 的单元测试: 代码围栏剥离, 逐张结果拆分, JSON 解析, 嵌套取值."""
 
 import unittest
 
-from app.shared.text_utils import strip_code_fence, split_image_results, parse_json, get_nested_value
+from src.shared.text_utils import strip_code_fence, split_image_results, parse_json, get_nested_value
 
 
 class TestStripCodeFence(unittest.TestCase):

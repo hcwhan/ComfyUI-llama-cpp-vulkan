@@ -106,7 +106,7 @@ CMAKE_ARGS="-DGGML_VULKAN=on" pip install llama-cpp-python --no-cache-dir --forc
 
 - **音频输入 (语音识别)**: 将 ComfyUI 的 `AUDIO` 输出连接到 `audio Instruct` 节点, 模型用 `vlm Model Loader` 加载并选择支持音频的 handler (如 Qwen3-ASR) 及其配套 mmproj。音频以 16-bit 单声道 WAV 发送, 重采样由 llama.cpp 完成。
 - **无状态推理**: 每次运行都是独立的一次性请求 (system prompt + 本次提问), 不保留任何跨运行的对话历史。
-- **检测不到 GPU?** 用 ComfyUI 的 Python 运行 `python scripts/check_devices.py`, 无需启动 ComfyUI 即可列出 GGML 后端枚举到的全部设备 (CPU/GPU/IGPU/ACCEL), 用于排查 Vulkan 驱动问题。
+- **检测不到 GPU?** 用 ComfyUI 的 Python 运行 `python tools/check_devices.py`, 无需启动 ComfyUI 即可列出 GGML 后端枚举到的全部设备 (CPU/GPU/IGPU/ACCEL), 用于排查 Vulkan 驱动问题。
 
 ## 致谢
 

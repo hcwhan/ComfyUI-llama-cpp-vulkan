@@ -1,6 +1,6 @@
-"""测试专用: 在导入 app 包之前注入 comfy/folder_paths 的最小替身模块.
+"""测试专用: 在导入 src 包之前注入 comfy/folder_paths 的最小替身模块.
 
-app 的部分模块在 import 时就访问 ComfyUI 运行时(注册模型目录, monkey-patch
+src 的部分模块在 import 时就访问 ComfyUI 运行时(注册模型目录, monkey-patch
 卸载钩子, 取 ProgressBar 类), 测试进程没有 ComfyUI, 用替身满足 import 期依赖.
 llama_cpp 使用真实安装(纯函数测试不触发推理).
 """
