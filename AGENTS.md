@@ -175,6 +175,8 @@ image 逐张模式的多图结果以 "====== Image N ======" 分隔行拼接
 
 项目代码只对接 `requirements.txt` 中固定的依赖版本（特别是 llama-cpp-python 的 JamePeng Vulkan wheel），不为历史版本或官方构建编写兼容/回退代码。mmproj 路径统一用 `mmproj_path` 键传入 handler。
 
+当前依赖的 wheel 私有 API 清单（升级 wheel 时按单复核）：`llm.n_tokens`、`llm._ctx.memory_clear`、`llm._hybrid_cache_mgr`、`llm._model.is_hybrid()/is_recurrent()`、`llama_cpp._ggml`（设备枚举符号）。`tests/test_wheel_contract.py` 契约测试静态检查上述接口存在性（不加载模型），升级 wheel 后运行即可发现断裂；公开 handler 类的契约另由 `tests/test_handlers.py` 锁定。
+
 ### INPUT_TYPES 字段顺序
 
 修改代码时不考虑兼容旧工作流（ComfyUI 的 widget 值按 `INPUT_TYPES` 声明顺序序列化，调整顺序会使已保存工作流的 widget 值错位，属预期代价），只考虑代码本身的合理性。特别是后加的配置项，不要为迁就旧工作流而堆在末尾，应按语义放到合理位置（与相关字段分组）。
