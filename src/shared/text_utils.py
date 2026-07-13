@@ -70,6 +70,16 @@ def get_nested_value(data, dotted_key, default=None):
                 return default
         if isinstance(data, dict) and key in data:
             data = data[key]
+        elif isinstance(data, list):
+            # 数组按数字下标下钻(如 items.0.label), 支持负下标从尾部取;
+            # 非数字 key 或越界与 "key 不存在" 同语义, 回落 default
+            try:
+                index = int(key)
+            except ValueError:
+                return default
+            if not -len(data) <= index < len(data):
+                return default
+            data = data[index]
         else:
             return default
     return data

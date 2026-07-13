@@ -130,6 +130,25 @@ class TestGetNestedValue(unittest.TestCase):
     def test_top_level_key(self):
         self.assertEqual(get_nested_value({"k": "v"}, "k"), "v")
 
+    def test_list_index(self):
+        data = {"items": [{"label": "a"}, {"label": "b"}]}
+        self.assertEqual(get_nested_value(data, "items.1.label"), "b")
+
+    def test_list_negative_index_from_tail(self):
+        data = {"items": [{"label": "a"}, {"label": "b"}]}
+        self.assertEqual(get_nested_value(data, "items.-1.label"), "b")
+
+    def test_top_level_list_indexable(self):
+        # parse_json 输出顶层数组时同样可下钻
+        self.assertEqual(get_nested_value([{"x": 1}], "0.x"), 1)
+
+    def test_list_index_out_of_range_returns_default(self):
+        self.assertEqual(get_nested_value({"items": [1]}, "items.3", "dflt"), "dflt")
+        self.assertEqual(get_nested_value({"items": [1]}, "items.-2", "dflt"), "dflt")
+
+    def test_non_numeric_key_on_list_returns_default(self):
+        self.assertEqual(get_nested_value({"items": [1]}, "items.label", "dflt"), "dflt")
+
 
 if __name__ == "__main__":
     unittest.main()

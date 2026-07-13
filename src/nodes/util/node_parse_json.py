@@ -21,7 +21,7 @@ class parse_json_node:
         return {
             "required": {
                 "input": ("STRING", {"forceInput": True}),
-                "key": ("STRING", {"default": "", "tooltip": "点分路径下钻取值, 如 a.b.c"}),
+                "key": ("STRING", {"default": "", "tooltip": "点分路径下钻取值, 如 a.b.c\n数组用数字下标, 如 items.0.label (负数从尾部取)"}),
             },
             "optional": {
                 "default": ("STRING",),
