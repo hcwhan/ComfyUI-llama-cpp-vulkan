@@ -12,7 +12,8 @@ class parse_json_node:
         "解析 JSON 字符串并按点分 key 取值, 同一个值以五种类型输出.\n"
         "转换规则: string 对 dict/list 输出合法 JSON 文本, 其余为 str() 结果;\n"
         "int/float 转换失败时回退 0 / 0.0; boolean 对数字取非零判定,\n"
-        "对文本仅 \"true\" (忽略大小写) 为真."
+        "对文本仅 \"true\" (忽略大小写) 为真.\n"
+        "key 未命中且未连 default 时输出 (None, \"\", 0, 0.0, False)."
     )
 
     @classmethod
@@ -62,9 +63,13 @@ class parse_json_node:
         else:
             boolean = str(val).strip().lower() == "true"
 
-        # dict/list 输出合法 JSON 文本而非 Python repr,下游可再接 Parse JSON
+        # dict/list 输出合法 JSON 文本而非 Python repr,下游可再接 Parse JSON;
+        # key 未命中且未连 default 时 val 为 None,string 输出回退空串,
+        # 避免字面 "None" 被下游当作有效文本拼进 prompt
         if isinstance(val, (dict, list)):
             string = json.dumps(val, ensure_ascii=False)
+        elif val is None:
+            string = ""
         else:
             string = str(val)
 

@@ -60,6 +60,15 @@ class TestParseJsonNodeConversions(unittest.TestCase):
         self.assertEqual(integer, 0)
         self.assertEqual(number, 0.0)
 
+    def test_missing_key_string_falls_back_to_empty(self):
+        # 回归: key 未命中且未连 default 时 string 输出空串而非字面 "None"
+        any_val, string, integer, number, boolean = self._run('{"a": 1}', "missing")
+        self.assertIsNone(any_val)
+        self.assertEqual(string, "")
+        self.assertEqual(integer, 0)
+        self.assertEqual(number, 0.0)
+        self.assertFalse(boolean)
+
 
 if __name__ == "__main__":
     unittest.main()
