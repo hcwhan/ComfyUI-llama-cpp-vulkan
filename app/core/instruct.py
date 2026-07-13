@@ -16,6 +16,25 @@ from ..shared.types import any_type
 from .prompts import instruct_presets, preset_content
 from .storage import LLAMA_CPP_STORAGE
 
+# 采样参数的统一默认值: Parameters 节点的 widget 默认值与 Instruct 未连接
+# parameters 端口时的生效值均取自此表,保证连不连默认参数节点行为一致
+# (否则未连接时会落到 wheel 库签名默认值: temperature 0.2 / top_k 40 /
+# top_p 0.95 / max_tokens 不限, 与节点默认差异明显)
+DEFAULT_SAMPLING_PARAMS = {
+    "max_tokens": 8192,
+    "top_k": 40,
+    "top_p": 0.95,
+    "min_p": 0.05,
+    "typical_p": 1.0,
+    "temperature": 0.8,
+    "repeat_penalty": 1.1,
+    "frequency_penalty": 0.0,
+    "present_penalty": 0.0,
+    "mirostat_mode": 0,
+    "mirostat_eta": 0.1,
+    "mirostat_tau": 5.0,
+}
+
 _THINK_BLOCK_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
 
 # Gemma4 思考块的闭合 token (格式 <|channel>thought ... <channel|>)。
@@ -147,7 +166,7 @@ class llama_cpp_instruct_base:
     @classmethod
     def optional_inputs(cls):
         return {
-            "parameters": ("LLAMACPPARAMS",),
+            "parameters": ("LLAMACPPARAMS", {"tooltip": "采样参数配置.\n不连接时使用与 llama.cpp Parameters 节点默认值相同的一套参数."}),
             "queue_handler": (any_type, {"tooltip": "用于控制多个 Instruct 节点的执行顺序."}),
         }
 
@@ -219,8 +238,9 @@ class llama_cpp_instruct_base:
         # 再触发可能长达数 GB 的模型加载, 避免漏填时白白完成一次全量加载才报错
         user_content = [self._build_user_prompt(preset_prompt, custom_prompt)]
         messages = self._prepare_messages(llama_model, system_prompt)
-        # 防御性复制:parameters 是 ComfyUI 缓存的共享 dict,防止 runner 修改时污染
-        params = (parameters or {}).copy()
+        # 合并生成新 dict 兼作防御性复制(parameters 是 ComfyUI 缓存的共享 dict,
+        # 防止 runner 修改时污染);未连接 parameters 端口时整体落到统一默认值
+        params = {**DEFAULT_SAMPLING_PARAMS, **(parameters or {})}
         extract_text = self._make_extract(strip_thinking)
 
         # 监视线程让长时间生成也能响应 ComfyUI 的取消操作;
