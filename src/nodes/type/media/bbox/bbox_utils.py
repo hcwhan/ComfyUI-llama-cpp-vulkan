@@ -103,7 +103,11 @@ def json_to_pixel_bboxes(json_items, mode, width=0, height=0):
         coords = item.get("bbox_2d")
         if not isinstance(coords, (list, tuple)) or len(coords) != 4:
             raise ValueError(f'BBox item is missing a valid "bbox_2d": [x1, y1, x2, y2] field: {item!r}')
-        x0, y0, x1, y1 = coords
+        try:
+            # 坐标经 float 强转: 弱模型常见输出数字字符串, 与 valid_int_bbox 行为一致
+            x0, y0, x1, y1 = (float(v) for v in coords)
+        except (TypeError, ValueError):
+            raise ValueError(f'BBox "bbox_2d" coordinates must be numeric: {item!r}') from None
         bboxes.append((x0 * sx, y0 * sy, x1 * sx, y1 * sy))
     return bboxes
 

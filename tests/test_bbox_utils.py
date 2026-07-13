@@ -27,6 +27,15 @@ class TestJsonToPixelBboxes(unittest.TestCase):
         result = json_to_pixel_bboxes(items, "Qwen3-VL", width=200, height=100)
         self.assertEqual(result, [(0.0, 0.0, 100.0, 100.0)])
 
+    def test_numeric_string_coords_accepted(self):
+        # 回归: 弱模型常见输出数字字符串坐标, 须与 valid_int_bbox 一样经 float 接受
+        items = [{"bbox_2d": ["10", "20", "30", "40"], "label": "cat"}]
+        self.assertEqual(json_to_pixel_bboxes(items, "simple"), [(10, 20, 30, 40)])
+
+    def test_non_numeric_coords_raise_value_error(self):
+        with self.assertRaises(ValueError):
+            json_to_pixel_bboxes([{"bbox_2d": [1, 2, 3, None]}], "simple")
+
     def test_missing_bbox_2d_raises_value_error(self):
         with self.assertRaises(ValueError):
             json_to_pixel_bboxes([{"label": "cat"}], "simple")
