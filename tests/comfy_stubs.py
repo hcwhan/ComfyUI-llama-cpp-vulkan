@@ -38,6 +38,11 @@ def install():
         def update(self, value):
             self.current += value
 
+        def update_absolute(self, value, total=None, preview=None):
+            if total is not None:
+                self.total = total
+            self.current = value
+
     utils.ProgressBar = ProgressBar
     comfy.model_management = mm
     comfy.utils = utils

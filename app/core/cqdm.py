@@ -8,6 +8,11 @@ class cqdm:
     def __init__(self, iterable, desc="Processing"):
         self.total = len(iterable)
         self.pbar = comfy.utils.ProgressBar(self.total)
+        # 立即推送 0/N: 前端马上显示进度起点,同时清掉上一次执行被中断时
+        # 残留的进度值。中断时刻无法归零——ComfyUI 的进度 hook 在发送前
+        # 检查中断标志并直接抛 InterruptProcessingException,推送必然失败,
+        # 因此归零只能推迟到下一次执行的起点
+        self.pbar.update_absolute(0)
         self.tqdm = tqdm(
             iterable=iterable,
             total=self.total,
