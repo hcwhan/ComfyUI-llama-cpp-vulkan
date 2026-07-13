@@ -9,13 +9,14 @@ import comfy.model_management as mm
 
 from ..shared.logger import logger
 from .devices import AUTO_LABEL, resolve_device_selection, log_backend_summary
-from .gguf_layers import get_layer_count
+from .gguf_layers import get_model_meta
 from .handlers import HANDLERS
 from .model_paths import get_llm_full_path
 
 # GGUF 文件体积 -> 运行时显存占用的经验放大系数,按 n_ctx=8192 校准拆成两项:
 # 与上下文无关的计算缓冲等固定开销 + 随 n_ctx 线性增长的 KV/激活开销
-# (8192 时合计 1.55)
+# (8192 时合计 1.55)。KV 项按体积折算只是元数据不全时的回退:
+# KV cache 实际大小与权重量化无关,强量化模型按体积折算会低估
 _BASE_OVERHEAD = 0.15
 _KV_OVERHEAD_AT_8K = 0.40
 _KV_CALIBRATION_CTX = 8192
@@ -29,6 +30,49 @@ def _vram_factor(n_ctx):
 _MMPROJ_FACTOR = 1.0 + _BASE_OVERHEAD
 
 
+def _as_number(value):
+    """元数据值归一为数值: 数组(hybrid 模型的逐层 head_count_kv)取均值。"""
+    if isinstance(value, (list, tuple)):
+        return sum(value) / len(value) if value else None
+    return value if isinstance(value, (int, float)) else None
+
+
+def _estimate_kv_bytes(meta, layers, n_ctx):
+    """按 GGUF 注意力元数据精确计算 KV cache 字节数(f16), 字段不全时返回 None。
+
+    每 token 每层 KV = head_count_kv * (key_dim + value_dim) * 2 字节;
+    hybrid 模型(线性注意力层的 head_count_kv 为 0)经数组均值自然折算。
+    """
+    kv_heads = _as_number(meta.get("head_count_kv"))
+    if not layers or not kv_heads:
+        return None
+    key_dim = _as_number(meta.get("key_length"))
+    if key_dim is None:
+        heads = _as_number(meta.get("head_count"))
+        embed = _as_number(meta.get("embedding_length"))
+        if not heads or not embed:
+            return None
+        key_dim = embed / heads
+    value_dim = _as_number(meta.get("value_length"))
+    if value_dim is None:
+        value_dim = key_dim
+    return int(n_ctx * layers * kv_heads * (key_dim + value_dim) * 2)
+
+
+def _estimate_per_layer_bytes(model_path, n_ctx):
+    """估算每层显存占用(权重+固定开销+KV), 返回 (per_layer_bytes, layers)。"""
+    meta = get_model_meta(model_path)
+    layers = _as_number(meta.get("block_count")) or 32
+    size = os.path.getsize(model_path)
+    kv_bytes = _estimate_kv_bytes(meta, layers, n_ctx)
+    if kv_bytes is None:
+        # 元数据不全时回退按体积折算的经验系数
+        total = size * _vram_factor(n_ctx)
+    else:
+        total = size * (1.0 + _BASE_OVERHEAD) + kv_bytes
+    return total / layers, layers
+
+
 def _estimate_n_gpu_layers(model_path, mmproj_path, vram_limit, n_ctx):
     """按 GGUF 层数把 vram_limit (GB) 折算成 (n_gpu_layers, mmproj 是否进显存)。
 
@@ -40,9 +84,8 @@ def _estimate_n_gpu_layers(model_path, mmproj_path, vram_limit, n_ctx):
         return -1, mmproj_path is not None
     if vram_limit == 0:
         return 0, False
-    factor = _vram_factor(n_ctx)
-    layers = get_layer_count(model_path) or 32
-    layer_size = os.path.getsize(model_path) * factor / (1024 ** 3) / layers
+    per_layer_bytes, _layers = _estimate_per_layer_bytes(model_path, n_ctx)
+    layer_size = per_layer_bytes / (1024 ** 3)
     if layer_size <= 0:
         return -1, mmproj_path is not None
     usable = vram_limit
@@ -57,11 +100,9 @@ def _estimate_n_gpu_layers(model_path, mmproj_path, vram_limit, n_ctx):
 
 def _estimate_vram_bytes(model_path, mmproj_path, n_gpu_layers, n_ctx):
     """估算本次加载的显存需求(字节),用于请求 ComfyUI 先腾挪 torch 侧显存。"""
-    factor = _vram_factor(n_ctx)
-    size = os.path.getsize(model_path) * factor
-    if n_gpu_layers >= 0:
-        layers = get_layer_count(model_path) or 32
-        size *= min(1.0, n_gpu_layers / layers)
+    per_layer_bytes, layers = _estimate_per_layer_bytes(model_path, n_ctx)
+    gpu_layers = layers if n_gpu_layers < 0 else min(n_gpu_layers, layers)
+    size = per_layer_bytes * gpu_layers
     if mmproj_path:
         size += os.path.getsize(mmproj_path) * _MMPROJ_FACTOR
     return int(size)

@@ -9,17 +9,29 @@ from tests import comfy_stubs
 
 comfy_stubs.install()
 
-from app.core.storage import _estimate_n_gpu_layers, _estimate_vram_bytes  # noqa: E402
+from app.core.storage import (  # noqa: E402
+    _BASE_OVERHEAD,
+    _estimate_kv_bytes,
+    _estimate_n_gpu_layers,
+    _estimate_vram_bytes,
+)
 
 _GB = 1024 ** 3
 
 
+def _kv_u32(key, value):
+    raw = key.encode("utf-8")
+    return struct.pack("<Q", len(raw)) + raw + struct.pack("<I", 4) + struct.pack("<I", value)
+
+
+def _gguf_bytes(kv_blobs):
+    header = b"GGUF" + struct.pack("<I", 3) + struct.pack("<Q", 0) + struct.pack("<Q", len(kv_blobs))
+    return header + b"".join(kv_blobs)
+
+
 def _minimal_gguf_bytes(block_count):
-    """构造只含 block_count 元数据的最小 GGUF 文件体."""
-    key = b"llama.block_count"
-    header = b"GGUF" + struct.pack("<I", 3) + struct.pack("<Q", 0) + struct.pack("<Q", 1)
-    kv = struct.pack("<Q", len(key)) + key + struct.pack("<I", 4) + struct.pack("<I", block_count)
-    return header + kv
+    """构造只含 block_count 元数据的最小 GGUF 文件体(KV 精确计算走不通, 落体积折算回退)."""
+    return _gguf_bytes([_kv_u32("llama.block_count", block_count)])
 
 
 class TestEstimateNGpuLayers(unittest.TestCase):
@@ -77,6 +89,28 @@ class TestEstimateNGpuLayers(unittest.TestCase):
         self.assertGreaterEqual(n_layers, 1)
 
 
+class TestEstimateKvBytes(unittest.TestCase):
+    def test_exact_kv_from_metadata(self):
+        # 8192 ctx x 32 层 x 8 kv头 x (128+128) 维 x 2 字节(f16) = 1 GB
+        meta = {"head_count_kv": 8, "head_count": 32, "embedding_length": 4096}
+        self.assertEqual(_estimate_kv_bytes(meta, 32, 8192), _GB)
+
+    def test_array_kv_heads_averaged(self):
+        # hybrid 模型逐层 head_count_kv(线性注意力层为 0), 取均值折算
+        meta = {"head_count_kv": [0, 8, 0, 8], "head_count": 32, "embedding_length": 4096}
+        self.assertEqual(_estimate_kv_bytes(meta, 32, 8192), _GB // 2)
+
+    def test_explicit_key_value_length_override(self):
+        # key_length/value_length 存在时优先于 embedding/head_count 推导
+        meta = {"head_count_kv": 8, "key_length": 64, "value_length": 32}
+        expected = 8192 * 32 * 8 * (64 + 32) * 2
+        self.assertEqual(_estimate_kv_bytes(meta, 32, 8192), expected)
+
+    def test_missing_metadata_returns_none(self):
+        self.assertIsNone(_estimate_kv_bytes({}, 32, 8192))
+        self.assertIsNone(_estimate_kv_bytes({"head_count_kv": 8}, 32, 8192))
+
+
 class TestEstimateVramBytes(unittest.TestCase):
     def _write_temp(self, data):
         fd, path = tempfile.mkstemp(suffix=".gguf")
@@ -99,6 +133,20 @@ class TestEstimateVramBytes(unittest.TestCase):
     def test_auto_layers_counts_full_model(self):
         size = _estimate_vram_bytes(self.model, None, -1, 8192)
         self.assertGreaterEqual(size, os.path.getsize(self.model))
+
+    def test_precise_kv_used_when_metadata_present(self):
+        # 注意力元数据齐全时, 估算 = 体积 x (1+固定开销) + 精确 KV 字节数
+        data = _gguf_bytes([
+            _kv_u32("llama.block_count", 2),
+            _kv_u32("llama.embedding_length", 64),
+            _kv_u32("llama.attention.head_count", 4),
+            _kv_u32("llama.attention.head_count_kv", 2),
+        ])
+        data += b"\x00" * (1024 * 1024 - len(data))
+        model = self._write_temp(data)
+        kv = 8192 * 2 * 2 * (16 + 16) * 2
+        expected = int(os.path.getsize(model) * (1.0 + _BASE_OVERHEAD) + kv)
+        self.assertEqual(_estimate_vram_bytes(model, None, -1, 8192), expected)
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-"""GGUF 文件头解析, 只读取元数据中的 block_count(模型层数), 供显存折算使用."""
+"""GGUF 文件头解析, 读取显存折算所需的元数据(层数与注意力 KV 参数)."""
 
 import struct
 
@@ -51,7 +51,25 @@ def read_value(f):
         return [_read_scalar(f, atype) for _ in range(count)]
     return _read_scalar(f, vtype)
 
-def _parse_block_count(path):
+# 显存折算所需的元数据字段 -> GGUF key 后缀(实际 key 带架构名前缀, 按后缀匹配);
+# key_length/value_length 仅部分模型存在(head_dim 与 embedding/head_count 不一致时)
+_META_SUFFIXES = {
+    "block_count": ".block_count",
+    "embedding_length": ".embedding_length",
+    "head_count": ".attention.head_count",
+    "head_count_kv": ".attention.head_count_kv",
+    "key_length": ".attention.key_length",
+    "value_length": ".attention.value_length",
+}
+
+
+def _parse_metadata(path):
+    """顺序扫描 GGUF KV 区, 返回 {字段名: 值}, 字段集齐即提前返回。
+
+    架构键通常排在 tokenizer 数组之前; 关键的 block_count 到手后一旦扫到
+    tokenizer 区即停止, 不为可选字段解析几十万条 token 元数据(慢且占内存)。
+    """
+    found = {}
     with open(path, "rb") as f:
         if f.read(4) != b"GGUF":
             raise ValueError("This is not a GGUF file!")
@@ -60,24 +78,33 @@ def _parse_block_count(path):
         _tensor_count = read_u64(f)
         kv_count = read_u64(f)
 
-        # block_count 通常排在 tokenizer 数组之前，命中即返回，
-        # 避免解析几十万条 token 元数据（慢且占内存）
         for _ in range(kv_count):
-            key = read_string(f)
+            key = read_string(f).lower()
+            if key.startswith("tokenizer.") and "block_count" in found:
+                break
             value = read_value(f)
-            if key.lower().endswith(".block_count"):
-                return value
+            for name, suffix in _META_SUFFIXES.items():
+                if name not in found and key.endswith(suffix):
+                    found[name] = value
+                    break
+            if len(found) == len(_META_SUFFIXES):
+                break
 
-    return None
+    return found
+
+
+def get_model_meta(path):
+    """读取显存折算所需的 GGUF 元数据 dict, 解析失败返回空 dict(调用方走回退路径)。"""
+    try:
+        meta = _parse_metadata(path)
+        if "block_count" not in meta:
+            logger.warning("[llama-cpp-vulkan] block_count not found in GGUF metadata")
+        return meta
+    except Exception as e:
+        logger.warning(f"[llama-cpp-vulkan] GGUF parse failed: {e}")
+        return {}
 
 
 def get_layer_count(path):
     """读取 GGUF 模型层数,失败返回 None(调用方回退默认值)。"""
-    try:
-        count = _parse_block_count(path)
-        if count is None:
-            logger.warning("[llama-cpp-vulkan] block_count not found in GGUF metadata")
-        return count
-    except Exception as e:
-        logger.warning(f"[llama-cpp-vulkan] GGUF parse failed: {e}")
-        return None
+    return get_model_meta(path).get("block_count")
