@@ -95,6 +95,12 @@ One wheel per platform covers all Python versions. Download from [Releases](http
 - **Stateless inference**: every run is an independent one-shot request (system prompt + current prompt). No conversation history is kept between runs.
 - **GPU not detected?** Run `python tools/check_devices.py` (with ComfyUI's Python) to list every device the GGML backend enumerates (CPU/GPU/IGPU/ACCEL) without starting ComfyUI — useful for diagnosing Vulkan driver issues.
 
+## Known Limitations
+
+- **Single model instance**: the plugin keeps one global model slot. Loading a different configuration automatically unloads the previous model; two models cannot be resident at the same time.
+- **Multi-shard GGUF (split shards) not supported**: VRAM estimation only counts the selected file, and non-first shards listed in the dropdown fail to load. Merge shards into a single file first with `llama-gguf-split --merge`.
+- **mmproj does not follow explicit GPU selection**: mtmd only exposes a boolean `use_gpu` switch (upstream limitation), so on multi-GPU systems the vision encoder may stay on mtmd's default device when a non-default GPU is selected.
+
 ## Credits
 
 - [llama-cpp-python](https://github.com/JamePeng/llama-cpp-python) @JamePeng

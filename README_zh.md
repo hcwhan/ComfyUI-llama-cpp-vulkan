@@ -95,6 +95,12 @@ pip install -r ComfyUI-llama-cpp-vulkan/requirements.txt
 - **无状态推理**: 每次运行都是独立的一次性请求 (system prompt + 本次提问), 不保留任何跨运行的对话历史。
 - **检测不到 GPU?** 用 ComfyUI 的 Python 运行 `python tools/check_devices.py`, 无需启动 ComfyUI 即可列出 GGML 后端枚举到的全部设备 (CPU/GPU/IGPU/ACCEL), 用于排查 Vulkan 驱动问题。
 
+## 已知限制
+
+- **单模型实例**: 插件维护一个全局模型槽位, 加载不同配置时自动卸载旧模型, 无法同时驻留两个模型。
+- **多分片 GGUF (split shards) 不支持**: 显存折算只计所选文件的体积, 且下拉框中列出的非首分片选中会加载失败。请先用 `llama-gguf-split --merge` 合并为单文件。
+- **mmproj 不跟随显式选卡**: mtmd 只有 `use_gpu` 布尔开关 (上游限制), 多卡下显式选择非默认 GPU 时, 视觉编码器可能仍落在 mtmd 默认挑选的设备上。
+
 ## 致谢
 
 - [llama-cpp-python](https://github.com/JamePeng/llama-cpp-python) @JamePeng
