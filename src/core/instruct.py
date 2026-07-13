@@ -135,6 +135,10 @@ class llama_cpp_instruct_base:
     MODEL_TYPE = "LLAMACPPLLM"
     MEDIA_WORD = "图像"
     MODALITY = "text"
+    # 纯文本路径无媒体载荷, 最终 user 文本为空的请求只会让模型自由发挥,
+    # 在 _run 中直接拦截; media 基类关闭(空文本 + 媒体内容是有意设计,
+    # 适合 chat 模板自带默认指令的模型)
+    REQUIRE_USER_TEXT = True
 
     # ---- INPUT_TYPES 字段组装块(子类按需拼接,顺序由子类的声明决定) ----
 
@@ -237,6 +241,8 @@ class llama_cpp_instruct_base:
         # 先做零成本的 prompt 校验(占位符预设缺 custom_prompt 时直接 ValueError),
         # 再触发可能长达数 GB 的模型加载, 避免漏填时白白完成一次全量加载才报错
         user_content = [self._build_user_prompt(preset_prompt, custom_prompt)]
+        if self.REQUIRE_USER_TEXT and not user_content[0]["text"].strip():
+            raise ValueError('User prompt is empty: select a non-blank preset_prompt or fill custom_prompt.')
         messages = self._prepare_messages(llama_model, system_prompt)
         # 合并生成新 dict 兼作防御性复制(parameters 是 ComfyUI 缓存的共享 dict,
         # 防止 runner 修改时污染);未连接 parameters 端口时整体落到统一默认值
@@ -269,6 +275,7 @@ class llama_cpp_instruct_base:
 
 class llama_cpp_media_instruct_base(llama_cpp_instruct_base):
     MODEL_TYPE = "LLAMACPPVLM"
+    REQUIRE_USER_TEXT = False
 
     @staticmethod
     def require_mmproj(kind):

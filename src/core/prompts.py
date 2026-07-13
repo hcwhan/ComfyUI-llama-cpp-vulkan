@@ -18,7 +18,8 @@
 预设与 custom_prompt 组合的生效场景(instruct.py 的 _build_user_prompt):
 1. 预设为空白("空白 - 空") + custom_prompt 非空 -> 纯自定义, 只发送 custom_prompt
 2. 预设为空白("空白 - 空") + custom_prompt 为空 -> user 文本为空, 只发送媒体内容
-   (适合 chat 模板自带默认指令的模型)
+   (适合 chat 模板自带默认指令的模型; text 节点无媒体载荷, 此场景在
+   _run 中按 REQUIRE_USER_TEXT 拦截报错, 不白白加载模型)
 3. 模板不含 "###" + custom_prompt 为空   -> 使用预设模板原文("@@@" 替换为模态词)
 4. 模板不含 "###" + custom_prompt 非空   -> custom_prompt 整体覆盖预设, 模板被丢弃
 5. 模板含 "###"   + custom_prompt 非空   -> custom_prompt 填入 "###" 占位符

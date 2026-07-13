@@ -158,6 +158,41 @@ class TestSingleCompletionContentFlattening(unittest.TestCase):
         self.assertIs(self.fake.captured_messages[-1]["content"], content)
 
 
+class TestRequireUserText(unittest.TestCase):
+    """text 路径空 user 文本拦截: 无媒体载荷的空请求在模型加载前报错。
+
+    media 路径不拦截(空文本 + 媒体内容是有意设计)。
+    """
+
+    def test_text_node_requires_user_text(self):
+        self.assertTrue(llama_cpp_text_instruct.REQUIRE_USER_TEXT)
+
+    def test_media_nodes_allow_empty_user_text(self):
+        for node_cls in (llama_cpp_image_instruct, llama_cpp_video_instruct, llama_cpp_audio_instruct):
+            self.assertFalse(node_cls.REQUIRE_USER_TEXT, node_cls.__name__)
+
+    def test_blank_preset_empty_custom_rejected_before_model_load(self):
+        # runner 不应被调用: 拦截必须发生在 _prepare_messages(触发加载)之前
+        node = llama_cpp_text_instruct()
+        with self.assertRaises(ValueError):
+            node._run(
+                llama_model={}, preset_prompt="空白 - 空", custom_prompt="  ",
+                system_prompt="", seed=0, force_offload=False, strip_thinking=True,
+                parameters=None, runner=lambda *args: self.fail("runner should not run"),
+            )
+
+    def test_non_empty_custom_passes_guard(self):
+        # 守卫放行后才会走到 _prepare_messages, 用空配置 dict 缺 "model" 键
+        # 触发的 KeyError 佐证已越过守卫(不实际加载模型)
+        node = llama_cpp_text_instruct()
+        with self.assertRaises(KeyError):
+            node._run(
+                llama_model={}, preset_prompt="空白 - 空", custom_prompt="一只猫",
+                system_prompt="", seed=0, force_offload=False, strip_thinking=True,
+                parameters=None, runner=lambda *args: self.fail("runner should not run"),
+            )
+
+
 class TestPresetConfig(unittest.TestCase):
     """预设 use 配置与节点类属性的一致性。"""
 
