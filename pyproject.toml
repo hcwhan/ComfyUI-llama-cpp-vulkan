@@ -12,7 +12,7 @@ classifiers = [
 # llama-cpp-python 有意不在此声明: Comfy Registry 不接受 URL 依赖,
 # 平台条件的 Vulkan wheel URL 以 requirements.txt 为准, 安装时必须执行
 # pip install -r requirements.txt (README 安装节第 2 步)
-dependencies = ["scipy", "numpy", "pillow", "tqdm"]
+dependencies = ["scipy", "numpy", "pillow>=10.1", "tqdm"]
 
 [project.urls]
 Repository = "https://github.com/hcwhan/ComfyUI-llama-cpp-vulkan"
