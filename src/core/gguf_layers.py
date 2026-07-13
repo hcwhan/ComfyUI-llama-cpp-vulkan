@@ -107,8 +107,3 @@ def get_model_meta(path):
     except Exception as e:
         logger.warning(f"[llama-cpp-vulkan] GGUF parse failed: {e}")
         return {}
-
-
-def get_layer_count(path):
-    """读取 GGUF 模型层数,失败返回 None(调用方回退默认值)."""
-    return get_model_meta(path).get("block_count")

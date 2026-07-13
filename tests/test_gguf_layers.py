@@ -5,7 +5,14 @@ import struct
 import tempfile
 import unittest
 
-from src.core.gguf_layers import get_layer_count
+from src.core.gguf_layers import get_model_meta
+
+
+def _block_count(path):
+    # 生产路径 (storage._estimate_per_layer_bytes) 取层数的同款写法:
+    # 解析失败 get_model_meta 返回空 dict, block_count 缺失得 None
+    return get_model_meta(path).get("block_count")
+
 
 # GGUF value type 编号(与被测模块一致)
 _T_UINT32 = 4
@@ -38,7 +45,7 @@ def _gguf_bytes(kv_blobs):
     return header + b"".join(kv_blobs)
 
 
-class TestGetLayerCount(unittest.TestCase):
+class TestBlockCountParsing(unittest.TestCase):
     def _write_temp(self, data):
         fd, path = tempfile.mkstemp(suffix=".gguf")
         with os.fdopen(fd, "wb") as f:
@@ -51,7 +58,7 @@ class TestGetLayerCount(unittest.TestCase):
             _kv_string("general.architecture", "llama"),
             _kv_uint32("llama.block_count", 32),
         ]))
-        self.assertEqual(get_layer_count(path), 32)
+        self.assertEqual(_block_count(path), 32)
 
     def test_block_count_after_array_kv(self):
         # 命中前需要正确跳过数组类型的 KV
@@ -59,27 +66,27 @@ class TestGetLayerCount(unittest.TestCase):
             _kv_string_array("tokenizer.ggml.tokens", ["a", "b", "c"]),
             _kv_uint32("qwen2.block_count", 48),
         ]))
-        self.assertEqual(get_layer_count(path), 48)
+        self.assertEqual(_block_count(path), 48)
 
     def test_block_count_missing_returns_none(self):
         path = self._write_temp(_gguf_bytes([
             _kv_string("general.architecture", "llama"),
         ]))
-        self.assertIsNone(get_layer_count(path))
+        self.assertIsNone(_block_count(path))
 
     def test_non_gguf_file_returns_none(self):
         path = self._write_temp(b"NOT A GGUF FILE")
-        self.assertIsNone(get_layer_count(path))
+        self.assertIsNone(_block_count(path))
 
     def test_truncated_file_returns_none(self):
         path = self._write_temp(b"GGUF" + struct.pack("<I", 3))
-        self.assertIsNone(get_layer_count(path))
+        self.assertIsNone(_block_count(path))
 
     def test_gguf_v1_rejected(self):
         # v1 的计数字段是 32 位, 按 v2+ 布局读会错乱, 应直接按不支持返回 None
         data = b"GGUF" + struct.pack("<I", 1) + struct.pack("<I", 0) + struct.pack("<I", 1)
         path = self._write_temp(data + _kv_uint32("llama.block_count", 32))
-        self.assertIsNone(get_layer_count(path))
+        self.assertIsNone(_block_count(path))
 
 
 if __name__ == "__main__":
