@@ -145,6 +145,16 @@ class TestLoadModelStateMachine(unittest.TestCase):
         self.assertIsNone(LLAMA_CPP_STORAGE.current_config)
         LLAMA_CPP_STORAGE.clean()
 
+    def test_unload_hook_cleans_storage(self):
+        # monkey-patch 后的 mm.unload_all_models 经 sys.modules 动态取当前
+        # 生效模块的类 (热重载加固), 调用即清理单例并级联原函数
+        LLAMA_CPP_STORAGE.load_model(self._config())
+        loaded = LLAMA_CPP_STORAGE.llm
+        storage.mm.unload_all_models()
+        self.assertTrue(loaded.closed)
+        self.assertIsNone(LLAMA_CPP_STORAGE.llm)
+        self.assertIsNone(LLAMA_CPP_STORAGE.current_config)
+
 
 if __name__ == "__main__":
     unittest.main()

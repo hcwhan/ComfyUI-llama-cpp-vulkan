@@ -2,6 +2,7 @@
 
 import os
 import gc
+import sys
 import time
 
 from llama_cpp import Llama
@@ -286,8 +287,13 @@ class LLAMA_CPP_STORAGE:
 if not hasattr(mm, "unload_all_models_backup"):
     mm.unload_all_models_backup = mm.unload_all_models
     def patched_unload_all_models(*args, **kwargs):
-        LLAMA_CPP_STORAGE.clean()
-        result = mm.unload_all_models_backup(*args, **kwargs)
-        return result
+        # 补丁按进程生命周期只打一次(hasattr 防重复), 而 "删 sys.modules 再
+        # import" 式热重载会产生新模块与新 LLAMA_CPP_STORAGE 类且不重打补丁;
+        # 经 sys.modules 动态取当前生效模块的类, 避免旧闭包绑死旧类导致
+        # 新模块加载的模型失去 Free 按钮/OOM 清理入口
+        module = sys.modules.get(__name__)
+        if module is not None:
+            module.LLAMA_CPP_STORAGE.clean()
+        return mm.unload_all_models_backup(*args, **kwargs)
     mm.unload_all_models = patched_unload_all_models
     logger.info("[llama-cpp-vulkan] Model cleanup hook applied!")
