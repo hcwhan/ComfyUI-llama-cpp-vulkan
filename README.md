@@ -72,20 +72,7 @@ Pre-built Vulkan wheels are available for:
 
 One wheel per platform covers all Python versions. Download from [Releases](https://github.com/hcwhan/ComfyUI-llama-cpp-vulkan/releases).
 
-#### Alternative: Build from source
-
-```powershell
-# Windows PowerShell
-$env:CMAKE_ARGS="-DGGML_VULKAN=1"
-pip install llama-cpp-python --no-cache-dir --force-reinstall
-```
-
-```bash
-# Linux
-CMAKE_ARGS="-DGGML_VULKAN=on" pip install llama-cpp-python --no-cache-dir --force-reinstall
-```
-
-> Requires [Vulkan SDK](https://vulkan.lunarg.com/sdk/home) when building from source.
+> Only the pre-built wheels pinned in `requirements.txt` are supported. The plugin relies on APIs specific to this Vulkan build ([JamePeng fork](https://github.com/JamePeng/llama-cpp-python)); the official PyPI package (`pip install llama-cpp-python`) lacks them and will not work.
 
 #### 3. Download models:
 

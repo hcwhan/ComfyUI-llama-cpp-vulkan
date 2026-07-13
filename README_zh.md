@@ -72,20 +72,7 @@ pip install -r ComfyUI-llama-cpp-vulkan/requirements.txt
 
 每个平台只需一个 wheel 即可覆盖所有 Python 版本。可从 [Releases](https://github.com/hcwhan/ComfyUI-llama-cpp-vulkan/releases) 页面下载。
 
-#### 备选: 从源码编译
-
-```powershell
-# Windows PowerShell
-$env:CMAKE_ARGS="-DGGML_VULKAN=1"
-pip install llama-cpp-python --no-cache-dir --force-reinstall
-```
-
-```bash
-# Linux
-CMAKE_ARGS="-DGGML_VULKAN=on" pip install llama-cpp-python --no-cache-dir --force-reinstall
-```
-
-> 从源码编译需要先安装 [Vulkan SDK](https://vulkan.lunarg.com/sdk/home)。
+> 仅支持 requirements.txt 固定的预编译 wheel。插件依赖该 Vulkan 构建 ([JamePeng 分支](https://github.com/JamePeng/llama-cpp-python)) 特有的 API, PyPI 官方包 (`pip install llama-cpp-python`) 缺少这些接口, 无法工作。
 
 #### 3. 模型路径:
 
