@@ -175,7 +175,7 @@ image 逐张模式的多图结果以 "====== Image N ======" 分隔行拼接
 
 项目代码只对接 `requirements.txt` 中固定的依赖版本（特别是 llama-cpp-python 的 JamePeng Vulkan wheel），不为历史版本或官方构建编写兼容/回退代码。mmproj 路径统一用 `mmproj_path` 键传入 handler。
 
-当前依赖的 wheel 私有 API 清单（升级 wheel 时按单复核）：`llm.n_tokens`、`llm._ctx.memory_clear`、`llm._hybrid_cache_mgr`、`llm._model.is_hybrid()/is_recurrent()`、`llama_cpp._ggml`（设备枚举符号）、chat handler 的 `mmproj_path` 实例属性（`require_mmproj` 的判定依据，getattr 兜底使重命名不报错而是恒判"未配置"）。`tests/test_wheel_contract.py` 契约测试静态检查上述接口存在性（不加载模型），升级 wheel 后运行即可发现断裂；公开 handler 类的契约另由 `tests/test_handlers.py` 锁定。
+当前依赖的 wheel 对接面清单（升级 wheel 时按单复核，与 `tests/test_wheel_contract.py` 一一对应）：`llm.n_tokens`、`llm._ctx.memory_clear`、`llm._hybrid_cache_mgr`、`llm._model.is_hybrid()/is_recurrent()`、`llama_cpp._ggml`（设备枚举符号）、chat handler 的 `mmproj_path` 实例属性（`require_mmproj` 的判定依据，getattr 兜底使重命名不报错而是恒判"未配置"）、`Llama.close()/abort()`（公开方法，但同为按单复核的对接面）、`llama_cpp.llama_cpp.llama_split_mode` 枚举（NONE/LAYER）、`create_chat_completion` 接受 Parameters 节点全部 12 个采样参数与 `seed`。契约测试静态检查上述接口存在性（不加载模型），升级 wheel 后运行即可发现断裂；公开 handler 类的契约另由 `tests/test_handlers.py` 锁定。
 
 ### INPUT_TYPES 字段顺序
 
