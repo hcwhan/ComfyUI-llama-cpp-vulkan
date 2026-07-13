@@ -113,6 +113,11 @@ jobs:
             Write-Error "Wheel filename missing +vulkan local version: $($wheelFile.Name)"
             exit 1
           }
+          # Linux 侧由 cibuildwheel/auditwheel 天然校验平台 tag, Windows 侧手动核对
+          if ($wheelFile.Name -notmatch "$($env:ABI3_MIN_CPYTHON)-abi3-win_amd64") {
+            Write-Error "Wheel filename missing abi3 platform tag ($($env:ABI3_MIN_CPYTHON)-abi3-win_amd64): $($wheelFile.Name)"
+            exit 1
+          }
           Write-Output "Built wheel: $($wheelFile.Name)"
 
           sccache --show-stats
