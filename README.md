@@ -82,7 +82,7 @@ One wheel per platform covers all Python versions. Download from [Releases](http
   > If you need a VLM model to process image input, don't forget to download the `mmproj` weights.
   > The loaders tell mmproj weights apart from main models by file name: only files whose name contains `mmproj` (case-insensitive) show up in the mmproj dropdown, so keep `mmproj` in the file name when renaming.
 
-## Nodes (v2.0)
+## Nodes (v2.1)
 
 - **Loaders**: `llm Model Loader` for text-only GGUF models, `vlm Model Loader` for vision/audio models (mmproj + chat handler required). Their outputs are separate types: llm connects only to `text Instruct`, vlm connects only to `image / video / audio Instruct`.
 - **Instruct**: one node per modality — `text` (prompt refining etc.), `image` (per-image or batched), `video` (IMAGE frame batch input, evenly sampled), `audio` (ASR / omni).

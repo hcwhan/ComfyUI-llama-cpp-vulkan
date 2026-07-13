@@ -1,7 +1,7 @@
 [project]
 name = "comfyui-llama-cpp-vulkan"
 description = "Run LLM/VLM models natively in ComfyUI based on llama.cpp with Vulkan GPU acceleration"
-version = "2.0.0"
+version = "2.1.0"
 # ABI3 Vulkan wheel 面向 CPython 3.10+
 requires-python = ">=3.10"
 classifiers = [
