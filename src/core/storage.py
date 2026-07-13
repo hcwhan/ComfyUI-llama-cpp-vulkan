@@ -230,7 +230,11 @@ class LLAMA_CPP_STORAGE:
             try:
                 cls.chat_handler = handler_cls(**kwargs)
             except Exception as e:
-                raise RuntimeError(f"{e}\nChatHandler initialization failed. Please update llama-cpp-python to the latest version with Vulkan support.")
+                raise RuntimeError(
+                    f"{e}\nChatHandler initialization failed. "
+                    "Check that the mmproj file matches the selected chat_handler, "
+                    "and that dependencies were installed from requirements.txt (pinned Vulkan wheel)."
+                )
         else:
             cls.chat_handler = None
 
