@@ -2,6 +2,7 @@
 
 import inspect
 import unittest
+from unittest import mock
 
 from tests import comfy_stubs
 
@@ -9,9 +10,13 @@ comfy_stubs.install()
 
 import llama_cpp.llama_multimodal as _handler_module  # noqa: E402
 
+import src.core.handlers as handlers  # noqa: E402
 from src.core.handlers import _HANDLER_SPECS  # noqa: E402
 
 _THINK_PARAM_NAMES = ("enable_thinking", "force_reasoning")
+
+# storage.load_model 构造 handler 时固定注入的 kwargs
+_STORAGE_KWARGS = ("mmproj_path", "verbose", "image_max_tokens", "image_min_tokens", "use_gpu")
 
 
 def _init_params(cls_name):
@@ -69,6 +74,43 @@ class TestHandlerSpecs(unittest.TestCase):
             base = label[: -len("-Thinking")]
             if base in _HANDLER_SPECS:
                 self.assertEqual(_HANDLER_SPECS[base][0], cls_name)
+
+    def test_storage_construction_kwargs_reach_every_class(self):
+        # storage.load_model 对所有 handler 注入五个构造 kwargs, 可用性依赖
+        # 子类签名显式接受或经 **kwargs 透传到基类; 基类必须显式接受兜底,
+        # wheel 升级时某子类改签名不再透传在此报出而非等到运行期
+        base_params = inspect.signature(_handler_module.MTMDChatHandler.__init__).parameters
+        for key in _STORAGE_KWARGS:
+            self.assertIn(key, base_params, f"基类 MTMDChatHandler.__init__ 不接受 {key}")
+        for label, (cls_name, _) in _HANDLER_SPECS.items():
+            params = _init_params(cls_name)
+            has_var_kw = any(p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values())
+            for key in _STORAGE_KWARGS:
+                self.assertTrue(
+                    key in params or has_var_kw,
+                    f'"{label}": {cls_name}.__init__ 既不显式接受 {key} 也无 **kwargs 透传',
+                )
+
+
+class TestResolveHandlers(unittest.TestCase):
+    def test_missing_class_dropped_others_kept(self):
+        # wheel 升级导致类缺失时: 该选项从下拉框剔除 (打 warning),
+        # 不静默吞错也不阻断整个注册表
+        specs = {
+            "Fake-Handler": ("NoSuchHandlerClass", None),
+            "Gemma3": ("Gemma3ChatHandler", None),
+        }
+        with mock.patch.object(handlers, "_HANDLER_SPECS", specs):
+            resolved = handlers._resolve_handlers()
+        self.assertNotIn("Fake-Handler", resolved)
+        self.assertIn("Gemma3", resolved)
+
+    def test_kwargs_prebound_via_partial(self):
+        # 声明了 kwargs 的条目须经 functools.partial 预绑定构造参数
+        specs = {"Gemma4": ("Gemma4ChatHandler", {"enable_thinking": False})}
+        with mock.patch.object(handlers, "_HANDLER_SPECS", specs):
+            resolved = handlers._resolve_handlers()
+        self.assertEqual(resolved["Gemma4"].keywords, {"enable_thinking": False})
 
 
 if __name__ == "__main__":
