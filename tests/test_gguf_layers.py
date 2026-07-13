@@ -75,6 +75,12 @@ class TestGetLayerCount(unittest.TestCase):
         path = self._write_temp(b"GGUF" + struct.pack("<I", 3))
         self.assertIsNone(get_layer_count(path))
 
+    def test_gguf_v1_rejected(self):
+        # v1 的计数字段是 32 位, 按 v2+ 布局读会错乱, 应直接按不支持返回 None
+        data = b"GGUF" + struct.pack("<I", 1) + struct.pack("<I", 0) + struct.pack("<I", 1)
+        path = self._write_temp(data + _kv_uint32("llama.block_count", 32))
+        self.assertIsNone(get_layer_count(path))
+
 
 if __name__ == "__main__":
     unittest.main()

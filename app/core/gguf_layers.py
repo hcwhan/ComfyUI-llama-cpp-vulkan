@@ -74,7 +74,11 @@ def _parse_metadata(path):
         if f.read(4) != b"GGUF":
             raise ValueError("This is not a GGUF file!")
 
-        _version = read_u32(f)
+        version = read_u32(f)
+        if version < 2:
+            # v1 的 tensor/kv 计数与字符串长度是 32 位, 按下面的 64 位布局读会
+            # 解析错乱; v1 在生态中已基本绝迹, 直接按不支持报错
+            raise ValueError(f"GGUF v{version} is too old (v2+ required)")
         _tensor_count = read_u64(f)
         kv_count = read_u64(f)
 
