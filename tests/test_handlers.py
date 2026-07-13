@@ -13,6 +13,10 @@ import llama_cpp.llama_multimodal as _handler_module  # noqa: E402
 import src.core.handlers as handlers  # noqa: E402
 from src.core.handlers import _HANDLER_SPECS  # noqa: E402
 
+# 思考相关构造参数名单: 仅收录影响单轮输出的开关。多轮对话保留历史思考块
+# 类参数豁免不收录 (当前 wheel 有两个: LFM25VLChatHandler 的 keep_past_thinking、
+# Qwen3VLChatHandler 的 preserve_thinking) —— 本插件无会话状态, 单轮请求不受
+# 其影响, 无需接线; 升级 wheel 复核时顺带扫一遍新 handler 签名有无新增思考开关
 _THINK_PARAM_NAMES = ("enable_thinking", "force_reasoning")
 
 # storage.load_model 构造 handler 时固定注入的 kwargs
