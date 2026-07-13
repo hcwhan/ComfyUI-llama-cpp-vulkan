@@ -76,16 +76,20 @@ llama_cpp_vlm_model_loader --> LLAMACPPVLM --+---> llama_cpp_image_instruct
                                              +---> llama_cpp_video_instruct
 llama_cpp_parameters ----> LLAMACPPARAMS ----+---> llama_cpp_audio_instruct
                         (全部 Instruct 的可选输入)
+system_prompt_preset ----> STRING -----------+   (接全部 Instruct 的 system_prompt)
 
 全部 Instruct 输出单端口 STRING (output);
 image 逐张模式的多图结果以 "====== Image N ======" 分隔行拼接
     |
-    +--> parse_json_node / json_to_bboxes / remove_code_block / split_instruct_output
-              |                  |                                   |
-              |                  |            (拆回 STRING 列表, 接第三方列表语义节点)
-              |                  +--> 内建同款拆分, output 可直连
-              +--> bboxes_to_segs / bboxes_to_mask  (下游图像处理)
+    +--> parse_json_node / remove_code_block
+    +--> split_instruct_output    (拆回 STRING 列表, 接第三方列表语义节点)
+    +--> json_to_bboxes           (内建同款拆分, output 可直连)
+              |
+              +--> BBOX --+--> bboxes_to_bbox  (按索引选取, 输出仍为 BBOX)
+                          +--> bboxes_to_segs / bboxes_to_mask  (下游图像处理)
 ```
+
+`llama_cpp_unload_model` 为 any 透传节点, 可串接在任意连线上, 不参与上图数据流。
 
 `LLAMACPPLLM`（llm Loader 输出）与 `LLAMACPPVLM`（vlm Loader 输出）完全独立：llm 配置只能连 text Instruct，vlm 配置只能连 image/video/audio Instruct，连错在连线阶段即被 ComfyUI 类型系统拦截。两种配置 dict 结构相同（llm 侧 mmproj/chat_handler 固定为 "None"），底层共用 `core/storage.py` 的加载路径。
 

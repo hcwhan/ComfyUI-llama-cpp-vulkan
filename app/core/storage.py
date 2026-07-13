@@ -114,17 +114,22 @@ class LLAMA_CPP_STORAGE:
 
     @classmethod
     def clean(cls):
-        try:
-            cls.llm.close()
-        except Exception:
-            pass
+        # 未加载(llm/chat_handler 为 None)是常态路径,显式判空;
+        # close 失败不阻断清理,但留日志供排查显存未释放问题
+        if cls.llm is not None:
+            try:
+                cls.llm.close()
+            except Exception as e:
+                logger.debug(f"[llama-cpp-vulkan] llm close failed: {e}")
 
-        try:
-            # 公开的 close() 幂等且完整(mtmd_free + exit_stack);
-            # 直接调 _exit_stack.close() 会跳过 mtmd 视觉编码器的释放
-            cls.chat_handler.close()
-        except Exception:
-            pass
+        if cls.chat_handler is not None:
+            try:
+                # Llama.close() 内部已级联关闭 chat_handler,此处显式调用依赖
+                # close() 的幂等性,兜底 llm 未创建/主模型加载失败的路径;
+                # 用公开的 close()(幂等且完整,mtmd_free + exit_stack)
+                cls.chat_handler.close()
+            except Exception as e:
+                logger.debug(f"[llama-cpp-vulkan] chat_handler close failed: {e}")
 
         cls.llm = None
         cls.chat_handler = None
