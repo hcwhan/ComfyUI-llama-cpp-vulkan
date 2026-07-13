@@ -62,13 +62,16 @@ def audio2base64(audio):
 
 
 def scale_image(image: torch.Tensor, max_size: int):
-    img_pil = Image.fromarray(tensor_to_uint8(image))
+    arr = tensor_to_uint8(image)
+    h, w = arr.shape[:2]
+    if max(w, h) <= max_size:
+        # 不超上限时跳过等尺寸 LANCZOS 重采样(视频多帧场景逐帧调用, 白耗 CPU)
+        return arr
 
-    w, h = img_pil.size
-    scale = min(max_size / max(w, h), 1.0)
+    scale = max_size / max(w, h)
     # 极端长宽比下缩放结果可能取整为 0，至少保留 1 像素
     new_w, new_h = max(1, int(w * scale)), max(1, int(h * scale))
-    img_resized = img_pil.resize((new_w, new_h), Image.Resampling.LANCZOS)
+    img_resized = Image.fromarray(arr).resize((new_w, new_h), Image.Resampling.LANCZOS)
 
     return np.array(img_resized)
 

@@ -68,6 +68,13 @@ class TestScaleImage(unittest.TestCase):
         arr = scale_image(torch.zeros((200, 400, 3)), 100)
         self.assertEqual(arr.shape, (50, 100, 3))
 
+    def test_image_within_limit_returned_unchanged(self):
+        # 回归: 不超 max_size 时短路返回, 跳过等尺寸重采样, 像素值不得有重采样扰动
+        image = torch.rand((32, 64, 3))
+        arr = scale_image(image, 128)
+        self.assertEqual(arr.shape, (32, 64, 3))
+        self.assertTrue((arr == tensor_to_uint8(image)).all())
+
 
 if __name__ == "__main__":
     unittest.main()
