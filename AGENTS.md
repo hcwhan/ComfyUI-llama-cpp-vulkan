@@ -18,8 +18,11 @@ ComfyUI-llama-cpp-vulkan/
   __init__.py                 # 入口：from .app.nodes 导出 NODE_CLASS_MAPPINGS
   pyproject.toml              # 项目元数据、依赖声明
   requirements.txt            # pip 依赖（含平台条件 llama-cpp-python wheel URL）
+  复核结论.md                 # 复核结论存档（见"文档维护原则"）
   .github/workflows/
     build-vulkan-wheels-abi3.yml  # CI：构建/发布双平台 Vulkan ABI3 wheel
+  docs/
+    项目分析.html             # 历史快照（页头已注明生成 commit，仅供历史参考）
   app/
     core/                     # 核心逻辑（非节点）
       storage.py              #   模型生命周期：全局单例、resolve_config 校验、显存折算、unload 钩子
@@ -112,7 +115,7 @@ image 逐张模式的多图结果以 "====== Image N ======" 分隔行拼接
 `app/core/storage.py` 的 `LLAMA_CPP_STORAGE` 类管理全局单例模型状态：
 
 - 懒加载：两个 Loader 只调用 `resolve_config()` 做快速失败校验（模型/mmproj 路径存在、mmproj 与 chat_handler 配对合法）并返回 config，实际加载由 Instruct 节点按需触发；多组 loader+instruct 交错时避免全局单例被 loader 反复挤占
-- `load_model()`: 先 `resolve_config()` 校验再卸载旧模型（无效配置不影响已加载的模型），随后加载 GGUF 模型 + 可选的 mmproj（视觉编码器）
+- `load_model()`: 先 `resolve_config()` 校验再卸载旧模型（无效配置不影响已加载的模型），随后加载 GGUF 模型；可选的 mmproj（视觉编码器）在此处只构造 chat_handler（校验路径），真正加载进显存由 mtmd 在首次推理时惰性初始化（与加载前的 `mm.free_memory` 腾挪同在一次节点执行内，时序有效）
 - `clean()`: 释放模型和 chat_handler 资源
 - 通过 monkey-patch `mm.unload_all_models` 实现 ComfyUI 模型卸载（前端 Free 按钮 / OOM 处理）时自动清理
 - `vram_limit` 折算 `n_gpu_layers` 集中在 `_estimate_n_gpu_layers()`：按 GGUF 层数（`core/gguf_layers.py` 手写解析 `block_count`，命中即返回避免解析 tokenizer 元数据）均摊文件体积，乘 `_vram_factor(n_ctx)` 经验系数（固定计算缓冲开销 + 随 n_ctx 线性增长的 KV/激活开销，n_ctx=8192 时合计 1.55）估算每层显存，mmproj 体积先从预算中扣除

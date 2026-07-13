@@ -21,6 +21,7 @@ from ..shared.logger import logger
 # OCR/文档专用类居中, 早期模型在后, Generic-MTMD 兜底收尾。
 _HANDLER_SPECS = {
     # ---- Qwen ----
+    # Qwen3.6 与 Qwen3.5 共用 handler (wheel 明确该类同时服务两者)
     "Qwen3.6": ("Qwen35ChatHandler", {"enable_thinking": False}),
     "Qwen3.6-Thinking": ("Qwen35ChatHandler", {"enable_thinking": True}),
     "Qwen3.5": ("Qwen35ChatHandler", {"enable_thinking": False}),

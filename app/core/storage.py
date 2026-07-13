@@ -167,7 +167,10 @@ class LLAMA_CPP_STORAGE:
                 logger.warning(f"[llama-cpp-vulkan] failed to free torch VRAM before load: {e}")
 
         if mmproj_path:
-            logger.info(f"[llama-cpp-vulkan] Loading mmproj: {mmproj}")
+            # handler 构造只校验路径,mmproj 真正加载进显存由 mtmd 在首次推理时
+            # 惰性初始化(_init_mtmd_context),与上面 free_memory 的腾挪同在
+            # 一次节点执行内完成,时序仍有效
+            logger.info(f"[llama-cpp-vulkan] Preparing mmproj: {mmproj}")
 
             # thinking 开关等构造期固定参数已由注册表经 functools.partial 预绑定
             kwargs = {
@@ -193,8 +196,9 @@ class LLAMA_CPP_STORAGE:
         try:
             cls.llm = Llama(model_path, chat_handler=cls.chat_handler, n_gpu_layers=n_gpu_layers, main_gpu=main_gpu, split_mode=split_mode, n_ctx=config["n_ctx"], verbose=False)
         except Exception:
-            # 主模型加载失败时立即释放已创建的 chat_handler(mmproj 已进显存),
-            # 不等下一次 load/unload 的 clean() 才回收
+            # 主模型加载失败时立即回收已创建的 chat_handler,避免半初始化状态
+            # 残留到下一次 load/unload;此时 mmproj 尚未进显存(mtmd 首次推理时
+            # 才惰性加载),close 释放的只是 handler 自身资源
             cls.clean()
             raise
         # 加载成功后才记录配置,避免加载失败时残留新配置导致后续误判"无需重载"
