@@ -1,0 +1,7 @@
+{
+    "extraPaths": [
+        "../../../ComfyUI",
+        "../../../python_embeded/Lib/site-packages"
+    ],
+    "typeCheckingMode": "off"
+}
