@@ -75,6 +75,20 @@ class TestVlmLoaderValidation(unittest.TestCase):
             (config,) = self._load(handler="Qwen3.6", thinking=True)
         self.assertTrue(config["thinking"])
 
+    def test_image_tokens_zeroed_for_audio_only_handler(self):
+        # 音频专用 handler 无视觉路径, 隐藏字段的残留值折算为 0 落盘,
+        # 且不触发 min/max 区间校验 (隐藏字段无法在 UI 修正)
+        with mock.patch.object(storage, "get_llm_full_path", lambda name: f"/fake/{name}"):
+            (config,) = self._load(handler="(ASR) Qwen3-ASR", min_t=64, max_t=32)
+        self.assertEqual(config["image_min_tokens"], 0)
+        self.assertEqual(config["image_max_tokens"], 0)
+
+    def test_image_tokens_kept_for_vision_handler(self):
+        with mock.patch.object(storage, "get_llm_full_path", lambda name: f"/fake/{name}"):
+            (config,) = self._load(handler="Qwen3-VL", min_t=64, max_t=128)
+        self.assertEqual(config["image_min_tokens"], 64)
+        self.assertEqual(config["image_max_tokens"], 128)
+
 
 if __name__ == "__main__":
     unittest.main()

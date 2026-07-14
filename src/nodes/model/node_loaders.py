@@ -169,6 +169,12 @@ class llama_cpp_vlm_model_loader:
             )
         if chat_handler == "None":
             raise ValueError("vlm Model Loader requires a chat handler matching the model.")
+        # 无视觉编码路径的 handler (音频专用) 把两个 image token 参数折算为 0
+        # (0 = 未设置): 与前端隐藏字段的行为对应, widget 值本身保留不动,
+        # 重新显示时不丢失; 也顺带豁免下方的区间校验 (隐藏字段无法在 UI 修正)
+        if chat_handler not in image_token_handlers():
+            image_min_tokens = 0
+            image_max_tokens = 0
         # 与 handler 侧同一条件, 只是提前到 loader 报错(<=0 视为未设置)
         if 0 < image_max_tokens < image_min_tokens:
             raise ValueError(f"image_max_tokens ({image_max_tokens}) cannot be less than image_min_tokens ({image_min_tokens}).")
