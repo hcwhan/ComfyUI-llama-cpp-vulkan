@@ -23,16 +23,23 @@ _GPU_DEVICE_FIELD = (
     },
 )
 
-_CTX_SIZE_FIELD = (
-    "INT",
-    {
-        "default": 8192,
-        "min": 1024,
-        "max": 327680,
-        "step": 128,
-        "tooltip": "上下文长度上限, 即 llama.cpp 的 n_ctx.\n请求的 prompt + 生成 token 总量受此约束.",
-    },
-)
+# UI 名 ctx_size; config dict 内部键维持 wheel 术语 n_ctx (Llama(n_ctx=...)).
+# vlm 默认取 llm 的 2 倍: 图像/视频帧经 mmproj 编码的媒体 token 直接占用
+# 上下文, 同样的文本余量需要更大的 n_ctx
+_CTX_SIZE_DEFAULT = 8192
+
+
+def _ctx_size_field(default):
+    return (
+        "INT",
+        {
+            "default": default,
+            "min": 1024,
+            "max": 327680,
+            "step": 128,
+            "tooltip": "上下文长度上限, 即 llama.cpp 的 n_ctx.\n请求的 prompt + 生成 token 总量受此约束.",
+        },
+    )
 
 _VRAM_LIMIT_FIELD = (
     "INT",
@@ -72,7 +79,7 @@ class llama_cpp_llm_model_loader:
             "required": {
                 "gpu_device": _GPU_DEVICE_FIELD,
                 "model": (_model_list(),),
-                "ctx_size": _CTX_SIZE_FIELD,
+                "ctx_size": _ctx_size_field(_CTX_SIZE_DEFAULT),
                 "vram_limit": _VRAM_LIMIT_FIELD,
             }
         }
@@ -125,7 +132,7 @@ class llama_cpp_vlm_model_loader:
                         "tooltip": "开启模型的思考(reasoning)模式.\n构造期模板级开关: 切换后下次执行会整体重新加载模型.\n仅对支持切换的 handler 生效: 不支持思考的强制为关,\nGLM-4.1V 等纯思考模型强制为开.\nGemma4 E2B/E4B 关闭后仍会以纯文本形式思考,\n残留思考内容由 Instruct 的 strip_thinking 剥离.",
                     },
                 ),
-                "ctx_size": _CTX_SIZE_FIELD,
+                "ctx_size": _ctx_size_field(_CTX_SIZE_DEFAULT * 2),
                 "vram_limit": _VRAM_LIMIT_FIELD,
                 "image_min_tokens": (
                     "INT",
