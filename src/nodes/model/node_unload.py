@@ -18,7 +18,16 @@ class llama_cpp_unload_model:
 
     @classmethod
     def INPUT_TYPES(s):
-        return {"required": {"any": (any_type, {"tooltip": "any 透传端口, 串接在需要先卸载模型的连线上.\n注意: 仅在上游输出变化时执行 (ComfyUI 缓存语义),\n重跑未改动的工作流不会重复卸载."})}}
+        return {
+            "required": {
+                "any": (
+                    any_type,
+                    {
+                        "tooltip": "any 透传端口, 串接在需要先卸载模型的连线上.\n注意: 仅在上游输出变化时执行 (ComfyUI 缓存语义),\n重跑未改动的工作流不会重复卸载."
+                    },
+                )
+            }
+        }
 
     RETURN_TYPES = (any_type,)
     RETURN_NAMES = ("any",)

@@ -60,7 +60,7 @@ def parse_json(json_str):
 
 
 def get_nested_value(data, dotted_key, default=None):
-    keys = dotted_key.split('.')
+    keys = dotted_key.split(".")
     for key in keys:
         if isinstance(data, str):
             # 嵌套的 JSON-in-string 字段:解析失败视为无法下钻,回落 default,

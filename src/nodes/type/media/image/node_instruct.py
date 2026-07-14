@@ -25,17 +25,23 @@ class llama_cpp_image_instruct(llama_cpp_media_instruct_base):
                 "vlm_model": (cls.MODEL_TYPE,),
                 "images": ("IMAGE",),
                 **cls.prompt_inputs(),
-                "batch_images": ("BOOLEAN", {
-                    "default": False,
-                    "tooltip": "关: 逐张推理, 每张图各得一条结果.\n开: 全部图片并入单次请求 (多图时缩放到 max_size, 单图保持原分辨率)."
-                }),
-                "max_size": ("INT", {
-                    "default": 256,
-                    "min": 128,
-                    "max": 16384,
-                    "step": 64,
-                    "tooltip": "批量模式下输入图片的最大边长.\n仅在发送多张图片时生效, 单张图片保持原分辨率."
-                }),
+                "batch_images": (
+                    "BOOLEAN",
+                    {
+                        "default": False,
+                        "tooltip": "关: 逐张推理, 每张图各得一条结果.\n开: 全部图片并入单次请求 (多图时缩放到 max_size, 单图保持原分辨率).",
+                    },
+                ),
+                "max_size": (
+                    "INT",
+                    {
+                        "default": 256,
+                        "min": 128,
+                        "max": 16384,
+                        "step": 64,
+                        "tooltip": "批量模式下输入图片的最大边长.\n仅在发送多张图片时生效, 单张图片保持原分辨率.",
+                    },
+                ),
                 **cls.runtime_inputs(),
             },
             "optional": cls.optional_inputs(),
@@ -55,7 +61,7 @@ class llama_cpp_image_instruct(llama_cpp_media_instruct_base):
             output = LLAMA_CPP_STORAGE.llm.create_chat_completion(messages=messages, seed=seed, **params)
             # 分隔行格式与 shared/text_utils 的 split_image_results 约定一致
             if len(images) > 1:
-                tmp_list.append(f"====== Image {i+1} ======")
+                tmp_list.append(f"====== Image {i + 1} ======")
             tmp_list.append(extract_text(output))
 
         return "\n\n".join(tmp_list)
@@ -68,7 +74,21 @@ class llama_cpp_image_instruct(llama_cpp_media_instruct_base):
                 user_content.append(image_content_item(tensor_to_uint8(image)))
         return self._single_completion(messages, user_content, seed, params, extract_text)
 
-    def process(self, vlm_model, images, preset_prompt, custom_prompt, system_prompt, batch_images, max_size, seed, force_offload, strip_thinking, parameters=None, queue_handler=None):
+    def process(
+        self,
+        vlm_model,
+        images,
+        preset_prompt,
+        custom_prompt,
+        system_prompt,
+        batch_images,
+        max_size,
+        seed,
+        force_offload,
+        strip_thinking,
+        parameters=None,
+        queue_handler=None,
+    ):
         def runner(messages, user_content, seed, params, extract_text, watcher):
             self.require_mmproj("Image")
             if batch_images:

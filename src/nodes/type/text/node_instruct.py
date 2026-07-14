@@ -23,7 +23,18 @@ class llama_cpp_text_instruct(llama_cpp_instruct_base):
             "optional": cls.optional_inputs(),
         }
 
-    def process(self, llm_model, preset_prompt, custom_prompt, system_prompt, seed, force_offload, strip_thinking, parameters=None, queue_handler=None):
+    def process(
+        self,
+        llm_model,
+        preset_prompt,
+        custom_prompt,
+        system_prompt,
+        seed,
+        force_offload,
+        strip_thinking,
+        parameters=None,
+        queue_handler=None,
+    ):
         def runner(messages, user_content, seed, params, extract_text, watcher):
             return self._single_completion(messages, user_content, seed, params, extract_text)
 

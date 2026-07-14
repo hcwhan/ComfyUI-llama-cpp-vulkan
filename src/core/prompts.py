@@ -30,15 +30,15 @@
 user_prompt_presets = {
     "空白 - 空": {
         "use": ["text", "image", "video", "audio"],
-        "content": '',
+        "content": "",
     },
     "常规 - 描述": {
         "use": ["image", "video", "audio"],
-        "content": '描述这个 @@@ 。',
+        "content": "描述这个 @@@ 。",
     },
     "常规 - 转写": {
         "use": ["audio"],
-        "content": '转写这段 @@@ 的内容。',
+        "content": "转写这段 @@@ 的内容。",
     },
     "创意 - 提示词增强 (需custom_prompt)": {
         "use": ["text"],
@@ -46,15 +46,15 @@ user_prompt_presets = {
     },
     "创意 - 图片分析": {
         "use": ["image"],
-        "content": '详细描述这个 @@@ ，将主体、服饰、配饰、背景与构图分节说明。',
+        "content": "详细描述这个 @@@ ，将主体、服饰、配饰、背景与构图分节说明。",
     },
     "创意 - 视频总结": {
         "use": ["video"],
-        "content": '总结这段视频中的关键事件与叙事要点。',
+        "content": "总结这段视频中的关键事件与叙事要点。",
     },
     "创意 - 短篇故事": {
         "use": ["image", "video"],
-        "content": '以这个 @@@ 为灵感，写一篇富有想象力的短篇故事。',
+        "content": "以这个 @@@ 为灵感，写一篇富有想象力的短篇故事。",
     },
     "提示词风格 - 标签": {
         "use": ["image", "video"],
@@ -62,19 +62,19 @@ user_prompt_presets = {
     },
     "提示词风格 - 简洁": {
         "use": ["image", "video"],
-        "content": '分析这个 @@@ ，生成一条简洁的单句文生 @@@ 提示词，简明描述主体与场景。',
+        "content": "分析这个 @@@ ，生成一条简洁的单句文生 @@@ 提示词，简明描述主体与场景。",
     },
     "提示词风格 - 详细": {
         "use": ["image", "video"],
-        "content": '基于这个 @@@ 生成一条详细而有艺术感的文生 @@@ 提示词。把主体、动作、环境、光线与整体氛围融合为一段 2-3 句的连贯文字，突出关键视觉细节。',
+        "content": "基于这个 @@@ 生成一条详细而有艺术感的文生 @@@ 提示词。把主体、动作、环境、光线与整体氛围融合为一段 2-3 句的连贯文字，突出关键视觉细节。",
     },
     "提示词风格 - 极致详细": {
         "use": ["image", "video"],
-        "content": '基于这个 @@@ 生成一条极其详细的文生 @@@ 提示词。用一段丰富的文字，细致刻画主体外貌、服饰质感、背景元素、光线的质感与色彩、阴影以及整体氛围，力求高度描述性与沉浸感。',
+        "content": "基于这个 @@@ 生成一条极其详细的文生 @@@ 提示词。用一段丰富的文字，细致刻画主体外貌、服饰质感、背景元素、光线的质感与色彩、阴影以及整体氛围，力求高度描述性与沉浸感。",
     },
     "提示词风格 - 电影感": {
         "use": ["image", "video"],
-        "content": '作为资深提示词工程师，为 @@@ 生成 AI 创作一条高度详细、富有感染力的提示词。描述主体、姿态、环境、光线、氛围与艺术风格（如写实摄影、电影感、绘画感），并将所有元素编织为一段自然流畅的文字，注重视觉冲击力。',
+        "content": "作为资深提示词工程师，为 @@@ 生成 AI 创作一条高度详细、富有感染力的提示词。描述主体、姿态、环境、光线、氛围与艺术风格（如写实摄影、电影感、绘画感），并将所有元素编织为一段自然流畅的文字，注重视觉冲击力。",
     },
     "视觉 - BBox 目标检测 (需custom_prompt)": {
         "use": ["image"],
@@ -105,4 +105,6 @@ def preset_content(name):
     try:
         return user_prompt_presets[name]["content"]
     except KeyError:
-        raise ValueError(f'Unknown preset_prompt: "{name}". Re-select a preset from the dropdown (the workflow may reference a renamed or removed preset).') from None
+        raise ValueError(
+            f'Unknown preset_prompt: "{name}". Re-select a preset from the dropdown (the workflow may reference a renamed or removed preset).'
+        ) from None

@@ -7,7 +7,7 @@ from tests import comfy_stubs
 
 comfy_stubs.install()
 
-import src.core.storage as storage  # noqa: E402
+from src.core import storage  # noqa: E402
 
 
 def _config(model="model.gguf", mmproj="None", chat_handler="None"):
@@ -22,9 +22,8 @@ class TestResolveConfig(unittest.TestCase):
         self.addCleanup(patcher.stop)
 
     def test_model_not_found_raises(self):
-        with mock.patch.object(storage, "get_llm_full_path", lambda name: None):
-            with self.assertRaises(FileNotFoundError):
-                storage.resolve_config(_config())
+        with mock.patch.object(storage, "get_llm_full_path", lambda name: None), self.assertRaises(FileNotFoundError):
+            storage.resolve_config(_config())
 
     def test_unknown_handler_name_raises(self):
         with self.assertRaisesRegex(ValueError, "Unknown chat handler"):

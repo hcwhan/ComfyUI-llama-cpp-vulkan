@@ -6,14 +6,14 @@
 
 import unittest
 
-import torch
 import numpy as np
+import torch
 
 from tests import comfy_stubs
 
 comfy_stubs.install()
 
-from src.nodes.type.media.bbox.node_bbox import bboxes_to_segs, bboxes_to_mask  # noqa: E402
+from src.nodes.type.media.bbox.node_bbox import bboxes_to_mask, bboxes_to_segs  # noqa: E402
 
 
 class TestBBoxesToSegs(unittest.TestCase):

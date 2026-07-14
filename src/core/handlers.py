@@ -30,13 +30,11 @@ _HANDLER_SPECS = {
     "Qwen3-VL-Thinking": ("Qwen3VLChatHandler", {"force_reasoning": True}),
     "Qwen3-ASR": ("Qwen3ASRChatHandler", None),
     "Qwen2.5-VL": ("Qwen25VLChatHandler", None),
-
     # ---- GLM ----
     "GLM-4.6V": ("GLM46VChatHandler", {"enable_thinking": False}),
     "GLM-4.6V-Thinking": ("GLM46VChatHandler", {"enable_thinking": True}),
     # GLM41VChatHandler 不接受 enable_thinking 参数 (模板固定输出 thinking 块)
     "GLM-4.1V-Thinking": ("GLM41VChatHandler", None),
-
     # ---- Gemma ----
     # Gemma4 的 enable_thinking 按 wheel 说明仅 31B/26BA4B 支持;
     # E2B 实测: 传 False 安全, 但 E 系列关不掉思考(仍以纯文本思考并输出
@@ -44,29 +42,24 @@ _HANDLER_SPECS = {
     "Gemma4": ("Gemma4ChatHandler", {"enable_thinking": False}),
     "Gemma4-Thinking": ("Gemma4ChatHandler", {"enable_thinking": True}),
     "Gemma3": ("Gemma3ChatHandler", None),
-
     # ---- MiniCPM ----
     "MiniCPM-v4.6": ("MiniCPMV46ChatHandler", {"enable_thinking": False}),
     "MiniCPM-v4.6-Thinking": ("MiniCPMV46ChatHandler", {"enable_thinking": True}),
     "MiniCPM-v4.5": ("MiniCPMv45ChatHandler", {"enable_thinking": False}),
     "MiniCPM-v4.5-Thinking": ("MiniCPMv45ChatHandler", {"enable_thinking": True}),
     "MiniCPM-v2.6": ("MiniCPMv26ChatHandler", None),
-
     # ---- Step ----
     "Step3-VL": ("Step3VLChatHandler", {"enable_thinking": False}),
     "Step3-VL-Thinking": ("Step3VLChatHandler", {"enable_thinking": True}),
-
     # ---- LFM ----
     "LFM2.5-VL": ("LFM25VLChatHandler", None),
     "LFM2-VL": ("LFM2VLChatHandler", None),
-
     # ---- OCR / 文档专用 ----
     "DeepSeek-OCR": ("MTMDChatHandler", None),
     "PaddleOCR-VL-1.5": ("PaddleOCRChatHandler", None),
     # MinerU2.5-Pro 基于 Qwen2.5-VL, 复用其 handler
     "MinerU2.5-Pro": ("Qwen25VLChatHandler", None),
     "Granite-Docling": ("GraniteDoclingChatHandler", None),
-
     # ---- 早期模型 ----
     "LLaVA-1.6": ("Llava16ChatHandler", None),
     "LLaVA-1.5": ("Llava15ChatHandler", None),
@@ -74,7 +67,6 @@ _HANDLER_SPECS = {
     "nanoLLaVA": ("NanoLlavaChatHandler", None),
     "Moondream2": ("MoondreamChatHandler", None),
     "Obsidian": ("ObsidianChatHandler", None),
-
     # ---- 兜底 ----
     # 渲染 GGUF 内置 chat template 并归一化媒体占位符,
     # 适配上表没有专用 handler 的 VLM;需要特殊 stop token/生成参数的

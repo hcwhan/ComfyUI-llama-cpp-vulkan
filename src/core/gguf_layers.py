@@ -6,14 +6,14 @@ from ..shared.logger import logger
 
 # GGUF 标量 value type -> struct 格式 (string=8 和 array=9 单独处理)
 _SCALAR_FORMATS = {
-    0: "<B",   # uint8
-    1: "<b",   # int8
-    2: "<H",   # uint16
-    3: "<h",   # int16
-    4: "<I",   # uint32
-    5: "<i",   # int32
-    6: "<f",   # float32
-    7: "<?",   # bool
+    0: "<B",  # uint8
+    1: "<b",  # int8
+    2: "<H",  # uint16
+    3: "<h",  # int16
+    4: "<I",  # uint32
+    5: "<i",  # int32
+    6: "<f",  # float32
+    7: "<?",  # bool
     10: "<Q",  # uint64
     11: "<q",  # int64
     12: "<d",  # float64
@@ -38,18 +38,19 @@ def _read_scalar(f, vtype):
     fmt = _SCALAR_FORMATS.get(vtype)
     if fmt is not None:
         return struct.unpack(fmt, f.read(struct.calcsize(fmt)))[0]
-    if vtype == 8:   # string
+    if vtype == 8:  # string
         return read_string(f)
     raise ValueError(f"Unknown value type {vtype}")
 
 
 def read_value(f):
     vtype = read_u32(f)
-    if vtype == 9:   # array (元素只能是标量,GGUF 不支持嵌套数组)
+    if vtype == 9:  # array (元素只能是标量,GGUF 不支持嵌套数组)
         atype = read_u32(f)
         count = read_u64(f)
         return [_read_scalar(f, atype) for _ in range(count)]
     return _read_scalar(f, vtype)
+
 
 # 显存折算所需的元数据字段 -> GGUF key 后缀(实际 key 带架构名前缀, 按后缀匹配);
 # key_length/value_length 仅部分模型存在(head_dim 与 embedding/head_count 不一致时)

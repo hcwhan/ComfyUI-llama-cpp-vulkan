@@ -14,7 +14,7 @@ from tests import comfy_stubs
 
 comfy_stubs.install()
 
-import src.core.instruct as instruct  # noqa: E402
+from src.core import instruct  # noqa: E402
 from src.core.instruct import InterruptWatcher, llama_cpp_instruct_base  # noqa: E402
 from src.core.storage import LLAMA_CPP_STORAGE  # noqa: E402
 
@@ -93,9 +93,15 @@ class TestRunFinalization(unittest.TestCase):
 
     def _run(self, runner, force_offload=False):
         return self.node._run(
-            llama_model=self.config, preset_prompt="空白 - 空", custom_prompt="一只猫",
-            system_prompt="", seed=0, force_offload=force_offload, strip_thinking=True,
-            parameters=None, runner=runner,
+            llama_model=self.config,
+            preset_prompt="空白 - 空",
+            custom_prompt="一只猫",
+            system_prompt="",
+            seed=0,
+            force_offload=force_offload,
+            strip_thinking=True,
+            parameters=None,
+            runner=runner,
         )
 
     def test_success_returns_runner_output(self):

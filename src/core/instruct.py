@@ -58,9 +58,9 @@ def _unwrap_answer(text):
     stripped = text.lstrip()
     if not stripped.startswith(_ANSWER_OPEN):
         return text
-    stripped = stripped[len(_ANSWER_OPEN):]
+    stripped = stripped[len(_ANSWER_OPEN) :]
     if stripped.rstrip().endswith(_ANSWER_CLOSE):
-        stripped = stripped.rstrip()[:-len(_ANSWER_CLOSE)]
+        stripped = stripped.rstrip()[: -len(_ANSWER_CLOSE)]
     return stripped.strip()
 
 
@@ -148,8 +148,15 @@ class llama_cpp_instruct_base:
         presets = instruct_presets(cls.MODALITY)
         return {
             "preset_prompt": (presets, {"default": presets[0]}),
-            "custom_prompt": ("STRING", {"default": "", "multiline": True, "placeholder": '用户提示词\n\n预设含占位符时(如 BBox 检测的目标类别、待改写的提示词), 此内容用于填充占位符\n否则, 此内容会整体覆盖预设提示词.'}),
-            "system_prompt": ("STRING", {"default": "", "multiline": True, "placeholder": '系统提示词\n\n用于设置模型的人设。'}),
+            "custom_prompt": (
+                "STRING",
+                {
+                    "default": "",
+                    "multiline": True,
+                    "placeholder": "用户提示词\n\n预设含占位符时(如 BBox 检测的目标类别、待改写的提示词), 此内容用于填充占位符\n否则, 此内容会整体覆盖预设提示词.",
+                },
+            ),
+            "system_prompt": ("STRING", {"default": "", "multiline": True, "placeholder": "系统提示词\n\n用于设置模型的人设。"}),
         }
 
     @classmethod
@@ -157,15 +164,18 @@ class llama_cpp_instruct_base:
         return {
             # 上限取 0xFFFFFFFE: 0xFFFFFFFF 是 llama.cpp 的 LLAMA_DEFAULT_SEED
             # 哨兵值(随机种子), 落在该值会静默失去可复现性
-            "seed": ("INT", {"default": 0, "min": 0, "max": 0xfffffffe, "step": 1, "tooltip": "32 位种子; 上限 0xFFFFFFFE, 避开 llama.cpp 的随机种子哨兵值 0xFFFFFFFF."}),
-            "force_offload": ("BOOLEAN", {
-                "default": False,
-                "tooltip": "推理结束后立即卸载模型, 释放显存."
-            }),
-            "strip_thinking": ("BOOLEAN", {
-                "default": True,
-                "tooltip": "移除输出中的思考/推理块\n(适用于 Thinking 模型)"
-            }),
+            "seed": (
+                "INT",
+                {
+                    "default": 0,
+                    "min": 0,
+                    "max": 0xFFFFFFFE,
+                    "step": 1,
+                    "tooltip": "32 位种子; 上限 0xFFFFFFFE, 避开 llama.cpp 的随机种子哨兵值 0xFFFFFFFF.",
+                },
+            ),
+            "force_offload": ("BOOLEAN", {"default": False, "tooltip": "推理结束后立即卸载模型, 释放显存."}),
+            "strip_thinking": ("BOOLEAN", {"default": True, "tooltip": "移除输出中的思考/推理块\n(适用于 Thinking 模型)"}),
         }
 
     @classmethod
@@ -204,7 +214,9 @@ class llama_cpp_instruct_base:
             if custom_prompt.strip():
                 return {"type": "text", "text": custom_prompt}
         elif not custom_prompt.strip():
-            raise ValueError(f'Preset "{preset_prompt}" requires custom_prompt to fill its placeholder (e.g. object categories for BBox detection, or the prompt to rewrite).')
+            raise ValueError(
+                f'Preset "{preset_prompt}" requires custom_prompt to fill its placeholder (e.g. object categories for BBox detection, or the prompt to rewrite).'
+            )
         # 先替换 @@@ 再注入用户文本,避免 custom_prompt 中的 @@@ 被误替换
         p = template.replace("@@@", self.MEDIA_WORD).replace("###", custom_prompt.strip())
         return {"type": "text", "text": p}
@@ -214,8 +226,9 @@ class llama_cpp_instruct_base:
             # ": " 前缀剥离针对 Vicuna/LLaVA 风格模板(生成提示以 "ASSISTANT:" 收尾,
             # 如 Llava15ChatHandler 与部分 GGUF 内嵌模板): 部分模型会把冒号连同空格
             # 再输出一遍。正文本身以 ": " 开头的场景极罕见, 误剥按可接受代价处理
-            text = output['choices'][0]['message']['content'].removeprefix(": ").lstrip()
+            text = output["choices"][0]["message"]["content"].removeprefix(": ").lstrip()
             return strip_thinking_blocks(text) if strip_thinking else text
+
         return extract_text
 
     def _single_completion(self, messages, user_content, seed, params, extract_text):
@@ -243,7 +256,7 @@ class llama_cpp_instruct_base:
         # 再触发可能长达数 GB 的模型加载, 避免漏填时白白完成一次全量加载才报错
         user_content = [self._build_user_prompt(preset_prompt, custom_prompt)]
         if self.REQUIRE_USER_TEXT and not user_content[0]["text"].strip():
-            raise ValueError('User prompt is empty: select a non-blank preset_prompt or fill custom_prompt.')
+            raise ValueError("User prompt is empty: select a non-blank preset_prompt or fill custom_prompt.")
         messages = self._prepare_messages(llama_model, system_prompt)
         # 合并生成新 dict 兼作防御性复制(parameters 是 ComfyUI 缓存的共享 dict,
         # 防止 runner 修改时污染);未连接 parameters 端口时整体落到统一默认值

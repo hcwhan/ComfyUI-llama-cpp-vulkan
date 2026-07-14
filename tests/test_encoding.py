@@ -5,8 +5,8 @@ import io
 import unittest
 import wave
 
-import torch
 import numpy as np
+import torch
 
 from tests import comfy_stubs
 

@@ -87,7 +87,7 @@ class TestJsonToBBoxesLabelFilter(unittest.TestCase):
         # 回归: label 过滤开启时非 dict 项(如坐标数组)不得抛裸 AttributeError,
         # 应留给结构校验报出带期望格式的 ValueError
         with self.assertRaises(ValueError):
-            self.node.process(['[[10, 20, 30, 40]]'], ["simple"], ["cat"], None)
+            self.node.process(["[[10, 20, 30, 40]]"], ["simple"], ["cat"], None)
 
     def test_numeric_label_matched_by_string_filter(self):
         # 回归: LLM 输出数字标签时画框显示 "5" (bbox_label 强转 str),
@@ -109,8 +109,7 @@ class TestJsonToBBoxesQwenMode(unittest.TestCase):
     def test_qwen3_normalized_coords_scaled_to_frame(self):
         # Qwen3-VL 输出 0-1000 归一化坐标, 按帧尺寸 (w=200, h=100) 换算
         frames = [torch.zeros(1, 100, 200, 3)]
-        bboxes, image_list = self.node.process(
-            ['[{"bbox_2d": [0, 0, 500, 1000], "label": "x"}]'], ["Qwen3-VL"], [""], frames)
+        bboxes, image_list = self.node.process(['[{"bbox_2d": [0, 0, 500, 1000], "label": "x"}]'], ["Qwen3-VL"], [""], frames)
         self.assertEqual(bboxes[0], [(0.0, 0.0, 100.0, 100.0)])
         self.assertEqual(tuple(image_list[0].shape), (1, 100, 200, 3))
 

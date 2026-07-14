@@ -4,7 +4,7 @@ import os
 
 import folder_paths
 
-llm_extensions = {'.gguf'}
+llm_extensions = {".gguf"}
 _LLM_FOLDER_KEYS = ("llm", "LLM")
 for _key in _LLM_FOLDER_KEYS:
     folder_paths.add_model_folder_path(_key, os.path.join(folder_paths.models_dir, _key))

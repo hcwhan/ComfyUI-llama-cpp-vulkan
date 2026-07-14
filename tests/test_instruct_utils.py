@@ -6,13 +6,13 @@ from tests import comfy_stubs
 
 comfy_stubs.install()
 
-from src.core.instruct import strip_thinking_blocks, llama_cpp_instruct_base  # noqa: E402
+from src.core.instruct import llama_cpp_instruct_base, strip_thinking_blocks  # noqa: E402
 from src.core.prompts import instruct_presets, preset_content  # noqa: E402
 from src.core.storage import LLAMA_CPP_STORAGE  # noqa: E402
-from src.nodes.type.text.node_instruct import llama_cpp_text_instruct  # noqa: E402
+from src.nodes.type.media.audio.node_instruct import llama_cpp_audio_instruct  # noqa: E402
 from src.nodes.type.media.image.node_instruct import llama_cpp_image_instruct  # noqa: E402
 from src.nodes.type.media.video.node_instruct import llama_cpp_video_instruct  # noqa: E402
-from src.nodes.type.media.audio.node_instruct import llama_cpp_audio_instruct  # noqa: E402
+from src.nodes.type.text.node_instruct import llama_cpp_text_instruct  # noqa: E402
 
 _INSTRUCT_NODES = (
     llama_cpp_text_instruct,
@@ -176,9 +176,15 @@ class TestRequireUserText(unittest.TestCase):
         node = llama_cpp_text_instruct()
         with self.assertRaises(ValueError):
             node._run(
-                llama_model={}, preset_prompt="空白 - 空", custom_prompt="  ",
-                system_prompt="", seed=0, force_offload=False, strip_thinking=True,
-                parameters=None, runner=lambda *args: self.fail("runner should not run"),
+                llama_model={},
+                preset_prompt="空白 - 空",
+                custom_prompt="  ",
+                system_prompt="",
+                seed=0,
+                force_offload=False,
+                strip_thinking=True,
+                parameters=None,
+                runner=lambda *args: self.fail("runner should not run"),
             )
 
     def test_non_empty_custom_passes_guard(self):
@@ -187,9 +193,15 @@ class TestRequireUserText(unittest.TestCase):
         node = llama_cpp_text_instruct()
         with self.assertRaises(KeyError):
             node._run(
-                llama_model={}, preset_prompt="空白 - 空", custom_prompt="一只猫",
-                system_prompt="", seed=0, force_offload=False, strip_thinking=True,
-                parameters=None, runner=lambda *args: self.fail("runner should not run"),
+                llama_model={},
+                preset_prompt="空白 - 空",
+                custom_prompt="一只猫",
+                system_prompt="",
+                seed=0,
+                force_offload=False,
+                strip_thinking=True,
+                parameters=None,
+                runner=lambda *args: self.fail("runner should not run"),
             )
 
 
@@ -207,8 +219,9 @@ class TestPresetConfig(unittest.TestCase):
         for node_cls in _INSTRUCT_NODES:
             first = instruct_presets(node_cls.MODALITY)[0]
             self.assertNotIn(
-                "###", preset_content(first),
-                f"{node_cls.__name__} 的默认预设 \"{first}\" 不应要求 custom_prompt",
+                "###",
+                preset_content(first),
+                f'{node_cls.__name__} 的默认预设 "{first}" 不应要求 custom_prompt',
             )
 
     def test_all_listed_presets_resolvable(self):

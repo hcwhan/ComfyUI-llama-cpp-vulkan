@@ -16,7 +16,7 @@ from src.core.storage import (  # noqa: E402
     _estimate_vram_bytes,
 )
 
-_GB = 1024 ** 3
+_GB = 1024**3
 
 
 def _kv_u32(key, value):
@@ -154,12 +154,14 @@ class TestEstimateVramBytes(unittest.TestCase):
 
     def test_precise_kv_used_when_metadata_present(self):
         # 注意力元数据齐全时, 估算 = 体积 x (1+固定开销) + 精确 KV 字节数
-        data = _gguf_bytes([
-            _kv_u32("llama.block_count", 2),
-            _kv_u32("llama.embedding_length", 64),
-            _kv_u32("llama.attention.head_count", 4),
-            _kv_u32("llama.attention.head_count_kv", 2),
-        ])
+        data = _gguf_bytes(
+            [
+                _kv_u32("llama.block_count", 2),
+                _kv_u32("llama.embedding_length", 64),
+                _kv_u32("llama.attention.head_count", 4),
+                _kv_u32("llama.attention.head_count_kv", 2),
+            ]
+        )
         data += b"\x00" * (1024 * 1024 - len(data))
         model = self._write_temp(data)
         kv = 8192 * 2 * 2 * (16 + 16) * 2

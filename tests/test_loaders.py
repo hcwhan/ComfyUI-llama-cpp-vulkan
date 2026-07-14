@@ -7,7 +7,7 @@ from tests import comfy_stubs
 
 comfy_stubs.install()
 
-import src.core.storage as storage  # noqa: E402
+from src.core import storage  # noqa: E402
 from src.nodes.model.node_loaders import (  # noqa: E402
     llama_cpp_llm_model_loader,
     llama_cpp_vlm_model_loader,

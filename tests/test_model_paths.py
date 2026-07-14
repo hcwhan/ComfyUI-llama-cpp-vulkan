@@ -10,7 +10,7 @@ comfy_stubs.install()
 
 import folder_paths  # noqa: E402
 
-import src.core.model_paths as model_paths  # noqa: E402
+from src.core import model_paths  # noqa: E402
 
 
 class TestGetLlmFilenameList(unittest.TestCase):

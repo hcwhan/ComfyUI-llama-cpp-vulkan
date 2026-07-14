@@ -54,24 +54,36 @@ class TestBlockCountParsing(unittest.TestCase):
         return path
 
     def test_block_count_found(self):
-        path = self._write_temp(_gguf_bytes([
-            _kv_string("general.architecture", "llama"),
-            _kv_uint32("llama.block_count", 32),
-        ]))
+        path = self._write_temp(
+            _gguf_bytes(
+                [
+                    _kv_string("general.architecture", "llama"),
+                    _kv_uint32("llama.block_count", 32),
+                ]
+            )
+        )
         self.assertEqual(_block_count(path), 32)
 
     def test_block_count_after_array_kv(self):
         # 命中前需要正确跳过数组类型的 KV
-        path = self._write_temp(_gguf_bytes([
-            _kv_string_array("tokenizer.ggml.tokens", ["a", "b", "c"]),
-            _kv_uint32("qwen2.block_count", 48),
-        ]))
+        path = self._write_temp(
+            _gguf_bytes(
+                [
+                    _kv_string_array("tokenizer.ggml.tokens", ["a", "b", "c"]),
+                    _kv_uint32("qwen2.block_count", 48),
+                ]
+            )
+        )
         self.assertEqual(_block_count(path), 48)
 
     def test_block_count_missing_returns_none(self):
-        path = self._write_temp(_gguf_bytes([
-            _kv_string("general.architecture", "llama"),
-        ]))
+        path = self._write_temp(
+            _gguf_bytes(
+                [
+                    _kv_string("general.architecture", "llama"),
+                ]
+            )
+        )
         self.assertIsNone(_block_count(path))
 
     def test_non_gguf_file_returns_none(self):

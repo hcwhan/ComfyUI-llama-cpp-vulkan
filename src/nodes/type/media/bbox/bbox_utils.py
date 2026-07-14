@@ -4,8 +4,8 @@ import hashlib
 import math
 from functools import lru_cache
 
-import torch
 import numpy as np
+import torch
 from PIL import Image, ImageDraw, ImageFont
 from scipy.ndimage import gaussian_filter
 
@@ -49,14 +49,15 @@ def qwen25_smart_resize(width, height):
         h_bar = math.ceil(height * beta / f - _EPS) * f
     return w_bar, h_bar
 
+
 # label 常为中文(BBox 检测预设引导用户填中文类别),PIL 默认 bitmap 字体
 # 无 CJK 字形会画成占位方块,按平台常见 CJK 字体依次尝试
 _CJK_FONT_CANDIDATES = (
-    "msyh.ttc",                 # Windows 微软雅黑
-    "simhei.ttf",               # Windows 黑体
+    "msyh.ttc",  # Windows 微软雅黑
+    "simhei.ttf",  # Windows 黑体
     "NotoSansCJK-Regular.ttc",  # Linux Noto CJK
     "NotoSansSC-Regular.otf",
-    "wqy-zenhei.ttc",           # Linux 文泉驿正黑
+    "wqy-zenhei.ttc",  # Linux 文泉驿正黑
 )
 
 
@@ -136,8 +137,8 @@ def draw_bbox(image, pixel_bboxes, labels):
             draw.rectangle((x0, y0, x1, y1), outline=color, width=line_width)
             text_y = max(0, y0 - font_size - 4)
             text_size = draw.textbbox((x0, text_y), label, font=font)
-            draw.rectangle([text_size[0], text_size[1]-2, text_size[2]+4, text_size[3]+2], fill=color)
-            draw.text((x0+2, text_y), label, fill=(255,255,255), font=font)
+            draw.rectangle([text_size[0], text_size[1] - 2, text_size[2] + 4, text_size[3] + 2], fill=color)
+            draw.text((x0 + 2, text_y), label, fill=(255, 255, 255), font=font)
         except Exception as e:
             # 反向坐标(x1 < x0,LLM 常见错误)或非有限值会让 PIL 抛错;
             # 逐框跳过,与 SEGS/MASK 路径的逐框容错粒度一致,

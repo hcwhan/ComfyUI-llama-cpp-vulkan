@@ -6,7 +6,7 @@ from tests import comfy_stubs
 
 comfy_stubs.install()
 
-import src.core.devices as devices  # noqa: E402
+from src.core import devices  # noqa: E402
 
 _FAKE_DGPU = {"name": "Vulkan0", "desc": "Fake dGPU", "type": "GPU"}
 _FAKE_IGPU = {"name": "Vulkan1", "desc": "Fake iGPU", "type": "IGPU"}

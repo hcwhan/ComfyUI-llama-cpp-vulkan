@@ -5,9 +5,8 @@ import os
 import sys
 import time
 
-from llama_cpp import Llama
-
 import comfy.model_management as mm
+from llama_cpp import Llama
 
 from ..shared.logger import logger
 from .devices import AUTO_LABEL, log_backend_summary, resolve_device_selection
@@ -89,19 +88,23 @@ def _estimate_n_gpu_layers(model_path, mmproj_path, vram_limit, n_ctx):
     if vram_limit == 0:
         return 0, False
     per_layer_bytes, _layers = _estimate_per_layer_bytes(model_path, n_ctx)
-    layer_size = per_layer_bytes / (1024 ** 3)
+    layer_size = per_layer_bytes / (1024**3)
     if layer_size <= 0:
         return -1, mmproj_path is not None
     usable = vram_limit
     if mmproj_path:
-        mmproj_gb = os.path.getsize(mmproj_path) * _MMPROJ_FACTOR / (1024 ** 3)
+        mmproj_gb = os.path.getsize(mmproj_path) * _MMPROJ_FACTOR / (1024**3)
         if mmproj_gb >= vram_limit:
-            logger.warning(f"[llama-cpp-vulkan] vram_limit ({vram_limit} GB) cannot fit the mmproj file (~{mmproj_gb:.1f} GB), keeping the main model and mmproj on CPU to honor the budget")
+            logger.warning(
+                f"[llama-cpp-vulkan] vram_limit ({vram_limit} GB) cannot fit the mmproj file (~{mmproj_gb:.1f} GB), keeping the main model and mmproj on CPU to honor the budget"
+            )
             return 0, False
         usable -= mmproj_gb
     n_layers = int(usable / layer_size)
     if n_layers < 1:
-        logger.warning(f"[llama-cpp-vulkan] vram_limit ({vram_limit} GB) leaves no room for even one model layer (~{layer_size:.1f} GB/layer), keeping the main model on CPU to honor the budget")
+        logger.warning(
+            f"[llama-cpp-vulkan] vram_limit ({vram_limit} GB) leaves no room for even one model layer (~{layer_size:.1f} GB/layer), keeping the main model on CPU to honor the budget"
+        )
         return 0, mmproj_path is not None
     return n_layers, mmproj_path is not None
 
@@ -247,8 +250,17 @@ class LLAMA_CPP_STORAGE:
 
         logger.info(f"[llama-cpp-vulkan] Loading model: {model}")
         logger.info(f"[llama-cpp-vulkan] n_gpu_layers = {n_gpu_layers}, main_gpu = {main_gpu}, split_mode = {split_mode}")
+
         def _create_llama():
-            return Llama(model_path, chat_handler=cls.chat_handler, n_gpu_layers=n_gpu_layers, main_gpu=main_gpu, split_mode=split_mode, n_ctx=config["n_ctx"], verbose=False)
+            return Llama(
+                model_path,
+                chat_handler=cls.chat_handler,
+                n_gpu_layers=n_gpu_layers,
+                main_gpu=main_gpu,
+                split_mode=split_mode,
+                n_ctx=config["n_ctx"],
+                verbose=False,
+            )
 
         try:
             try:
@@ -286,6 +298,7 @@ class LLAMA_CPP_STORAGE:
 
 if not hasattr(mm, "unload_all_models_backup"):
     mm.unload_all_models_backup = mm.unload_all_models
+
     def patched_unload_all_models(*args, **kwargs):
         # 补丁按进程生命周期只打一次(hasattr 防重复), 而 "删 sys.modules 再
         # import" 式热重载会产生新模块与新 LLAMA_CPP_STORAGE 类且不重打补丁;
@@ -295,5 +308,6 @@ if not hasattr(mm, "unload_all_models_backup"):
         if module is not None:
             module.LLAMA_CPP_STORAGE.clean()
         return mm.unload_all_models_backup(*args, **kwargs)
+
     mm.unload_all_models = patched_unload_all_models
     logger.info("[llama-cpp-vulkan] Model cleanup hook applied!")

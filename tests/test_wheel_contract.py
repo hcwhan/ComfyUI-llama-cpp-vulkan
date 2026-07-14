@@ -12,8 +12,10 @@ from tests import comfy_stubs
 
 comfy_stubs.install()
 
-from llama_cpp import Llama  # noqa: E402
-import llama_cpp._internals as _internals  # noqa: E402
+from llama_cpp import (
+    Llama,  # noqa: E402
+    _internals,  # noqa: E402
+)
 
 from src.core.instruct import DEFAULT_SAMPLING_PARAMS  # noqa: E402
 
@@ -41,11 +43,13 @@ class TestWheelPrivateApiContract(unittest.TestCase):
         # mmproj 是否配置: 属性被 wheel 重命名不会立刻报错, 而是恒判 "未配置"
         # 使全部媒体 Instruct 误报, 静态锁定基类源码中的属性赋值
         import llama_cpp.llama_multimodal as multimodal
+
         source = inspect.getsource(multimodal.MTMDChatHandler)
         self.assertIn("self.mmproj_path", source)
 
     def test_ggml_device_symbols(self):
         from llama_cpp import _ggml
+
         for name in (
             "libggml_base",
             "ggml_backend_dev_count",
@@ -57,6 +61,7 @@ class TestWheelPrivateApiContract(unittest.TestCase):
 
     def test_split_mode_enum(self):
         import llama_cpp.llama_cpp as llama_cpp_lib
+
         self.assertTrue(hasattr(llama_cpp_lib.llama_split_mode, "LLAMA_SPLIT_MODE_NONE"))
         self.assertTrue(hasattr(llama_cpp_lib.llama_split_mode, "LLAMA_SPLIT_MODE_LAYER"))
 

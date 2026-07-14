@@ -24,13 +24,27 @@ class llama_cpp_audio_instruct(llama_cpp_media_instruct_base):
             "optional": cls.optional_inputs(),
         }
 
-    def process(self, vlm_model, audio, preset_prompt, custom_prompt, system_prompt, seed, force_offload, strip_thinking, parameters=None, queue_handler=None):
+    def process(
+        self,
+        vlm_model,
+        audio,
+        preset_prompt,
+        custom_prompt,
+        system_prompt,
+        seed,
+        force_offload,
+        strip_thinking,
+        parameters=None,
+        queue_handler=None,
+    ):
         def runner(messages, user_content, seed, params, extract_text, watcher):
             self.require_mmproj("Audio")
-            user_content.append({
-                "type": "input_audio",
-                "input_audio": {"data": audio2base64(audio), "format": "wav"},
-            })
+            user_content.append(
+                {
+                    "type": "input_audio",
+                    "input_audio": {"data": audio2base64(audio), "format": "wav"},
+                }
+            )
             return self._single_completion(messages, user_content, seed, params, extract_text)
 
         return self._run(vlm_model, preset_prompt, custom_prompt, system_prompt, seed, force_offload, strip_thinking, parameters, runner)

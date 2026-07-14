@@ -15,23 +15,27 @@ from ...core.handlers import HANDLERS
 from ...core.model_paths import get_llm_filename_list
 from ...core.storage import resolve_config
 
-_GPU_DEVICE_FIELD = (gpu_device_choices, {
-    "default": AUTO_LABEL,
-    "tooltip": "选择 LLM 推理使用的 GPU 设备.\nAuto = llama.cpp 默认行为: 独显优先, 多独显按层切分.\n显式选择某设备时, 整个模型加载到该单卡.\n(仅当系统没有独显时, 核显才可选)"
-})
+_GPU_DEVICE_FIELD = (
+    gpu_device_choices,
+    {
+        "default": AUTO_LABEL,
+        "tooltip": "选择 LLM 推理使用的 GPU 设备.\nAuto = llama.cpp 默认行为: 独显优先, 多独显按层切分.\n显式选择某设备时, 整个模型加载到该单卡.\n(仅当系统没有独显时, 核显才可选)",
+    },
+)
 
 # TODO
-_N_CTX_FIELD = ("INT", {
-    "default": 8192,
-    "min": 1024, "max": 327680, "step": 128,
-    "tooltip": "上下文长度上限."
-})
+_N_CTX_FIELD = ("INT", {"default": 8192, "min": 1024, "max": 327680, "step": 128, "tooltip": "上下文长度上限."})
 
-_VRAM_LIMIT_FIELD = ("INT", {
-    "default": -1,
-    "min": -1, "max": 1024, "step": 1,
-    "tooltip": "显存占用上限, 单位 GB.\n-1 = 自动 (llama.cpp 按空闲显存适配层数), 0 = 纯 CPU 推理.\n预算不足模型 1 层时全部留在 CPU (严格守上限);\n层体积为估算值, 实际占用可能略有偏差."
-})
+_VRAM_LIMIT_FIELD = (
+    "INT",
+    {
+        "default": -1,
+        "min": -1,
+        "max": 1024,
+        "step": 1,
+        "tooltip": "显存占用上限, 单位 GB.\n-1 = 自动 (llama.cpp 按空闲显存适配层数), 0 = 纯 CPU 推理.\n预算不足模型 1 层时全部留在 CPU (严格守上限);\n层体积为估算值, 实际占用可能略有偏差.",
+    },
+)
 
 
 def _is_mmproj(path):
@@ -56,13 +60,15 @@ class llama_cpp_llm_model_loader:
 
     @classmethod
     def INPUT_TYPES(s):
-        return {"required": {
-            "gpu_device": _GPU_DEVICE_FIELD,
-            "model": (_model_list(),),
-            # TODO 是否开启思考
-            "n_ctx": _N_CTX_FIELD,
-            "vram_limit": _VRAM_LIMIT_FIELD,
-        }}
+        return {
+            "required": {
+                "gpu_device": _GPU_DEVICE_FIELD,
+                "model": (_model_list(),),
+                # TODO 是否开启思考
+                "n_ctx": _N_CTX_FIELD,
+                "vram_limit": _VRAM_LIMIT_FIELD,
+            }
+        }
 
     RETURN_TYPES = ("LLAMACPPLLM",)
     RETURN_NAMES = ("llm_model",)
@@ -90,24 +96,38 @@ class llama_cpp_vlm_model_loader:
 
     @classmethod
     def INPUT_TYPES(s):
-        return {"required": {
-            "gpu_device": _GPU_DEVICE_FIELD,
-            "model": (_model_list(),),
-            "mmproj": (_mmproj_list(),),
-            # "None" 占位在首位作为默认值, 强制用户显式选择匹配的 handler
-            # (loadmodel 做非空校验), 避免默认首个 handler 被误用于不匹配的模型
-            "chat_handler": (["None"] + list(HANDLERS),),
-            "n_ctx": _N_CTX_FIELD,
-            "vram_limit": _VRAM_LIMIT_FIELD,
-            "image_min_tokens": ("INT", {
-                "default": 0, "min": 0, "max": 4096, "step": 32,
-                "tooltip": "mmproj 视觉编码的最小 token 数.\n0 = 使用模型默认 (<=0 视为未设置).\n修改后 Qwen2.5-VL 的 bbox 坐标换算会有偏差."
-            }),
-            "image_max_tokens": ("INT", {
-                "default": 0, "min": 0, "max": 4096, "step": 32,
-                "tooltip": "mmproj 视觉编码的最大 token 数, 可限制高分辨率图片的显存与耗时.\n0 = 使用模型默认 (<=0 视为未设置).\n修改后 Qwen2.5-VL 的 bbox 坐标换算会有偏差."
-            }),
-        }}
+        return {
+            "required": {
+                "gpu_device": _GPU_DEVICE_FIELD,
+                "model": (_model_list(),),
+                "mmproj": (_mmproj_list(),),
+                # "None" 占位在首位作为默认值, 强制用户显式选择匹配的 handler
+                # (loadmodel 做非空校验), 避免默认首个 handler 被误用于不匹配的模型
+                "chat_handler": (["None"] + list(HANDLERS),),
+                "n_ctx": _N_CTX_FIELD,
+                "vram_limit": _VRAM_LIMIT_FIELD,
+                "image_min_tokens": (
+                    "INT",
+                    {
+                        "default": 0,
+                        "min": 0,
+                        "max": 4096,
+                        "step": 32,
+                        "tooltip": "mmproj 视觉编码的最小 token 数.\n0 = 使用模型默认 (<=0 视为未设置).\n修改后 Qwen2.5-VL 的 bbox 坐标换算会有偏差.",
+                    },
+                ),
+                "image_max_tokens": (
+                    "INT",
+                    {
+                        "default": 0,
+                        "min": 0,
+                        "max": 4096,
+                        "step": 32,
+                        "tooltip": "mmproj 视觉编码的最大 token 数, 可限制高分辨率图片的显存与耗时.\n0 = 使用模型默认 (<=0 视为未设置).\n修改后 Qwen2.5-VL 的 bbox 坐标换算会有偏差.",
+                    },
+                ),
+            }
+        }
 
     RETURN_TYPES = ("LLAMACPPVLM",)
     RETURN_NAMES = ("vlm_model",)
@@ -116,7 +136,9 @@ class llama_cpp_vlm_model_loader:
         if model == "None":
             raise ValueError("Please select a gguf model.")
         if mmproj == "None":
-            raise ValueError("vlm Model Loader requires a mmproj file. Put the matching mmproj gguf in the llm/LLM folder, or use llm Model Loader for text-only models.")
+            raise ValueError(
+                "vlm Model Loader requires a mmproj file. Put the matching mmproj gguf in the llm/LLM folder, or use llm Model Loader for text-only models."
+            )
         if chat_handler == "None":
             raise ValueError("vlm Model Loader requires a chat handler matching the model.")
         # 与 handler 侧同一条件,只是提前到 loader 报错(<=0 视为未设置)

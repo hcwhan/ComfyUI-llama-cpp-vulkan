@@ -2,8 +2,8 @@
 
 from collections import namedtuple
 
-import torch
 import numpy as np
+import torch
 
 from .....shared.logger import logger
 from .....shared.text_utils import parse_json, split_image_results
@@ -15,6 +15,7 @@ from .bbox_utils import (
     json_to_pixel_bboxes,
     valid_int_bbox,
 )
+
 
 def _normalized_label(value):
     """label 匹配归一化: 忽略大小写与首尾空格; None(字段缺失)视为不匹配.
@@ -41,24 +42,27 @@ class json_to_bboxes:
     FUNCTION = "process"
 
     INPUT_IS_LIST = True
+
     @classmethod
     def INPUT_TYPES(s):
         return {
             "required": {
                 "json": ("STRING", {"forceInput": True}),
-                "mode": (["simple","Qwen3-VL", "Qwen2.5-VL"], {
-                    "default": "simple",
-                    "tooltip": "坐标系换算:\nsimple = 原样透传 (模型输出即原图像素坐标)\nQwen3-VL = 0-1000 归一化坐标\nQwen2.5-VL = 内部 resize 空间的绝对坐标 (自动还原到原图;\n  loader 修改过 image_min/max_tokens 时换算会有偏差;\n  需配合 image Instruct 逐张模式使用: 批量模式多图会被 max_size\n  缩放而破坏换算, 批量单图不缩放、换算仍精确)"
-                }),
-                "label": ("STRING", {
-                    "default":"",
-                    "multiline": False,
-                    "tooltip": "只保留指定 label 的 BBox.\n(匹配忽略大小写与首尾空格)"
-                }),
+                "mode": (
+                    ["simple", "Qwen3-VL", "Qwen2.5-VL"],
+                    {
+                        "default": "simple",
+                        "tooltip": "坐标系换算:\nsimple = 原样透传 (模型输出即原图像素坐标)\nQwen3-VL = 0-1000 归一化坐标\nQwen2.5-VL = 内部 resize 空间的绝对坐标 (自动还原到原图;\n  loader 修改过 image_min/max_tokens 时换算会有偏差;\n  需配合 image Instruct 逐张模式使用: 批量模式多图会被 max_size\n  缩放而破坏换算, 批量单图不缩放、换算仍精确)",
+                    },
+                ),
+                "label": (
+                    "STRING",
+                    {"default": "", "multiline": False, "tooltip": "只保留指定 label 的 BBox.\n(匹配忽略大小写与首尾空格)"},
+                ),
             },
             "optional": {
                 "image": ("IMAGE",),
-            }
+            },
         }
 
     OUTPUT_IS_LIST = (True, True)
@@ -81,7 +85,7 @@ class json_to_bboxes:
             if img_batch.ndim == 3:
                 img_batch = img_batch.unsqueeze(0)
             batch_sizes.append(img_batch.shape[0])
-            flat_images.extend(img_batch[n:n + 1] for n in range(img_batch.shape[0]))
+            flat_images.extend(img_batch[n : n + 1] for n in range(img_batch.shape[0]))
 
         if mode in QWEN_BBOX_MODES and not flat_images:
             raise ValueError("Image required for Qwen mode")
@@ -90,7 +94,9 @@ class json_to_bboxes:
                 detail = "extra JSON entries reuse the last frame, appended to image_list as single-frame batches"
             else:
                 detail = "unpaired trailing frames are passed through without boxes"
-            logger.warning(f"[llama-cpp-vulkan] {len(json)} JSON result(s) but {len(flat_images)} image frame(s); pairing by index, {detail}")
+            logger.warning(
+                f"[llama-cpp-vulkan] {len(json)} JSON result(s) but {len(flat_images)} image frame(s); pairing by index, {detail}"
+            )
 
         output_bboxes = []
         drawn_images = []
@@ -110,8 +116,12 @@ class json_to_bboxes:
                 # 兼容 label / text_content 混用的输出,任一字段匹配即保留;
                 # 非 dict 项原样保留, 由 json_to_pixel_bboxes 的结构校验给出
                 # 带期望格式的报错, 而非在此抛裸 AttributeError
-                items = [b for b in items if not isinstance(b, dict)
-                         or wanted_label in (_normalized_label(b.get("label")), _normalized_label(b.get("text_content")))]
+                items = [
+                    b
+                    for b in items
+                    if not isinstance(b, dict)
+                    or wanted_label in (_normalized_label(b.get("label")), _normalized_label(b.get("text_content")))
+                ]
 
             if flat_images:
                 curr_img = flat_images[min(i, len(flat_images) - 1)]
@@ -133,13 +143,13 @@ class json_to_bboxes:
         # JSON 少于帧时, 尾部未配对的帧原样进入输出(不画框), 保持批次结构完整
         # (透传帧同样统一 .cpu(), 理由同上; CPU 张量的 .cpu() 是零拷贝 no-op)
         if flat_images and len(drawn_images) < len(flat_images):
-            drawn_images.extend(f.cpu() for f in flat_images[len(drawn_images):])
+            drawn_images.extend(f.cpu() for f in flat_images[len(drawn_images) :])
 
         # 画框结果按输入图像的批次结构重新分组
         restructured_images = []
         cursor = 0
         for count in batch_sizes:
-            restructured_images.append(torch.cat(drawn_images[cursor:cursor + count], dim=0))
+            restructured_images.append(torch.cat(drawn_images[cursor : cursor + count], dim=0))
             cursor += count
         # JSON 多于帧时, 多出的画框帧(复用末帧)作为单帧批次追加,
         # image_list 总帧数与 bboxes 组数保持对齐
@@ -160,11 +170,35 @@ class bboxes_to_segs:
             "required": {
                 "bboxes": ("BBOX",),
                 "image": ("IMAGE",),
-                "label": ("STRING", {"default": "bbox", "tooltip": "写入每个 SEG 的 label, 供下游按 label 过滤/赋值 (如 Impact Pack 的 SEGS Filter)."}),
-                "confidence": ("FLOAT", {"default": 0.9, "min": 0.0, "max": 1.0, "step": 0.01, "tooltip": "写入每个 SEG 的置信度, 供下游按阈值过滤."}),
-                "dilation": ("INT", {"default": 10, "min": 0, "max": 200, "step": 1, "tooltip": "掩码矩形向外扩张的像素数, 直接扩大下游的重绘区域.\n(与 Impact Pack 检测器及 BBoxes to MASK 的 dilation 语义一致)"}),
+                "label": (
+                    "STRING",
+                    {"default": "bbox", "tooltip": "写入每个 SEG 的 label, 供下游按 label 过滤/赋值 (如 Impact Pack 的 SEGS Filter)."},
+                ),
+                "confidence": (
+                    "FLOAT",
+                    {"default": 0.9, "min": 0.0, "max": 1.0, "step": 0.01, "tooltip": "写入每个 SEG 的置信度, 供下游按阈值过滤."},
+                ),
+                "dilation": (
+                    "INT",
+                    {
+                        "default": 10,
+                        "min": 0,
+                        "max": 200,
+                        "step": 1,
+                        "tooltip": "掩码矩形向外扩张的像素数, 直接扩大下游的重绘区域.\n(与 Impact Pack 检测器及 BBoxes to MASK 的 dilation 语义一致)",
+                    },
+                ),
                 "feather": ("INT", {"default": 0, "min": 0, "max": 100, "step": 1, "tooltip": "掩码边缘高斯羽化的 sigma (像素)."}),
-                "crop_factor": ("FLOAT", {"default": 3.0, "min": 1.0, "max": 10.0, "step": 0.1, "tooltip": "crop_region 相对掩码矩形的放大倍数, 为下游 Detailer 提供重绘上下文.\n(Impact Pack 惯例, 1.0 = 不外扩)"}),
+                "crop_factor": (
+                    "FLOAT",
+                    {
+                        "default": 3.0,
+                        "min": 1.0,
+                        "max": 10.0,
+                        "step": 0.1,
+                        "tooltip": "crop_region 相对掩码矩形的放大倍数, 为下游 Detailer 提供重绘上下文.\n(Impact Pack 惯例, 1.0 = 不外扩)",
+                    },
+                ),
             }
         }
 
@@ -177,7 +211,9 @@ class bboxes_to_segs:
 
         seg_list = []
         if batch_size > 1:
-            logger.warning(f"[llama-cpp-vulkan] BBoxes to SEGS received a batch of {batch_size} images; cropped images are taken from the first frame only")
+            logger.warning(
+                f"[llama-cpp-vulkan] BBoxes to SEGS received a batch of {batch_size} images; cropped images are taken from the first frame only"
+            )
         image_for_cropping = image[0]
 
         for bbox in bboxes:
@@ -247,7 +283,16 @@ class bboxes_to_mask:
             "required": {
                 "bboxes": ("BBOX",),
                 "image": ("IMAGE",),
-                "dilation": ("INT", {"default": 10, "min": 0, "max": 200, "step": 1, "tooltip": "掩码矩形向外扩张的像素数.\n(与 BBoxes to SEGS 的 dilation 语义一致)"}),
+                "dilation": (
+                    "INT",
+                    {
+                        "default": 10,
+                        "min": 0,
+                        "max": 200,
+                        "step": 1,
+                        "tooltip": "掩码矩形向外扩张的像素数.\n(与 BBoxes to SEGS 的 dilation 语义一致)",
+                    },
+                ),
                 "feather": ("INT", {"default": 0, "min": 0, "max": 100, "step": 1, "tooltip": "掩码边缘高斯羽化的 sigma (像素)."}),
             }
         }
@@ -288,8 +333,10 @@ class bboxes_to_mask:
 
             # 扩张框(裁剪到图像内)在窗口坐标系中的位置
             inner_rect = (
-                max(0, x1_exp) - wx1, max(0, y1_exp) - wy1,
-                min(width, x2_exp) - wx1, min(height, y2_exp) - wy1,
+                max(0, x1_exp) - wx1,
+                max(0, y1_exp) - wy1,
+                min(width, x2_exp) - wx1,
+                min(height, y2_exp) - wy1,
             )
             local_mask_np = feathered_rect_mask(wy2 - wy1, wx2 - wx1, inner_rect, feather)
             local_mask_tensor = torch.from_numpy(local_mask_np)
@@ -307,19 +354,17 @@ class bboxes_to_bbox:
     # 必须声明 INPUT_IS_LIST 才能在单次调用中拿到完整的组列表，
     # 否则 ComfyUI 按组 map 执行，image_index/bbox_index 的二级索引语义失效。
     INPUT_IS_LIST = True
+
     @classmethod
     def INPUT_TYPES(s):
         return {
             "required": {
                 "bboxes": ("BBOX",),
                 "image_index": ("INT", {"default": 0, "min": 0, "max": 1000000, "step": 1}),
-                "bbox_index": ("INT", {
-                    "default": 0,
-                    "min": -998,
-                    "max": 999,
-                    "step": 1,
-                    "tooltip": "图内 BBox 索引. 设为 999 时返回该图全部 BBox."
-                }),
+                "bbox_index": (
+                    "INT",
+                    {"default": 0, "min": -998, "max": 999, "step": 1, "tooltip": "图内 BBox 索引. 设为 999 时返回该图全部 BBox."},
+                ),
             }
         }
 

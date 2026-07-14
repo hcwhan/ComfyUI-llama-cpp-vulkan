@@ -13,10 +13,10 @@ from pathlib import Path
 import llama_cpp.llama_cpp as _llama_cpp_lib
 from llama_cpp._ggml import (
     GGMLBackendDevType,
-    libggml_base,
     ggml_backend_dev_count,
     ggml_backend_dev_get,
     ggml_backend_load_all_from_path,
+    libggml_base,
 )
 
 from ..shared.logger import logger

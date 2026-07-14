@@ -1,7 +1,7 @@
-scipy
 numpy
 # ImageFont.load_default(size) 需要 >= 10.1 (bbox 画框的 CJK 字体回退路径)
 pillow>=10.1
+scipy
 tqdm
 
 # for Windows (Vulkan) - ABI3 universal wheel, supports CPython 3.10+

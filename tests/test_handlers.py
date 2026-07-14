@@ -10,7 +10,7 @@ comfy_stubs.install()
 
 import llama_cpp.llama_multimodal as _handler_module  # noqa: E402
 
-import src.core.handlers as handlers  # noqa: E402
+from src.core import handlers  # noqa: E402
 from src.core.handlers import _HANDLER_SPECS  # noqa: E402
 
 # 思考相关构造参数名单: 仅收录影响单轮输出的开关。多轮对话保留历史思考块
@@ -38,9 +38,10 @@ class TestHandlerSpecs(unittest.TestCase):
     def test_kwargs_accepted_by_init(self):
         # 全部构造 kwargs 必须被类 __init__ 显式接受(基类对未知 kwargs 抛 TypeError)
         for label, (cls_name, kwargs) in _HANDLER_SPECS.items():
-            for key in (kwargs or {}):
+            for key in kwargs or {}:
                 self.assertIn(
-                    key, _init_params(cls_name),
+                    key,
+                    _init_params(cls_name),
                     f'"{label}": {cls_name}.__init__ 不接受 {key}',
                 )
 
@@ -52,7 +53,8 @@ class TestHandlerSpecs(unittest.TestCase):
             capable = [p for p in _THINK_PARAM_NAMES if p in params]
             for param in capable:
                 self.assertIn(
-                    param, kwargs or {},
+                    param,
+                    kwargs or {},
                     f'"{label}": {cls_name} 的 __init__ 接受 {param} 但注册表未显式声明',
                 )
 
@@ -66,7 +68,8 @@ class TestHandlerSpecs(unittest.TestCase):
             expected = label.endswith("-Thinking")
             for param in declared:
                 self.assertEqual(
-                    kwargs[param], expected,
+                    kwargs[param],
+                    expected,
                     f'"{label}": {param}={kwargs[param]} 与显示名后缀语义不符',
                 )
 

@@ -12,7 +12,7 @@ classifiers = [
 # llama-cpp-python 有意不在此声明: Comfy Registry 不接受 URL 依赖,
 # 平台条件的 Vulkan wheel URL 以 requirements.txt 为准, 安装时必须执行
 # pip install -r requirements.txt (README 安装节第 2 步)
-dependencies = ["scipy", "numpy", "pillow>=10.1", "tqdm"]
+dependencies = ["numpy", "pillow>=10.1", "scipy", "tqdm"]
 
 [project.urls]
 Repository = "https://github.com/hcwhan/ComfyUI-llama-cpp-vulkan"
@@ -20,8 +20,41 @@ Documentation = "https://github.com/hcwhan/ComfyUI-llama-cpp-vulkan/blob/main/RE
 "Bug Tracker" = "https://github.com/hcwhan/ComfyUI-llama-cpp-vulkan/issues"
 
 [tool.comfy]
-PublisherId = "lhy666"
+PublisherId = "hcwhan"
 DisplayName = "ComfyUI-llama-cpp-vulkan"
 Icon = ""
 includes = []
 # "requires-comfyui" = ">=1.0.0"  # ComfyUI version compatibility
+
+[tool.ruff]
+# target-version 自动取自上方 requires-python (>=3.10), 不重复声明
+line-length = 140
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # Pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "SIM", # flake8-simplify
+    "PL",  # Pylint
+]
+ignore = [
+    # 中文文案与模板字符串天然超长, 行宽只约束代码行, 长字符串不折行
+    "E501",
+    # ComfyUI 节点类的 INPUT_TYPES/IS_CHANGED 等钩子由框架调用, 复杂度阈值不适用
+    "PLR0913", # 参数过多: Instruct 节点入口需铺开全部采样参数
+    "PLR0912", # 分支过多
+    "PLR0915", # 语句过多
+    "PLR2004", # 魔法数字: 张量维度/采样默认值场景大量存在, 逐一命名反而降低可读性
+]
+
+[tool.ruff.lint.per-file-ignores]
+# 契约测试的函数内 import 是有意为之: 逐接口惰性导入, 断裂时报错定位到具体用例
+"tests/*" = ["PLC0415"]
+
+[tool.ruff.format]
+# 项目字符串引号风格以双引号为主, 与 format 默认一致; docstring 保持原样
+docstring-code-format = false

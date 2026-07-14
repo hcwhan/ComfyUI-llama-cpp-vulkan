@@ -4,8 +4,8 @@ import base64
 import io
 import wave
 
-import torch
 import numpy as np
+import torch
 from PIL import Image
 
 from ....shared.logger import logger
@@ -29,7 +29,7 @@ def image2base64(image):
     img = Image.fromarray(image)
     buffered = io.BytesIO()
     img.save(buffered, format="PNG")
-    img_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
+    img_base64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
     return img_base64
 
 

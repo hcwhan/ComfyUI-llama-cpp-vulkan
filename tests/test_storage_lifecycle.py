@@ -14,7 +14,7 @@ from tests import comfy_stubs
 
 comfy_stubs.install()
 
-import src.core.storage as storage  # noqa: E402
+from src.core import storage  # noqa: E402
 from src.core.storage import LLAMA_CPP_STORAGE  # noqa: E402
 
 
@@ -52,7 +52,8 @@ class TestLoadModelStateMachine(unittest.TestCase):
         patches = [
             mock.patch.object(storage, "Llama", _FakeLlama),
             mock.patch.object(
-                storage, "get_llm_full_path",
+                storage,
+                "get_llm_full_path",
                 lambda name: self.model_path if name == "model.gguf" else None,
             ),
             # 重试路径的 WDDM 等待与测试无关, 打桩省掉 1 秒
@@ -80,9 +81,13 @@ class TestLoadModelStateMachine(unittest.TestCase):
     @staticmethod
     def _config(vram_limit=-1):
         return {
-            "model": "model.gguf", "mmproj": "None", "chat_handler": "None",
-            "n_ctx": 2048, "vram_limit": vram_limit,
-            "image_min_tokens": 0, "image_max_tokens": 0,
+            "model": "model.gguf",
+            "mmproj": "None",
+            "chat_handler": "None",
+            "n_ctx": 2048,
+            "vram_limit": vram_limit,
+            "image_min_tokens": 0,
+            "image_max_tokens": 0,
         }
 
     def test_success_records_config_copy(self):

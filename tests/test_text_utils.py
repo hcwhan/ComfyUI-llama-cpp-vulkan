@@ -2,7 +2,7 @@
 
 import unittest
 
-from src.shared.text_utils import strip_code_fence, split_image_results, parse_json, get_nested_value
+from src.shared.text_utils import get_nested_value, parse_json, split_image_results, strip_code_fence
 
 
 class TestStripCodeFence(unittest.TestCase):
@@ -48,7 +48,7 @@ class TestStripCodeFence(unittest.TestCase):
         self.assertEqual(strip_code_fence(text), '{"a": 1}')
 
     def test_leading_prose_takes_first_of_multiple_blocks(self):
-        text = 'A:\n```\nfirst\n```\nB:\n```\nsecond\n```'
+        text = "A:\n```\nfirst\n```\nB:\n```\nsecond\n```"
         self.assertEqual(strip_code_fence(text), "first")
 
     def test_leading_prose_with_unclosed_fence_kept(self):

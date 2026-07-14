@@ -122,15 +122,15 @@ class TestQwen25SmartResize(unittest.TestCase):
     """
 
     def test_large_image_downscaled_to_token_cap(self):
-        self.assertEqual(qwen25_smart_resize(3200, 2400), (2044, 1540))   # 4015 tok
-        self.assertEqual(qwen25_smart_resize(2400, 2400), (1792, 1792))   # 恰 4096 tok
+        self.assertEqual(qwen25_smart_resize(3200, 2400), (2044, 1540))  # 4015 tok
+        self.assertEqual(qwen25_smart_resize(2400, 2400), (1792, 1792))  # 恰 4096 tok
 
     def test_medium_image_rounded_to_patch_multiple(self):
-        self.assertEqual(qwen25_smart_resize(1600, 1200), (1596, 1204))   # 2451 tok
-        self.assertEqual(qwen25_smart_resize(800, 600), (812, 588))       # 609 tok
+        self.assertEqual(qwen25_smart_resize(1600, 1200), (1596, 1204))  # 2451 tok
+        self.assertEqual(qwen25_smart_resize(800, 600), (812, 588))  # 609 tok
 
     def test_tiny_image_upscaled_to_min_pixels(self):
-        self.assertEqual(qwen25_smart_resize(56, 56), (84, 84))           # 9 tok
+        self.assertEqual(qwen25_smart_resize(56, 56), (84, 84))  # 9 tok
 
 
 class TestQwen25ModeConversion(unittest.TestCase):

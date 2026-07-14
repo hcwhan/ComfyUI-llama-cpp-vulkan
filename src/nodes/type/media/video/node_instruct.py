@@ -28,26 +28,37 @@ class llama_cpp_video_instruct(llama_cpp_media_instruct_base):
                 "vlm_model": (cls.MODEL_TYPE,),
                 "frames": ("IMAGE", {"tooltip": "IMAGE 帧批次形式的视频帧(如 VHS Load Video 或视频模型 VAE Decode 的输出)."}),
                 **cls.prompt_inputs(),
-                "max_frames": ("INT", {
-                    "default": 24,
-                    "min": 2,
-                    "max": 1024,
-                    "step": 1,
-                    "tooltip": "从输入帧中均匀采样的帧数上限."
-                }),
-                "max_size": ("INT", {
-                    "default": 256,
-                    "min": 128,
-                    "max": 16384,
-                    "step": 64,
-                    "tooltip": "采样帧的最大边长.\n仅在发送多帧时生效, 单帧保持原分辨率."
-                }),
+                "max_frames": ("INT", {"default": 24, "min": 2, "max": 1024, "step": 1, "tooltip": "从输入帧中均匀采样的帧数上限."}),
+                "max_size": (
+                    "INT",
+                    {
+                        "default": 256,
+                        "min": 128,
+                        "max": 16384,
+                        "step": 64,
+                        "tooltip": "采样帧的最大边长.\n仅在发送多帧时生效, 单帧保持原分辨率.",
+                    },
+                ),
                 **cls.runtime_inputs(),
             },
             "optional": cls.optional_inputs(),
         }
 
-    def process(self, vlm_model, frames, preset_prompt, custom_prompt, system_prompt, max_frames, max_size, seed, force_offload, strip_thinking, parameters=None, queue_handler=None):
+    def process(
+        self,
+        vlm_model,
+        frames,
+        preset_prompt,
+        custom_prompt,
+        system_prompt,
+        max_frames,
+        max_size,
+        seed,
+        force_offload,
+        strip_thinking,
+        parameters=None,
+        queue_handler=None,
+    ):
         # 注入句与用户 system_prompt 之间加换行分隔,避免两段指令粘连成一句
         video_hint = "请将输入的图像序列视为一段连续的视频，而不是彼此独立的静态帧。"
         system_prompt = (video_hint + "\n" + system_prompt) if system_prompt.strip() else video_hint
