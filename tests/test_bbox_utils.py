@@ -56,7 +56,7 @@ class TestJsonToPixelBboxes(unittest.TestCase):
 class TestDrawBbox(unittest.TestCase):
     def test_bad_box_skipped_other_boxes_drawn(self):
         # 回归: 单个坏框(反向坐标使 PIL 抛 ValueError)只跳过该框,
-        # 不放弃整张图 —— 与 SEGS/MASK 路径的逐框容错粒度一致
+        # 不放弃整张图 - 与 SEGS/MASK 路径的逐框容错粒度一致
         image = torch.zeros(32, 32, 3)
         boxes = [(20.0, 10.0, 5.0, 15.0), (2.0, 2.0, 12.0, 12.0)]
         out = draw_bbox(image, boxes, ["bad", "good"])

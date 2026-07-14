@@ -95,7 +95,7 @@ class TestBuildUserPrompt(unittest.TestCase):
         self.assertEqual(self._text("常规 - 描述", "自定义内容"), "自定义内容")
 
     def test_plain_preset_used_when_custom_empty(self):
-        self.assertEqual(self._text("常规 - 描述", ""), "描述这个 图像 。")
+        self.assertEqual(self._text("常规 - 描述", ""), "描述这个 图像.")
 
     def test_placeholder_preset_fills_custom(self):
         text = self._text("视觉 - BBox 目标检测 (需custom_prompt)", "人物, 车辆")
@@ -213,7 +213,7 @@ class TestPresetConfig(unittest.TestCase):
             self.assertTrue(instruct_presets(node_cls.MODALITY))
 
     def test_default_preset_needs_no_custom_prompt(self):
-        # 各模态列表第一项即默认预设, 默认选中就必填 custom_prompt 会造成开箱即报错。
+        # 各模态列表第一项即默认预设, 默认选中就必填 custom_prompt 会造成开箱即报错.
         # text 模态的默认空白预设 + 空 custom_prompt 自 05e03d8 起同样开箱报错
         # (REQUIRE_USER_TEXT 空文本拦截, 报错不同), 本约束对 media 模态仍是开箱保证
         for node_cls in _INSTRUCT_NODES:

@@ -76,7 +76,7 @@ One wheel per platform covers all Python versions. Download from [Releases](http
 
 #### 3. Download models:
 
-- Place your `.gguf` model files in the `ComfyUI/models/LLM` folder (both `llm` and `LLM` folder names are registered — on case-sensitive Linux filesystems either directory works).
+- Place your `.gguf` model files in the `ComfyUI/models/LLM` folder (both `llm` and `LLM` folder names are registered - on case-sensitive Linux filesystems either directory works).
 - Custom paths via `extra_model_paths.yaml` are also supported.
 
   > If you need a VLM model to process image input, don't forget to download the `mmproj` weights.
@@ -85,7 +85,7 @@ One wheel per platform covers all Python versions. Download from [Releases](http
 ## Nodes (v2.1.0)
 
 - **Loaders**: `llm Model Loader` for text-only GGUF models, `vlm Model Loader` for vision/audio models (mmproj + chat handler required). Their outputs are separate types: llm connects only to `text Instruct`, vlm connects only to `image / video / audio Instruct`.
-- **Instruct**: one node per modality — `text` (prompt refining etc.), `image` (per-image or batched), `video` (IMAGE frame batch input, evenly sampled), `audio` (ASR / omni).
+- **Instruct**: one node per modality - `text` (prompt refining etc.), `image` (per-image or batched), `video` (IMAGE frame batch input, evenly sampled), `audio` (ASR / omni).
 - **BBox toolchain**: `JSON to BBoxes` (parse detection JSON, draw boxes), `BBoxes to SEGS` (Impact Pack compatible), `BBoxes to MASK`, `BBoxes to BBox`.
 - **Utilities**: `Parameters` (sampling config), `Unload Model`, `Parse JSON`, `Unpack Code Block`, `Split Instruct Output`, `System Prompt Preset` (Chinese prompt-enhancement presets for Qwen-Image / Z-Image / Flux.2 / Wan).
 
@@ -93,7 +93,7 @@ One wheel per platform covers all Python versions. Download from [Releases](http
 
 - **Audio input (ASR)**: connect a ComfyUI `AUDIO` output to the `audio Instruct` node and load the model with `vlm Model Loader` using an audio-capable handler (e.g. Qwen3-ASR) with its matching mmproj. Audio is sent as 16-bit mono WAV; resampling is handled by llama.cpp.
 - **Stateless inference**: every run is an independent one-shot request (system prompt + current prompt). No conversation history is kept between runs.
-- **GPU not detected?** Run `python tools/check_devices.py` (with ComfyUI's Python) to list every device the GGML backend enumerates (CPU/GPU/IGPU/ACCEL) without starting ComfyUI — useful for diagnosing Vulkan driver issues.
+- **GPU not detected?** Run `python tools/check_devices.py` (with ComfyUI's Python) to list every device the GGML backend enumerates (CPU/GPU/IGPU/ACCEL) without starting ComfyUI - useful for diagnosing Vulkan driver issues.
 
 ## Known Limitations
 

@@ -20,7 +20,7 @@ from .bbox_utils import (
 def _normalized_label(value):
     """label 匹配归一化: 忽略大小写与首尾空格; None(字段缺失)视为不匹配.
 
-    LLM 可能输出数字等非字符串标签,与 bbox_label 的显示路径一致地强转 str,
+    LLM 可能输出数字等非字符串标签, 与 bbox_label 的显示路径一致地强转 str,
     保证画得出的标签在过滤框中也能匹配到.
     """
     if value is None:
@@ -28,7 +28,7 @@ def _normalized_label(value):
     return str(value).strip().casefold()
 
 
-# 与 Impact Pack 的 SEG 保持同定义(modules/impact/core.py),字段名与顺序不能改:
+# 与 Impact Pack 的 SEG 保持同定义(modules/impact/core.py), 字段名与顺序不能改:
 # 其部分节点依赖 namedtuple 语义(如 SEGSLabelAssign 调用 seg._replace)
 SEG = namedtuple(
     "SEG",
@@ -52,7 +52,7 @@ class json_to_bboxes:
                     ["simple", "Qwen3-VL", "Qwen2.5-VL"],
                     {
                         "default": "simple",
-                        "tooltip": "坐标系换算:\nsimple = 原样透传 (模型输出即原图像素坐标)\nQwen3-VL = 0-1000 归一化坐标\nQwen2.5-VL = 内部 resize 空间的绝对坐标 (自动还原到原图;\n  loader 修改过 image_min/max_tokens 时换算会有偏差;\n  需配合 image Instruct 逐张模式使用: 批量模式多图会被 max_size\n  缩放而破坏换算, 批量单图不缩放、换算仍精确)",
+                        "tooltip": "坐标系换算:\nsimple = 原样透传 (模型输出即原图像素坐标)\nQwen3-VL = 0-1000 归一化坐标\nQwen2.5-VL = 内部 resize 空间的绝对坐标 (自动还原到原图;\n  loader 修改过 image_min/max_tokens 时换算会有偏差;\n  需配合 image Instruct 逐张模式使用: 批量模式多图会被 max_size\n  缩放而破坏换算, 批量单图不缩放, 换算仍精确)",
                     },
                 ),
                 "label": (
@@ -75,10 +75,10 @@ class json_to_bboxes:
         wanted_label = _normalized_label(label[0])
 
         # image Instruct 逐张模式的 output 是分隔行拼接的整段文本,
-        # 自动拆回逐张 JSON;合法 JSON 文本中不存在真实分隔行,不会被误拆
+        # 自动拆回逐张 JSON; 合法 JSON 文本中不存在真实分隔行, 不会被误拆
         json = [part for text in json for part in split_image_results(text)]
 
-        # 拆平为 [1,H,W,C] 单帧列表,记录每个输入元素的批次大小以便还原结构
+        # 拆平为 [1,H,W,C] 单帧列表, 记录每个输入元素的批次大小以便还原结构
         flat_images = []
         batch_sizes = []
         for img_item in image or []:
@@ -104,7 +104,7 @@ class json_to_bboxes:
             try:
                 items = parse_json(json_str)
             except ValueError as e:
-                # 逐张模式拆出几十段结果时定位坏段,与画框失败分支的 JSON #{i} 对齐
+                # 逐张模式拆出几十段结果时定位坏段, 与画框失败分支的 JSON #{i} 对齐
                 raise ValueError(f"JSON #{i}: {e}") from None
             # 模型只检出单个目标时可能直接输出对象而非单元素列表
             if isinstance(items, dict):
@@ -112,7 +112,7 @@ class json_to_bboxes:
             if not isinstance(items, list):
                 raise ValueError(f'Expected a JSON list of {{"bbox_2d": [...], "label": "..."}} objects, got: {type(items).__name__}')
             if wanted_label:
-                # 兼容 label / text_content 混用的输出,任一字段匹配即保留;
+                # 兼容 label / text_content 混用的输出, 任一字段匹配即保留;
                 # 非 dict 项原样保留, 由 json_to_pixel_bboxes 的结构校验给出
                 # 带期望格式的报错, 而非在此抛裸 AttributeError
                 items = [
@@ -220,7 +220,7 @@ class bboxes_to_segs:
             if coords is None:
                 continue
             x1, y1, x2, y2 = coords
-            # LLM 输出的坐标不可信，先裁剪到图像范围
+            # LLM 输出的坐标不可信, 先裁剪到图像范围
             x1 = max(0, min(x1, width))
             x2 = max(0, min(x2, width))
             y1 = max(0, min(y1, height))
@@ -229,15 +229,15 @@ class bboxes_to_segs:
                 logger.warning(f"[llama-cpp-vulkan] Skipping bbox outside image bounds: {bbox}")
                 continue
 
-            # dilation 直接外扩掩码矩形（重绘区域），与 bboxes_to_mask 及
-            # Impact Pack 检测器的 dilation 语义一致；限制在图像内，
-            # 保证坐标不为负（Impact Pack 约定）
+            # dilation 直接外扩掩码矩形(重绘区域), 与 bboxes_to_mask 及
+            # Impact Pack 检测器的 dilation 语义一致; 限制在图像内,
+            # 保证坐标不为负(Impact Pack 约定)
             mx1 = max(0, x1 - dilation)
             my1 = max(0, y1 - dilation)
             mx2 = min(width, x2 + dilation)
             my2 = min(height, y2 + dilation)
 
-            # crop_region 以掩码矩形为中心按 crop_factor 放大（Impact Pack 惯例），
+            # crop_region 以掩码矩形为中心按 crop_factor 放大(Impact Pack 惯例),
             # 供下游 Detailer 携带周边上下文重绘
             pad_x = int((mx2 - mx1) * (crop_factor - 1.0) / 2)
             pad_y = int((my2 - my1) * (crop_factor - 1.0) / 2)
@@ -260,7 +260,7 @@ class bboxes_to_segs:
                 # Impact Pack 约定 confidence 为标量
                 confidence=confidence,
                 crop_region=crop_region,
-                # bbox 保留原始检测框（Impact Pack 约定 dilation 不改变 seg.bbox）
+                # bbox 保留原始检测框(Impact Pack 约定 dilation 不改变 seg.bbox)
                 bbox=np.array([x1, y1, x2, y2], dtype=np.float32),
                 label=label,
             )
@@ -305,8 +305,8 @@ class bboxes_to_mask:
         # 恒在 CPU 上构建与输出, 与 json_to_bboxes 的 image_list 策略一致:
         # --gpu-only 下跟随 image.device 会让直接 .numpy() 的下游第三方节点报错
         combined_full_mask = torch.zeros(mask_shape, dtype=torch.float32)
-        # gaussian_filter 默认 truncate=4.0,窗口向外留 4 sigma 即可覆盖全部有效衰减,
-        # 在局部窗口内做羽化,避免每个 bbox 都在全图尺寸上跑一次 filter
+        # gaussian_filter 默认 truncate=4.0, 窗口向外留 4 sigma 即可覆盖全部有效衰减,
+        # 在局部窗口内做羽化, 避免每个 bbox 都在全图尺寸上跑一次 filter
         margin = int(4 * feather) + 1 if feather > 0 else 0
 
         for bbox in bboxes:
@@ -323,7 +323,7 @@ class bboxes_to_mask:
                 logger.warning(f"[llama-cpp-vulkan] Skipping bbox with empty area: {bbox}")
                 continue
 
-            # 局部窗口(含羽化边界),裁剪到图像范围
+            # 局部窗口(含羽化边界), 裁剪到图像范围
             wx1, wy1 = max(0, x1_exp - margin), max(0, y1_exp - margin)
             wx2, wy2 = min(width, x2_exp + margin), min(height, y2_exp + margin)
             if wx2 <= wx1 or wy2 <= wy1:
@@ -349,9 +349,9 @@ class bboxes_to_bbox:
     CATEGORY = "llama-cpp-vulkan"
     FUNCTION = "process"
 
-    # 上游 json_to_bboxes 的 BBOX 输出是 OUTPUT_IS_LIST（每元素一组）。
-    # 必须声明 INPUT_IS_LIST 才能在单次调用中拿到完整的组列表，
-    # 否则 ComfyUI 按组 map 执行，image_index/bbox_index 的二级索引语义失效。
+    # 上游 json_to_bboxes 的 BBOX 输出是 OUTPUT_IS_LIST(每元素一组).
+    # 必须声明 INPUT_IS_LIST 才能在单次调用中拿到完整的组列表,
+    # 否则 ComfyUI 按组 map 执行, image_index/bbox_index 的二级索引语义失效.
     INPUT_IS_LIST = True
 
     @classmethod

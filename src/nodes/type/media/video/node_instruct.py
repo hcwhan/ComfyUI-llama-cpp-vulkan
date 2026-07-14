@@ -59,8 +59,8 @@ class llama_cpp_video_instruct(llama_cpp_media_instruct_base):
         parameters=None,
         queue_handler=None,
     ):
-        # 注入句与用户 system_prompt 之间加换行分隔,避免两段指令粘连成一句
-        video_hint = "请将输入的图像序列视为一段连续的视频，而不是彼此独立的静态帧。"
+        # 注入句与用户 system_prompt 之间加换行分隔, 避免两段指令粘连成一句
+        video_hint = "请将输入的图像序列视为一段连续的视频, 而不是彼此独立的静态帧."
         system_prompt = (video_hint + "\n" + system_prompt) if system_prompt.strip() else video_hint
 
         def runner(messages, user_content, seed, params, extract_text, watcher):

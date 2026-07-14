@@ -30,7 +30,7 @@ def read_u64(f):
 
 def read_string(f):
     ln = read_u64(f)
-    # BPE 模型的 tokenizer 元数据可能含非法 UTF-8 字节序列，严格解码会中断整个解析
+    # BPE 模型的 tokenizer 元数据可能含非法 UTF-8 字节序列, 严格解码会中断整个解析
     return f.read(ln).decode("utf-8", errors="replace")
 
 
@@ -45,7 +45,7 @@ def _read_scalar(f, vtype):
 
 def read_value(f):
     vtype = read_u32(f)
-    if vtype == 9:  # array (元素只能是标量,GGUF 不支持嵌套数组)
+    if vtype == 9:  # array (元素只能是标量, GGUF 不支持嵌套数组)
         atype = read_u32(f)
         count = read_u64(f)
         return [_read_scalar(f, atype) for _ in range(count)]

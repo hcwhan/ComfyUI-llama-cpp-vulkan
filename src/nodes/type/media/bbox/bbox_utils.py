@@ -15,11 +15,11 @@ from ..encoding import tensor_to_uint8
 QWEN_BBOX_MODES = ("Qwen3-VL", "Qwen2.5-VL")
 
 # Qwen2.5-VL 输出的是 mtmd smart_resize 后图像空间的绝对像素坐标(官方语义,
-# 实测 Qwen2.5-VL-3B GGUF 逐值吻合), 换算回原图需要复现 resize 尺寸。
+# 实测 Qwen2.5-VL-3B GGUF 逐值吻合), 换算回原图需要复现 resize 尺寸.
 # 三个常量对接 requirements.txt 固定 wheel 的 mtmd 默认值(经 5 组不同尺寸
 # 实测反推并完全复现): 有效 patch 28 (patch 14 x merge 2), 下限 8 token,
-# 上限 4096 token。
-# 注意 loader 的 image_min/max_tokens > 0 会改变上下限, 此时换算不再精确。
+# 上限 4096 token.
+# 注意 loader 的 image_min/max_tokens > 0 会改变上下限, 此时换算不再精确.
 _QWEN25_FACTOR = 28
 _QWEN25_MIN_PIXELS = 8 * 28 * 28
 _QWEN25_MAX_PIXELS = 4096 * 28 * 28
@@ -50,8 +50,8 @@ def qwen25_smart_resize(width, height):
     return w_bar, h_bar
 
 
-# label 常为中文(BBox 检测预设引导用户填中文类别),PIL 默认 bitmap 字体
-# 无 CJK 字形会画成占位方块,按平台常见 CJK 字体依次尝试
+# label 常为中文(BBox 检测预设引导用户填中文类别), PIL 默认 bitmap 字体
+# 无 CJK 字形会画成占位方块, 按平台常见 CJK 字体依次尝试
 _CJK_FONT_CANDIDATES = (
     "msyh.ttc",  # Windows 微软雅黑
     "simhei.ttf",  # Windows 黑体
@@ -63,7 +63,7 @@ _CJK_FONT_CANDIDATES = (
 
 @lru_cache(maxsize=8)
 def _label_font(size):
-    """按字号加载 CJK 字体,全部候选缺失时回退 PIL 默认字体(中文会显示为方块)."""
+    """按字号加载 CJK 字体, 全部候选缺失时回退 PIL 默认字体(中文会显示为方块)."""
     for name in _CJK_FONT_CANDIDATES:
         try:
             return ImageFont.truetype(name, size)
@@ -74,9 +74,9 @@ def _label_font(size):
 
 
 def bbox_label(item):
-    """取 bbox JSON 项的标签,兼容 label / text_content 两种字段.
+    """取 bbox JSON 项的标签, 兼容 label / text_content 两种字段.
 
-    LLM 可能输出数字等非字符串标签,强转 str 保证下游
+    LLM 可能输出数字等非字符串标签, 强转 str 保证下游
     _label_color(label.encode) 与 PIL draw.text 不因单个标签放弃整张图.
     """
     return str(item.get("label") or item.get("text_content") or "bbox")
@@ -99,7 +99,7 @@ def json_to_pixel_bboxes(json_items, mode, width=0, height=0):
 
     bboxes = []
     for item in json_items:
-        # LLM 输出结构不可信,显式校验并给出期望格式,避免裸 KeyError/TypeError
+        # LLM 输出结构不可信, 显式校验并给出期望格式, 避免裸 KeyError/TypeError
         if not isinstance(item, dict):
             raise ValueError(f'Expected a JSON list of objects like {{"bbox_2d": [x1, y1, x2, y2], "label": "..."}}, got item: {item!r}')
         coords = item.get("bbox_2d")
@@ -115,8 +115,8 @@ def json_to_pixel_bboxes(json_items, mode, width=0, height=0):
 
 
 def _label_color(label):
-    # 由 label 内容哈希出稳定颜色,同一 label 每次运行颜色一致;
-    # 80-180 区间保证中等亮度,白色标签文字可读
+    # 由 label 内容哈希出稳定颜色, 同一 label 每次运行颜色一致;
+    # 80-180 区间保证中等亮度, 白色标签文字可读
     digest = hashlib.md5(label.encode("utf-8")).digest()
     return tuple(80 + b % 101 for b in digest[:3])
 
@@ -125,7 +125,7 @@ def draw_bbox(image, pixel_bboxes, labels):
     img = Image.fromarray(tensor_to_uint8(image))
     draw = ImageDraw.Draw(img)
 
-    # 字号/线宽随图像尺寸缩放,高分辨率图上固定像素值会小到不可读
+    # 字号/线宽随图像尺寸缩放, 高分辨率图上固定像素值会小到不可读
     ref = min(img.size)
     font_size = max(12, ref // 40)
     line_width = max(2, ref // 250)
@@ -141,18 +141,18 @@ def draw_bbox(image, pixel_bboxes, labels):
             draw.rectangle([text_size[0], text_size[1] - 2, text_size[2] + 4, text_size[3] + 2], fill=color)
             draw.text((x0 + 2, text_y), label, fill=(255, 255, 255), font=font)
         except Exception as e:
-            # 反向坐标(x1 < x0,LLM 常见错误)或非有限值会让 PIL 抛错;
-            # 逐框跳过,与 SEGS/MASK 路径的逐框容错粒度一致,
+            # 反向坐标(x1 < x0, LLM 常见错误)或非有限值会让 PIL 抛错;
+            # 逐框跳过, 与 SEGS/MASK 路径的逐框容错粒度一致,
             # 单个坏框不放弃整张图的其余框
             logger.warning(f"[llama-cpp-vulkan] Skipping bbox that failed to draw ({label!r}: ({x0}, {y0}, {x1}, {y1})): {e}")
     return torch.from_numpy(np.array(img).astype(np.float32) / 255.0).unsqueeze(0)
 
 
 def valid_int_bbox(bbox):
-    """校验 bbox 结构并取整为 (x1, y1, x2, y2),非法时打 warning 返回 None.
+    """校验 bbox 结构并取整为 (x1, y1, x2, y2), 非法时打 warning 返回 None.
 
-    Qwen 归一化坐标换算后是浮点数,四舍五入比截断更贴近原框;
-    坐标值来自 LLM 输出,非数字时按无效项跳过.
+    Qwen 归一化坐标换算后是浮点数, 四舍五入比截断更贴近原框;
+    坐标值来自 LLM 输出, 非数字时按无效项跳过.
     """
     if not isinstance(bbox, (list, tuple)) or len(bbox) < 4:
         logger.warning(f"[llama-cpp-vulkan] Skipping invalid bbox item: {bbox}")
@@ -165,10 +165,10 @@ def valid_int_bbox(bbox):
 
 
 def feathered_rect_mask(window_h, window_w, inner_rect, feather):
-    """在 (window_h, window_w) 局部窗口内构建矩形 mask,feather > 0 时做高斯羽化.
+    """在 (window_h, window_w) 局部窗口内构建矩形 mask, feather > 0 时做高斯羽化.
 
     inner_rect 是窗口坐标系下的 (x1, y1, x2, y2).
-    在局部窗口而非全图上跑 gaussian_filter,避免每个 bbox 的羽化代价随图像尺寸增长.
+    在局部窗口而非全图上跑 gaussian_filter, 避免每个 bbox 的羽化代价随图像尺寸增长.
     """
     mask = np.zeros((window_h, window_w), dtype=np.float32)
     x1, y1, x2, y2 = inner_rect

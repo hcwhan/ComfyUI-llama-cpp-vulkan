@@ -39,7 +39,7 @@ _VRAM_LIMIT_FIELD = (
 
 
 def _is_mmproj(path):
-    # 只看文件名,避免目录名含 mmproj 时整个目录的主模型被误过滤
+    # 只看文件名, 避免目录名含 mmproj 时整个目录的主模型被误过滤
     return "mmproj" in os.path.basename(path).lower()
 
 
@@ -141,7 +141,7 @@ class llama_cpp_vlm_model_loader:
             )
         if chat_handler == "None":
             raise ValueError("vlm Model Loader requires a chat handler matching the model.")
-        # 与 handler 侧同一条件,只是提前到 loader 报错(<=0 视为未设置)
+        # 与 handler 侧同一条件, 只是提前到 loader 报错(<=0 视为未设置)
         if 0 < image_max_tokens < image_min_tokens:
             raise ValueError(f"image_max_tokens ({image_max_tokens}) cannot be less than image_min_tokens ({image_min_tokens}).")
         config = {

@@ -3,10 +3,10 @@
 import json
 import re
 
-# 开头的 ```label(标签限单词类字符,可无,如 json/python/c++;CommonMark
-# 允许标签前有空格,少数模型会输出 "``` json" 形态);结尾的 ```。
-# 两端独立匹配,生成被截断导致围栏未闭合时,开头的标记仍能剥离。
-# 标签不能用 [^\s`]* 之类的宽匹配:围栏后无换行直接跟正文时会把正文吞掉
+# 开头的 ```label(标签限单词类字符, 可无, 如 json/python/c++; CommonMark
+# 允许标签前有空格, 少数模型会输出 "``` json" 形态); 结尾的 ```.
+# 两端独立匹配, 生成被截断导致围栏未闭合时, 开头的标记仍能剥离.
+# 标签不能用 [^\s`]* 之类的宽匹配: 围栏后无换行直接跟正文时会把正文吞掉
 _FENCE_OPEN_RE = re.compile(r"^```[ \t]*[\w+.-]*[ \t]*\r?\n?")
 _FENCE_CLOSE_RE = re.compile(r"\r?\n?```$")
 # 文本中部的完整围栏块(用于 "前导说明 + 围栏块" 形态的回退提取)
@@ -63,7 +63,7 @@ def get_nested_value(data, dotted_key, default=None):
     keys = dotted_key.split(".")
     for key in keys:
         if isinstance(data, str):
-            # 嵌套的 JSON-in-string 字段:解析失败视为无法下钻,回落 default,
+            # 嵌套的 JSON-in-string 字段: 解析失败视为无法下钻, 回落 default,
             # 与 "key 不存在" 的语义一致(顶层输入的解析错误由 parse_json 报出)
             try:
                 data = json.loads(data)

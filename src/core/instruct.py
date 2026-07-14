@@ -18,7 +18,7 @@ from .prompts import instruct_presets, preset_content
 from .storage import LLAMA_CPP_STORAGE
 
 # 采样参数的统一默认值: Parameters 节点的 widget 默认值与 Instruct 未连接
-# parameters 端口时的生效值均取自此表,保证连不连默认参数节点行为一致
+# parameters 端口时的生效值均取自此表, 保证连不连默认参数节点行为一致
 # (否则未连接时会落到 wheel 库签名默认值: temperature 0.2 / top_k 40 /
 # top_p 0.95 / max_tokens 不限, 与节点默认差异明显)
 DEFAULT_SAMPLING_PARAMS = {
@@ -38,7 +38,7 @@ DEFAULT_SAMPLING_PARAMS = {
 
 _THINK_BLOCK_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
 
-# Gemma4 思考块的闭合 token (格式 <|channel>thought ... <channel|>)。
+# Gemma4 思考块的闭合 token (格式 <|channel>thought ... <channel|>).
 # E2B/E4B 在 enable_thinking=False 时仍会以纯文本思考并自行输出 <channel|>
 # 分隔符(无开标签, 实测确认), 因此不能按 "开标签...闭标签" 成对匹配,
 # 统一取最后一个 <channel|> 之后的内容
@@ -66,10 +66,10 @@ def _unwrap_answer(text):
 
 
 def strip_thinking_blocks(text):
-    """移除思考块: <think>...</think>、Gemma4 的 channel 格式、GLM-4.1V 的 <answer> 包裹.
+    """移除思考块: <think>...</think>, Gemma4 的 channel 格式, GLM-4.1V 的 <answer> 包裹.
 
     Thinking 模型的 generation prompt 通常已注入开头的 <think>,
-    此时输出只含闭合标签,需要取最后一个 </think> 之后的内容.
+    此时输出只含闭合标签, 需要取最后一个 </think> 之后的内容.
     Gemma4 同理只认闭合 token <channel|>; 未闭合(生成截断)时保持原样.
     """
     if "</think>" in text:
@@ -83,19 +83,19 @@ def strip_thinking_blocks(text):
 
 
 def is_hybrid_arch(llm):
-    """判断模型是否为 hybrid/recurrent 架构(如 Qwen3.5 的线性注意力、Mamba 类).
+    """判断模型是否为 hybrid/recurrent 架构(如 Qwen3.5 的线性注意力, Mamba 类).
 
-    纯 SWA 模型(如 Gemma3)不算:其前缀缓存由 llama-cpp-python 内置的
-    checkpoint 机制处理,无需请求后整体重置.
+    纯 SWA 模型(如 Gemma3)不算: 其前缀缓存由 llama-cpp-python 内置的
+    checkpoint 机制处理, 无需请求后整体重置.
     """
     return llm._model.is_hybrid() or llm._model.is_recurrent()
 
 
 class InterruptWatcher:
-    """推理期间轮询 ComfyUI 的中断标志,命中时触发 llama 的 abort_event.
+    """推理期间轮询 ComfyUI 的中断标志, 命中时触发 llama 的 abort_event.
 
     create_completion 在每次请求开始时会 clear abort_event,
-    因此命中后持续重复 set 而不是设置一次就退出,避免竞态丢失中断.
+    因此命中后持续重复 set 而不是设置一次就退出, 避免竞态丢失中断.
     """
 
     def __init__(self, llm, poll_interval=0.2):
@@ -130,7 +130,7 @@ class llama_cpp_instruct_base:
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("output",)
 
-    # 子类覆盖:模型端口类型(llm_model/vlm_model) / 预设模板 @@@ 占位符替换词 /
+    # 子类覆盖: 模型端口类型(llm_model/vlm_model) / 预设模板 @@@ 占位符替换词 /
     # 模态标识(按预设的 use 字段过滤下拉框名单, 列表第一项即默认预设)
     MODEL_TYPE = "LLAMACPPLLM"
     MEDIA_WORD = "图像"
@@ -140,7 +140,7 @@ class llama_cpp_instruct_base:
     # 适合 chat 模板自带默认指令的模型)
     REQUIRE_USER_TEXT = True
 
-    # ---- INPUT_TYPES 字段组装块(子类按需拼接,顺序由子类的声明决定) ----
+    # ---- INPUT_TYPES 字段组装块(子类按需拼接, 顺序由子类的声明决定) ----
 
     @classmethod
     def prompt_inputs(cls):
@@ -152,10 +152,10 @@ class llama_cpp_instruct_base:
                 {
                     "default": "",
                     "multiline": True,
-                    "placeholder": "用户提示词\n\n预设含占位符时(如 BBox 检测的目标类别、待改写的提示词), 此内容用于填充占位符\n否则, 此内容会整体覆盖预设提示词.",
+                    "placeholder": "用户提示词\n\n预设含占位符时(如 BBox 检测的目标类别, 待改写的提示词), 此内容用于填充占位符\n否则, 此内容会整体覆盖预设提示词.",
                 },
             ),
-            "system_prompt": ("STRING", {"default": "", "multiline": True, "placeholder": "系统提示词\n\n用于设置模型的人设。"}),
+            "system_prompt": ("STRING", {"default": "", "multiline": True, "placeholder": "系统提示词\n\n用于设置模型的人设."}),
         }
 
     @classmethod
@@ -187,9 +187,9 @@ class llama_cpp_instruct_base:
     # ---- 执行核心 ----
 
     def _prepare_messages(self, llama_model, system_prompt):
-        """确保目标模型已加载,并构建本次请求的初始消息列表(无跨执行状态).
+        """确保目标模型已加载, 并构建本次请求的初始消息列表(无跨执行状态).
 
-        多组 loader+instruct 交错执行时,全局单例可能已被切换成其他模型,
+        多组 loader+instruct 交错执行时, 全局单例可能已被切换成其他模型,
         因此按 current_config 比对后按需(重新)加载.
         """
         if not LLAMA_CPP_STORAGE.llm or LLAMA_CPP_STORAGE.current_config != llama_model:
@@ -204,9 +204,9 @@ class llama_cpp_instruct_base:
         """构建 user 消息的文本内容项(模板取自 user_prompt_presets).
 
         覆盖/填充按模板内容判定:
-        - 模板含 "###":custom_prompt 是填充物(必填),替换 "###" 占位符
-        - 模板不含 "###":非空 custom_prompt 整体覆盖预设,为空则用模板原文
-        预设名的 "(需custom_prompt)" 标注仅为 UI 提示,不参与判定.
+        - 模板含 "###": custom_prompt 是填充物(必填), 替换 "###" 占位符
+        - 模板不含 "###": 非空 custom_prompt 整体覆盖预设, 为空则用模板原文
+        预设名的 "(需custom_prompt)" 标注仅为 UI 提示, 不参与判定.
         """
         template = preset_content(preset_prompt)
         if "###" not in template:
@@ -216,7 +216,7 @@ class llama_cpp_instruct_base:
             raise ValueError(
                 f'Preset "{preset_prompt}" requires custom_prompt to fill its placeholder (e.g. object categories for BBox detection, or the prompt to rewrite).'
             )
-        # 先替换 @@@ 再注入用户文本,避免 custom_prompt 中的 @@@ 被误替换
+        # 先替换 @@@ 再注入用户文本, 避免 custom_prompt 中的 @@@ 被误替换
         p = template.replace("@@@", self.MEDIA_WORD).replace("###", custom_prompt.strip())
         return {"type": "text", "text": p}
 
@@ -224,19 +224,19 @@ class llama_cpp_instruct_base:
         def extract_text(output):
             # ": " 前缀剥离针对 Vicuna/LLaVA 风格模板(生成提示以 "ASSISTANT:" 收尾,
             # 如 Llava15ChatHandler 与部分 GGUF 内嵌模板): 部分模型会把冒号连同空格
-            # 再输出一遍。正文本身以 ": " 开头的场景极罕见, 误剥按可接受代价处理
+            # 再输出一遍. 正文本身以 ": " 开头的场景极罕见, 误剥按可接受代价处理
             text = output["choices"][0]["message"]["content"].removeprefix(": ").lstrip()
             return strip_thinking_blocks(text) if strip_thinking else text
 
         return extract_text
 
     def _single_completion(self, messages, user_content, seed, params, extract_text):
-        """把 user_content 作为单条 user 消息发起一次补全,返回生成文本.
+        """把 user_content 作为单条 user 消息发起一次补全, 返回生成文本.
 
-        content 只含单个 text 项时扁平化为纯字符串:无 chat handler 的纯文本路径
-        由 GGUF 内嵌 chat template 渲染消息,旧式模板(ChatML/Llama-3/Mistral 等)
-        假定 content 是字符串,收到 content-part 列表会报错或渲染出 Python repr.
-        媒体路径的 content 必然追加了媒体项(长度 > 1),不受影响.
+        content 只含单个 text 项时扁平化为纯字符串: 无 chat handler 的纯文本路径
+        由 GGUF 内嵌 chat template 渲染消息, 旧式模板(ChatML/Llama-3/Mistral 等)
+        假定 content 是字符串, 收到 content-part 列表会报错或渲染出 Python repr.
+        媒体路径的 content 必然追加了媒体项(长度 > 1), 不受影响.
         """
         if len(user_content) == 1 and user_content[0].get("type") == "text":
             user_content = user_content[0]["text"]
@@ -245,10 +245,10 @@ class llama_cpp_instruct_base:
         return extract_text(output)
 
     def _run(self, llama_model, preset_prompt, custom_prompt, system_prompt, seed, force_offload, strip_thinking, parameters, runner):
-        """通用执行骨架:组消息 -> 中断监视下执行 runner -> 收尾清理.
+        """通用执行骨架: 组消息 -> 中断监视下执行 runner -> 收尾清理.
 
         runner(messages, user_content, seed, params, extract_text, watcher)
-        由子类提供,返回输出文本(image 逐张模式为按分隔行拼接的整段文本,
+        由子类提供, 返回输出文本(image 逐张模式为按分隔行拼接的整段文本,
         下游可用 Split Instruct Output 节点或 JSON to BBoxes 的内建拆分还原).
         """
         # 先做零成本的 prompt 校验(占位符预设缺 custom_prompt 时直接 ValueError),
@@ -258,25 +258,25 @@ class llama_cpp_instruct_base:
             raise ValueError("User prompt is empty: select a non-blank preset_prompt or fill custom_prompt.")
         messages = self._prepare_messages(llama_model, system_prompt)
         # 合并生成新 dict 兼作防御性复制(parameters 是 ComfyUI 缓存的共享 dict,
-        # 防止 runner 修改时污染);未连接 parameters 端口时整体落到统一默认值
+        # 防止 runner 修改时污染); 未连接 parameters 端口时整体落到统一默认值
         params = {**DEFAULT_SAMPLING_PARAMS, **(parameters or {})}
         extract_text = self._make_extract(strip_thinking)
 
         # 监视线程让长时间生成也能响应 ComfyUI 的取消操作;
-        # 收尾放 finally:中断/异常路径同样需要 force_offload 释放显存与 hybrid 重置
+        # 收尾放 finally: 中断/异常路径同样需要 force_offload 释放显存与 hybrid 重置
         try:
             with InterruptWatcher(LLAMA_CPP_STORAGE.llm) as watcher:
                 out = runner(messages, user_content, seed, params, extract_text, watcher)
             if watcher.interrupted:
-                # abort_event 使生成提前返回了截断结果,丢弃并走标准中断流程
+                # abort_event 使生成提前返回了截断结果, 丢弃并走标准中断流程
                 raise mm.InterruptProcessingException()
         finally:
             if force_offload:
                 LLAMA_CPP_STORAGE.clean()
             elif LLAMA_CPP_STORAGE.llm is not None and is_hybrid_arch(LLAMA_CPP_STORAGE.llm):
-                # 真 hybrid/recurrent 架构(Qwen3.5、LFM2 系等)的线性注意力状态无法
-                # 跨请求做前缀复用,不重置会导致后续请求输出错乱;按架构判断而非
-                # handler 名单,避免每加一个 hybrid 模型都要维护名单
+                # 真 hybrid/recurrent 架构(Qwen3.5, LFM2 系等)的线性注意力状态无法
+                # 跨请求做前缀复用, 不重置会导致后续请求输出错乱; 按架构判断而非
+                # handler 名单, 避免每加一个 hybrid 模型都要维护名单
                 llm = LLAMA_CPP_STORAGE.llm
                 llm.n_tokens = 0
                 llm._ctx.memory_clear(True)

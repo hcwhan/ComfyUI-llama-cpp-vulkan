@@ -1,8 +1,8 @@
 """src/core/instruct.py 执行骨架的单元测试: InterruptWatcher 中断链路与 _run 收尾分支.
 
-覆盖: watcher 命中后置位并持续 abort、无中断时干净收线; _run 的 finally
-收尾 (force_offload 卸载、hybrid 三件套重置、中断丢弃截断结果抛
-InterruptProcessingException、runner 异常时收尾仍执行).
+覆盖: watcher 命中后置位并持续 abort, 无中断时干净收线; _run 的 finally
+收尾 (force_offload 卸载, hybrid 三件套重置, 中断丢弃截断结果抛
+InterruptProcessingException, runner 异常时收尾仍执行).
 """
 
 import time

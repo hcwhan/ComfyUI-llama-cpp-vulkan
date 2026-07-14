@@ -11,14 +11,14 @@ import llama_cpp.llama_multimodal as _handler_module
 
 from ..shared.logger import logger
 
-# 显示名 -> (类名, 构造 kwargs)。kwargs 为构造 handler 时固定注入的参数
-# (thinking 开关、Generic 的 chat_format 等), None 表示不注入任何参数;
-# 每个 key 必须被该类 __init__ 显式接受(基类对未知 kwargs 抛 TypeError)。
+# 显示名 -> (类名, 构造 kwargs). kwargs 为构造 handler 时固定注入的参数
+# (thinking 开关, Generic 的 chat_format 等), None 表示不注入任何参数;
+# 每个 key 必须被该类 __init__ 显式接受(基类对未知 kwargs 抛 TypeError).
 # 带 "-Thinking" 后缀的显示名与基名共享同一个类, 仅 thinking 值不同,
-# 后缀与开关值的一致性由 tests/test_handlers.py 契约测试锁定。
+# 后缀与开关值的一致性由 tests/test_handlers.py 契约测试锁定.
 # dict 声明顺序即 UI 下拉框顺序(首项为默认选项), 排序约定: 同家族聚组,
 # 家族内新版本在上, -Thinking 变体紧随普通版之下; 常用家族在前,
-# OCR/文档专用类居中, 早期模型在后, Generic-MTMD 兜底收尾。
+# OCR/文档专用类居中, 早期模型在后, Generic-MTMD 兜底收尾.
 _HANDLER_SPECS = {
     # ---- Qwen ----
     # Qwen3.6 与 Qwen3.5 共用 handler (wheel 明确该类同时服务两者)
@@ -69,8 +69,8 @@ _HANDLER_SPECS = {
     "Obsidian": ("ObsidianChatHandler", None),
     # ---- 兜底 ----
     # 渲染 GGUF 内置 chat template 并归一化媒体占位符,
-    # 适配上表没有专用 handler 的 VLM;需要特殊 stop token/生成参数的
-    # 模型仍应优先用专用 handler。chat_format=None 表示沿用模型内置模板
+    # 适配上表没有专用 handler 的 VLM; 需要特殊 stop token/生成参数的
+    # 模型仍应优先用专用 handler. chat_format=None 表示沿用模型内置模板
     "Generic-MTMD": ("GenericMTMDChatHandler", {"chat_format": None}),
 }
 

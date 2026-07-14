@@ -24,7 +24,7 @@ def tensor_to_uint8(image: torch.Tensor):
 
 
 def image2base64(image):
-    # PNG 无损：JPEG q85 的压缩伪影会影响 OCR 类模型的小字识别，
+    # PNG 无损: JPEG q85 的压缩伪影会影响 OCR 类模型的小字识别,
     # 且 JPEG 不支持 RGBA 输入
     img = Image.fromarray(image)
     buffered = io.BytesIO()
@@ -46,8 +46,8 @@ def _encode_wav_base64(pcm_bytes, sample_rate):
 def audio2base64(audio):
     """ComfyUI AUDIO dict ({"waveform": [B,C,T], "sample_rate": int}) 转 WAV base64.
 
-    只负责打包成 16-bit PCM WAV;重采样和声道适配由 llama.cpp 的 mtmd
-    解码端完成,多声道先均值混为单声道以减小 base64 载荷.
+    只负责打包成 16-bit PCM WAV; 重采样和声道适配由 llama.cpp 的 mtmd
+    解码端完成, 多声道先均值混为单声道以减小 base64 载荷.
     """
     waveform = audio["waveform"]
     if waveform.ndim == 3:
@@ -69,7 +69,7 @@ def scale_image(image: torch.Tensor, max_size: int):
         return arr
 
     scale = max_size / max(w, h)
-    # 极端长宽比下缩放结果可能取整为 0，至少保留 1 像素
+    # 极端长宽比下缩放结果可能取整为 0, 至少保留 1 像素
     new_w, new_h = max(1, int(w * scale)), max(1, int(h * scale))
     img_resized = Image.fromarray(arr).resize((new_w, new_h), Image.Resampling.LANCZOS)
 

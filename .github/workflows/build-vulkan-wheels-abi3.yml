@@ -24,9 +24,9 @@ env:
   ABI3_MIN_CPYTHON: "cp310"
 
 jobs:
-  # ────────────────────────────────────────────────────────────────
+  # ----------------------------------------------------------------
   #  Windows build (single universal wheel)
-  # ────────────────────────────────────────────────────────────────
+  # ----------------------------------------------------------------
   build_windows:
     name: Build Vulkan wheel (Windows abi3)
     runs-on: windows-2022
@@ -129,9 +129,9 @@ jobs:
           path: ./dist/*.whl
           compression-level: 0
 
-  # ────────────────────────────────────────────────────────────────
+  # ----------------------------------------------------------------
   #  Linux build (single universal wheel via cibuildwheel)
-  # ────────────────────────────────────────────────────────────────
+  # ----------------------------------------------------------------
   build_linux:
     name: Build Vulkan wheel (Linux abi3)
     runs-on: ubuntu-22.04
@@ -211,9 +211,9 @@ jobs:
           path: ./wheelhouse/*.whl
           compression-level: 0
 
-  # ────────────────────────────────────────────────────────────────
+  # ----------------------------------------------------------------
   #  Release (collects all wheels)
-  # ────────────────────────────────────────────────────────────────
+  # ----------------------------------------------------------------
   release:
     name: Create Release
     needs: [build_windows, build_linux]
@@ -255,7 +255,7 @@ jobs:
           name: "llama-cpp-python v${{ env.TAG_VERSION }} Vulkan (ABI3)"
           body: |
             Pre-built `llama-cpp-python` wheels with **Vulkan** GPU backend.
-            **ABI3 universal build** — one wheel per platform, compatible with CPython 3.10+.
+            **ABI3 universal build** - one wheel per platform, compatible with CPython 3.10+.
 
             Source: [JamePeng/llama-cpp-python](https://github.com/JamePeng/llama-cpp-python) @ `${{ inputs.jamepeng_ref }}`
 

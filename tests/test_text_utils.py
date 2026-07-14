@@ -44,7 +44,7 @@ class TestStripCodeFence(unittest.TestCase):
         self.assertEqual(strip_code_fence(text), '{"a": 1}')
 
     def test_leading_prose_ignores_trailing_prose(self):
-        text = '说明:\n```json\n{"a": 1}\n```\n以上就是结果。'
+        text = '说明:\n```json\n{"a": 1}\n```\n以上就是结果.'
         self.assertEqual(strip_code_fence(text), '{"a": 1}')
 
     def test_leading_prose_takes_first_of_multiple_blocks(self):

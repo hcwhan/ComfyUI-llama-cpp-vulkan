@@ -40,12 +40,12 @@ class parse_json_node:
         if not key.strip():
             raise ValueError("Key cannot be empty!")
 
-        # parse_json 统一顶层报错(含代码围栏剥离),嵌套字符串由 get_nested_value 容错
+        # parse_json 统一顶层报错(含代码围栏剥离), 嵌套字符串由 get_nested_value 容错
         val = get_nested_value(parse_json(input), key, default)
 
-        # 转换失败时回退类型零值,保证输出与声明的 INT/FLOAT 类型一致,
-        # 不能把原始值(可能是 str/dict)透传给下游节点。
-        # int 不经 float 中转:超过 2^53 的大整数(如雪花 ID)会在 float 中丢精度。
+        # 转换失败时回退类型零值, 保证输出与声明的 INT/FLOAT 类型一致,
+        # 不能把原始值(可能是 str/dict)透传给下游节点.
+        # int 不经 float 中转: 超过 2^53 的大整数(如雪花 ID)会在 float 中丢精度.
         # OverflowError: json.loads 接受 Infinity 字面量返回 float('inf')
         try:
             integer = int(val)
@@ -62,13 +62,13 @@ class parse_json_node:
         if isinstance(val, bool):
             boolean = val
         elif isinstance(val, (int, float)):
-            # 数字按非零判定,对齐常见 truthy 直觉(JSON 中 1/0 常当布尔用)
+            # 数字按非零判定, 对齐常见 truthy 直觉(JSON 中 1/0 常当布尔用)
             boolean = val != 0
         else:
             boolean = str(val).strip().lower() == "true"
 
-        # dict/list 输出合法 JSON 文本而非 Python repr,下游可再接 Parse JSON;
-        # key 未命中且未连 default 时 val 为 None,string 输出回退空串,
+        # dict/list 输出合法 JSON 文本而非 Python repr, 下游可再接 Parse JSON;
+        # key 未命中且未连 default 时 val 为 None, string 输出回退空串,
         # 避免字面 "None" 被下游当作有效文本拼进 prompt
         if isinstance(val, (dict, list)):
             string = json.dumps(val, ensure_ascii=False)
