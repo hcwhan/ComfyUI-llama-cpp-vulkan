@@ -144,7 +144,7 @@ class TestQwen25ModeConversion(unittest.TestCase):
         items = [{"bbox_2d": [1534, 769, 1789, 1025], "label": "红色方块"}]
         (box,) = json_to_pixel_bboxes(items, "Qwen2.5-VL", width=3200, height=2400)
         expected = (2400, 1200, 2800, 1600)
-        for got, want in zip(box, expected):
+        for got, want in zip(box, expected, strict=True):
             self.assertAlmostEqual(got, want, delta=5)
 
     def test_identity_scale_below_cap(self):
@@ -152,7 +152,7 @@ class TestQwen25ModeConversion(unittest.TestCase):
         items = [{"bbox_2d": [609, 294, 711, 392]}]
         (box,) = json_to_pixel_bboxes(items, "Qwen2.5-VL", width=800, height=600)
         expected = (600, 300, 700, 400)
-        for got, want in zip(box, expected):
+        for got, want in zip(box, expected, strict=True):
             self.assertAlmostEqual(got, want, delta=1)
 
 

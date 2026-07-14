@@ -7,6 +7,7 @@
 模态专属字段), 把媒体内容注入 user_content, 选择执行路径.
 """
 
+import contextlib
 import re
 import threading
 
@@ -108,10 +109,8 @@ class InterruptWatcher:
         while not self._stop.wait(self.poll_interval):
             if mm.processing_interrupted():
                 self.interrupted = True
-                try:
+                with contextlib.suppress(Exception):
                     self.llm.abort()
-                except Exception:
-                    pass
 
     def __enter__(self):
         self._thread = threading.Thread(target=self._watch, daemon=True)

@@ -55,7 +55,7 @@ def parse_json(json_str):
     try:
         parsed = json.loads(strip_code_fence(json_str))
     except Exception as e:
-        raise ValueError(f"Unable to load JSON data!\n{e}")
+        raise ValueError(f"Unable to load JSON data!\n{e}") from e
     return parsed
 
 

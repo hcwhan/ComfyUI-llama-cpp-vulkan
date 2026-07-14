@@ -30,11 +30,13 @@ class _AbortRecorder:
 class TestInterruptWatcher(unittest.TestCase):
     def test_interrupt_sets_flag_and_aborts(self):
         llm = _AbortRecorder()
-        with mock.patch.object(instruct.mm, "processing_interrupted", lambda: True):
-            with InterruptWatcher(llm, poll_interval=0.01) as watcher:
-                deadline = time.time() + 2.0
-                while not watcher.interrupted and time.time() < deadline:
-                    time.sleep(0.005)
+        with (
+            mock.patch.object(instruct.mm, "processing_interrupted", lambda: True),
+            InterruptWatcher(llm, poll_interval=0.01) as watcher,
+        ):
+            deadline = time.time() + 2.0
+            while not watcher.interrupted and time.time() < deadline:
+                time.sleep(0.005)
         self.assertTrue(watcher.interrupted)
         self.assertGreaterEqual(llm.abort_calls, 1)
         self.assertFalse(watcher._thread.is_alive())
@@ -42,11 +44,13 @@ class TestInterruptWatcher(unittest.TestCase):
     def test_hit_keeps_re_aborting_against_clear_race(self):
         # 命中后持续重复 set: 对抗 create_completion 每次请求开始 clear abort_event
         llm = _AbortRecorder()
-        with mock.patch.object(instruct.mm, "processing_interrupted", lambda: True):
-            with InterruptWatcher(llm, poll_interval=0.01) as watcher:
-                deadline = time.time() + 2.0
-                while llm.abort_calls < 3 and time.time() < deadline:
-                    time.sleep(0.005)
+        with (
+            mock.patch.object(instruct.mm, "processing_interrupted", lambda: True),
+            InterruptWatcher(llm, poll_interval=0.01) as watcher,
+        ):
+            deadline = time.time() + 2.0
+            while llm.abort_calls < 3 and time.time() < deadline:
+                time.sleep(0.005)
         self.assertGreaterEqual(llm.abort_calls, 3)
         self.assertTrue(watcher.interrupted)
 

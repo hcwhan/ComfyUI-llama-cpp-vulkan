@@ -131,7 +131,8 @@ def draw_bbox(image, pixel_bboxes, labels):
     line_width = max(2, ref // 250)
     font = _label_font(font_size)
 
-    for (x0, y0, x1, y1), label in zip(pixel_bboxes, labels):
+    # 两者均由调用方从同一 items 列表逐项生成, 长度恒等, strict 仅作断言
+    for (x0, y0, x1, y1), label in zip(pixel_bboxes, labels, strict=True):
         color = _label_color(label)
         try:
             draw.rectangle((x0, y0, x1, y1), outline=color, width=line_width)

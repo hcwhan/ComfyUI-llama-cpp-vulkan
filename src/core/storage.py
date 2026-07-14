@@ -66,7 +66,7 @@ def _estimate_per_layer_bytes(model_path, n_ctx):
     layers = _as_number(meta.get("block_count")) or 32
     size = os.path.getsize(model_path)
     kv_bytes = _estimate_kv_bytes(meta, layers, n_ctx)
-    if kv_bytes is None:
+    if kv_bytes is None:  # noqa: SIM108 -- 回退分支的注释与两个公式的对照价值高于三元式的紧凑
         # 元数据不全时回退按体积折算的经验系数
         total = size * _vram_factor(n_ctx)
     else:
@@ -244,7 +244,7 @@ class LLAMA_CPP_STORAGE:
                     f"{e}\nChatHandler initialization failed. "
                     "Check that the mmproj file matches the selected chat_handler, "
                     "and that dependencies were installed from requirements.txt (pinned Vulkan wheel)."
-                )
+                ) from e
         else:
             cls.chat_handler = None
 

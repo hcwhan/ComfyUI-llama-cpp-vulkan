@@ -81,9 +81,8 @@ class json_to_bboxes:
         # 拆平为 [1,H,W,C] 单帧列表,记录每个输入元素的批次大小以便还原结构
         flat_images = []
         batch_sizes = []
-        for img_batch in image or []:
-            if img_batch.ndim == 3:
-                img_batch = img_batch.unsqueeze(0)
+        for img_item in image or []:
+            img_batch = img_item.unsqueeze(0) if img_item.ndim == 3 else img_item
             batch_sizes.append(img_batch.shape[0])
             flat_images.extend(img_batch[n : n + 1] for n in range(img_batch.shape[0]))
 

@@ -12,10 +12,7 @@ from tests import comfy_stubs
 
 comfy_stubs.install()
 
-from llama_cpp import (
-    Llama,  # noqa: E402
-    _internals,  # noqa: E402
-)
+from llama_cpp import Llama, _internals  # noqa: E402
 
 from src.core.instruct import DEFAULT_SAMPLING_PARAMS  # noqa: E402
 

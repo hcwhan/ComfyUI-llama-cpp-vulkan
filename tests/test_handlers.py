@@ -61,7 +61,7 @@ class TestHandlerSpecs(unittest.TestCase):
     def test_thinking_suffix_matches_value(self):
         # -Thinking 后缀 <=> thinking 开关值为 True (类不接受开关的条目豁免,
         # 如 GLM-4.1V-Thinking 的后缀仅描述模型本身)
-        for label, (cls_name, kwargs) in _HANDLER_SPECS.items():
+        for label, (_cls_name, kwargs) in _HANDLER_SPECS.items():
             declared = [p for p in _THINK_PARAM_NAMES if p in (kwargs or {})]
             if not declared:
                 continue
