@@ -24,8 +24,7 @@ def tensor_to_uint8(image: torch.Tensor):
 
 
 def image2base64(image):
-    # PNG 无损: JPEG q85 的压缩伪影会影响 OCR 类模型的小字识别,
-    # 且 JPEG 不支持 RGBA 输入
+    # PNG 无损: JPEG q85 的压缩伪影会影响 OCR 类模型的小字识别, 且 JPEG 不支持 RGBA 输入
     img = Image.fromarray(image)
     buffered = io.BytesIO()
     img.save(buffered, format="PNG")
