@@ -30,6 +30,16 @@ class TestResolveConfig(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Unknown chat handler"):
             storage.resolve_config(_config(mmproj="m.gguf", chat_handler="No-Such-Handler"))
 
+    def test_registered_but_unavailable_handler_raises(self):
+        # 注册表声明过但 wheel 缺类的 handler (HANDLERS 缺项抛 KeyError):
+        # 报错应指向 "本构建不可用" 而非 "名字未知"
+        with (
+            mock.patch.object(storage, "handler_constructor", side_effect=KeyError),
+            mock.patch.object(storage, "is_registered", return_value=True),
+            self.assertRaisesRegex(ValueError, "unavailable in this llama-cpp-python build"),
+        ):
+            storage.resolve_config(_config(mmproj="m.gguf", chat_handler="Qwen3-VL"))
+
     def test_mmproj_without_handler_raises(self):
         with self.assertRaisesRegex(ValueError, "chat handler"):
             storage.resolve_config(_config(mmproj="m.gguf", chat_handler="None"))

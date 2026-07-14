@@ -11,7 +11,7 @@ from llama_cpp import Llama
 from ..shared.logger import logger
 from .devices import AUTO_LABEL, log_backend_summary, resolve_device_selection
 from .gguf_layers import get_model_meta
-from .handlers import handler_constructor
+from .handlers import handler_constructor, is_registered
 from .model_paths import get_llm_full_path
 
 # GGUF 文件体积 -> 运行时显存占用的经验放大系数, 按 n_ctx=8192 校准拆成两项:
@@ -138,9 +138,16 @@ def resolve_config(config):
     if chat_handler == "None":
         handler_cls = None
     else:
+        thinking = config["thinking"]
         try:
-            handler_cls = handler_constructor(chat_handler, config["thinking"])
+            handler_cls = handler_constructor(chat_handler, thinking)
         except KeyError:
+            # 注册过但本构建缺类的 handler 已在启动日志给出 warning,
+            # 此处区分两种失配, 避免把 wheel 缺类误报为名字未知
+            if is_registered(chat_handler):
+                raise ValueError(
+                    f'Chat handler "{chat_handler}" is unavailable in this llama-cpp-python build (see startup warnings).'
+                ) from None
             raise ValueError(f'Unknown chat handler: "{chat_handler}"') from None
 
     mmproj_path = None

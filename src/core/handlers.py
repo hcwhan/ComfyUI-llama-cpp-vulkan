@@ -110,6 +110,14 @@ def clamp_thinking(label, thinking):
     return thinking
 
 
+def is_registered(label):
+    """label 是否在注册表中声明; 与 HANDLERS 的差集即本构建缺类的 handler.
+
+    供 resolve_config 区分 "未知名字" 与 "注册过但 wheel 缺类" 两种报错.
+    """
+    return label in _HANDLER_SPECS
+
+
 def handler_constructor(label, thinking):
     """返回按三态绑定 thinking 后的 handler 构造器 (label 未知时抛 KeyError).
 
