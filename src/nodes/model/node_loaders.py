@@ -23,8 +23,16 @@ _GPU_DEVICE_FIELD = (
     },
 )
 
-# TODO
-_N_CTX_FIELD = ("INT", {"default": 8192, "min": 1024, "max": 327680, "step": 128, "tooltip": "上下文长度上限."})
+_CTX_SIZE_FIELD = (
+    "INT",
+    {
+        "default": 8192,
+        "min": 1024,
+        "max": 327680,
+        "step": 128,
+        "tooltip": "上下文长度上限, 即 llama.cpp 的 n_ctx.\n请求的 prompt + 生成 token 总量受此约束.",
+    },
+)
 
 _VRAM_LIMIT_FIELD = (
     "INT",
@@ -65,7 +73,7 @@ class llama_cpp_llm_model_loader:
                 "gpu_device": _GPU_DEVICE_FIELD,
                 "model": (_model_list(),),
                 # TODO 是否开启思考
-                "n_ctx": _N_CTX_FIELD,
+                "ctx_size": _CTX_SIZE_FIELD,
                 "vram_limit": _VRAM_LIMIT_FIELD,
             }
         }
@@ -73,7 +81,7 @@ class llama_cpp_llm_model_loader:
     RETURN_TYPES = ("LLAMACPPLLM",)
     RETURN_NAMES = ("llm_model",)
 
-    def loadmodel(self, gpu_device, model, n_ctx, vram_limit):
+    def loadmodel(self, gpu_device, model, ctx_size, vram_limit):
         if model == "None":
             raise ValueError("Please select a gguf model.")
         config = {
@@ -81,7 +89,7 @@ class llama_cpp_llm_model_loader:
             "model": model,
             "mmproj": "None",
             "chat_handler": "None",
-            "n_ctx": n_ctx,
+            "n_ctx": ctx_size,
             "vram_limit": vram_limit,
             "image_min_tokens": 0,
             "image_max_tokens": 0,
@@ -104,7 +112,7 @@ class llama_cpp_vlm_model_loader:
                 # "None" 占位在首位作为默认值, 强制用户显式选择匹配的 handler
                 # (loadmodel 做非空校验), 避免默认首个 handler 被误用于不匹配的模型
                 "chat_handler": (["None"] + list(HANDLERS),),
-                "n_ctx": _N_CTX_FIELD,
+                "ctx_size": _CTX_SIZE_FIELD,
                 "vram_limit": _VRAM_LIMIT_FIELD,
                 "image_min_tokens": (
                     "INT",
@@ -132,7 +140,7 @@ class llama_cpp_vlm_model_loader:
     RETURN_TYPES = ("LLAMACPPVLM",)
     RETURN_NAMES = ("vlm_model",)
 
-    def loadmodel(self, gpu_device, model, mmproj, chat_handler, n_ctx, vram_limit, image_min_tokens, image_max_tokens):
+    def loadmodel(self, gpu_device, model, mmproj, chat_handler, ctx_size, vram_limit, image_min_tokens, image_max_tokens):
         if model == "None":
             raise ValueError("Please select a gguf model.")
         if mmproj == "None":
@@ -149,7 +157,7 @@ class llama_cpp_vlm_model_loader:
             "model": model,
             "mmproj": mmproj,
             "chat_handler": chat_handler,
-            "n_ctx": n_ctx,
+            "n_ctx": ctx_size,
             "vram_limit": vram_limit,
             "image_min_tokens": image_min_tokens,
             "image_max_tokens": image_max_tokens,
