@@ -113,7 +113,7 @@ class llama_cpp_vlm_model_loader:
                         "min": 0,
                         "max": 4096,
                         "step": 32,
-                        "tooltip": "mmproj 视觉编码的最小 token 数.\n0 = 使用模型默认 (<=0 视为未设置).\n修改后 Qwen2.5-VL 的 bbox 坐标换算会有偏差.",
+                        "tooltip": "mmproj 视觉编码的最小 token 数.\n0 = 使用模型默认 (<=0 视为未设置).\n仅对图像/视频输入生效, 音频不受影响.\n修改后 Qwen2.5-VL 的 bbox 坐标换算会有偏差.",
                     },
                 ),
                 "image_max_tokens": (
@@ -123,7 +123,7 @@ class llama_cpp_vlm_model_loader:
                         "min": 0,
                         "max": 4096,
                         "step": 32,
-                        "tooltip": "mmproj 视觉编码的最大 token 数, 可限制高分辨率图片的显存与耗时.\n0 = 使用模型默认 (<=0 视为未设置).\n修改后 Qwen2.5-VL 的 bbox 坐标换算会有偏差.",
+                        "tooltip": "mmproj 视觉编码的最大 token 数, 可限制高分辨率图片的显存与耗时.\n0 = 使用模型默认 (<=0 视为未设置).\n仅对图像/视频输入生效, 音频不受影响.\n修改后 Qwen2.5-VL 的 bbox 坐标换算会有偏差.",
                     },
                 ),
             }
