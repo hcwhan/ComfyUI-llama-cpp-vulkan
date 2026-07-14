@@ -180,7 +180,7 @@ class llama_cpp_instruct_base:
         # force_offload 是执行结束后的收尾动作, 垫底; 输出后处理 (strip_thinking) 靠前
         return {
             "strip_thinking": ("BOOLEAN", {"default": True, "tooltip": "移除输出中的思考/推理块\n(适用于 Thinking 模型)"}),
-            "force_offload": ("BOOLEAN", {"default": False, "tooltip": "推理结束后立即卸载模型, 释放显存."}),
+            "force_offload": ("BOOLEAN", {"default": True, "tooltip": "推理结束后立即卸载模型, 释放显存."}),
         }
 
     @classmethod
