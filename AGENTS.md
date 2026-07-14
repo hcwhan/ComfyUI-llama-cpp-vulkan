@@ -162,6 +162,10 @@ image 逐张模式的多图结果以 "====== Image N ======" 分隔行拼接
 - 本文件只记录无法从代码直接看出的内容: 架构决策, 跨文件约束, 易踩的坑. 一般性内容(如"在某个 dict 加一行"式的操作步骤, 读代码即可自然得出的说明)不要写入本文件
 - 根目录 `复核结论.md` 是复核结论存档, 用于避免重复排查或重新争论. 只收录两类条目: 项目外事实与跨边界对接结论(经明确源码分析确立, 对照 wheel / ComfyUI / llama.cpp 上游 / 下游生态实际源码核实), 设计决策/权衡存档; 项目内代码行为不在其中复述, 以代码与注释本身为准. 写入前需与用户确认
 
+### 提交前检查
+
+- 每次 git commit 前必须先修复全部 ruff 问题: 依次运行 `python -m ruff check src tests --fix` 与 `python -m ruff format src tests`(用 ComfyUI 嵌入式 Python, 即 `python_embeded/python.exe`), 两者均无报告后再提交
+
 ### Commit message 规范
 
 - 一律使用中文书写(标题与正文), 保留 conventional commits 类型前缀(`feat:` / `fix:` / `refactor:` / `docs:` / `chore:` / `ci:` / `test:`, 破坏性变更加 `!`)
