@@ -11,7 +11,7 @@
 import os
 
 from ...core.devices import AUTO_LABEL, gpu_device_choices
-from ...core.handlers import HANDLERS
+from ...core.handlers import HANDLERS, clamp_thinking, thinking_modes
 from ...core.model_paths import get_llm_filename_list
 from ...core.storage import resolve_config
 
@@ -88,6 +88,7 @@ class llama_cpp_llm_model_loader:
             "model": model,
             "mmproj": "None",
             "chat_handler": "None",
+            "thinking": False,
             "n_ctx": ctx_size,
             "vram_limit": vram_limit,
             "image_min_tokens": 0,
@@ -109,8 +110,17 @@ class llama_cpp_vlm_model_loader:
                 "model": (_model_list(),),
                 "mmproj": (_mmproj_list(),),
                 # "None" 占位在首位作为默认值, 强制用户显式选择匹配的 handler
-                # (loadmodel 做非空校验), 避免默认首个 handler 被误用于不匹配的模型
-                "chat_handler": (["None"] + list(HANDLERS),),
+                # (loadmodel 做非空校验), 避免默认首个 handler 被误用于不匹配的模型.
+                # thinking_modes 是自定义 key, 经 /object_info 原样透传给前端 JS
+                # 做 thinking 开关的三态置灰(与注册表单一真源)
+                "chat_handler": (["None"] + list(HANDLERS), {"thinking_modes": thinking_modes()}),
+                "thinking": (
+                    "BOOLEAN",
+                    {
+                        "default": False,
+                        "tooltip": "开启模型的思考(reasoning)模式.\n构造期模板级开关: 切换后下次执行会整体重新加载模型.\n仅对支持切换的 handler 生效: 不支持思考的强制为关,\nGLM-4.1V 等纯思考模型强制为开.\nGemma4 E2B/E4B 关闭后仍会以纯文本形式思考,\n残留思考内容由 Instruct 的 strip_thinking 剥离.",
+                    },
+                ),
                 "ctx_size": _CTX_SIZE_FIELD,
                 "vram_limit": _VRAM_LIMIT_FIELD,
                 "image_min_tokens": (
@@ -139,7 +149,7 @@ class llama_cpp_vlm_model_loader:
     RETURN_TYPES = ("LLAMACPPVLM",)
     RETURN_NAMES = ("vlm_model",)
 
-    def loadmodel(self, gpu_device, model, mmproj, chat_handler, ctx_size, vram_limit, image_min_tokens, image_max_tokens):
+    def loadmodel(self, gpu_device, model, mmproj, chat_handler, thinking, ctx_size, vram_limit, image_min_tokens, image_max_tokens):
         if model == "None":
             raise ValueError("Please select a gguf model.")
         if mmproj == "None":
@@ -156,10 +166,14 @@ class llama_cpp_vlm_model_loader:
             "model": model,
             "mmproj": mmproj,
             "chat_handler": chat_handler,
+            "thinking": thinking,
             "n_ctx": ctx_size,
             "vram_limit": vram_limit,
             "image_min_tokens": image_min_tokens,
             "image_max_tokens": image_max_tokens,
         }
         resolve_config(config)
+        # 校验通过后钳制并落盘实际生效值(warning 离配置点近), 也避免不可切换档
+        # 的开关值变化引起无意义的 current_config 失配重载
+        config["thinking"] = clamp_thinking(chat_handler, thinking)
         return (config,)

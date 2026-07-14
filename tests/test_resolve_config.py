@@ -8,10 +8,11 @@ from tests import comfy_stubs
 comfy_stubs.install()
 
 from src.core import storage  # noqa: E402
+from src.core.handlers import HANDLERS  # noqa: E402
 
 
 def _config(model="model.gguf", mmproj="None", chat_handler="None"):
-    return {"model": model, "mmproj": mmproj, "chat_handler": chat_handler}
+    return {"model": model, "mmproj": mmproj, "chat_handler": chat_handler, "thinking": False}
 
 
 class TestResolveConfig(unittest.TestCase):
@@ -34,7 +35,7 @@ class TestResolveConfig(unittest.TestCase):
             storage.resolve_config(_config(mmproj="m.gguf", chat_handler="None"))
 
     def test_handler_without_mmproj_raises(self):
-        handler = next(iter(storage.HANDLERS))
+        handler = next(iter(HANDLERS))
         with self.assertRaisesRegex(ValueError, "mmproj"):
             storage.resolve_config(_config(mmproj="None", chat_handler=handler))
 
@@ -45,7 +46,7 @@ class TestResolveConfig(unittest.TestCase):
         self.assertIsNone(handler_cls)
 
     def test_vlm_config_resolves(self):
-        handler = next(iter(storage.HANDLERS))
+        handler = next(iter(HANDLERS))
         model_path, mmproj_path, handler_cls = storage.resolve_config(_config(mmproj="m.gguf", chat_handler=handler))
         self.assertEqual(mmproj_path, "/fake/m.gguf")
         self.assertIsNotNone(handler_cls)

@@ -11,7 +11,7 @@ from llama_cpp import Llama
 from ..shared.logger import logger
 from .devices import AUTO_LABEL, log_backend_summary, resolve_device_selection
 from .gguf_layers import get_model_meta
-from .handlers import HANDLERS
+from .handlers import handler_constructor
 from .model_paths import get_llm_full_path
 
 # GGUF 文件体积 -> 运行时显存占用的经验放大系数, 按 n_ctx=8192 校准拆成两项:
@@ -124,7 +124,8 @@ def resolve_config(config):
 
     loader 节点用它做快速失败校验(不实际加载模型),
     load_model 用它取得路径与 handler 类, 两处共享同一套报错.
-    handler_cls 已由注册表预绑定构造期固定参数(thinking 开关等).
+    handler_cls 已绑定构造期固定参数(注册表 kwargs)与 thinking 开关值
+    (handler_constructor 按注册表三态元数据折算, storage 不感知 thinking 逻辑).
     """
     model = config["model"]
     mmproj = config["mmproj"]
@@ -138,7 +139,7 @@ def resolve_config(config):
         handler_cls = None
     else:
         try:
-            handler_cls = HANDLERS[chat_handler]
+            handler_cls = handler_constructor(chat_handler, config["thinking"])
         except KeyError:
             raise ValueError(f'Unknown chat handler: "{chat_handler}"') from None
 
@@ -224,7 +225,7 @@ class LLAMA_CPP_STORAGE:
             # 一次节点执行内完成, 时序仍有效
             logger.info(f"[llama-cpp-vulkan] Preparing mmproj: {mmproj}")
 
-            # thinking 开关等构造期固定参数已由注册表经 functools.partial 预绑定
+            # 注册表固定 kwargs 与 thinking 开关已由 resolve_config 预绑定
             kwargs = {
                 "mmproj_path": mmproj_path,
                 "verbose": False,

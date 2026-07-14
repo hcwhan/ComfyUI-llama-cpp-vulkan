@@ -15,7 +15,7 @@
 
 ```
 ComfyUI-llama-cpp-vulkan/
-  __init__.py                 # 入口: from .src.nodes 导出 NODE_CLASS_MAPPINGS
+  __init__.py                 # 入口: from .src.nodes 导出 NODE_CLASS_MAPPINGS, 声明 WEB_DIRECTORY
   pyproject.toml              # 项目元数据, 依赖声明
   requirements.txt            # pip 依赖(含平台条件 llama-cpp-python wheel URL)
   复核结论.md                 # 复核结论存档(见"文档维护原则")
@@ -23,6 +23,8 @@ ComfyUI-llama-cpp-vulkan/
     build-vulkan-wheels-abi3.yml  # CI: 构建/发布双平台 Vulkan ABI3 wheel
   docs/
     项目分析.html             # 历史快照(页头已注明生成 commit, 仅供历史参考)
+  web/
+    vlm_thinking.js           # vlm loader thinking 开关的三态置灰联动(纯 UX 增强)
   src/
     core/                     # 核心逻辑(非节点)
       storage.py              #   模型生命周期: 全局单例, resolve_config 校验, 显存折算, unload 钩子
@@ -94,7 +96,7 @@ image 逐张模式的多图结果以 "====== Image N ======" 分隔行拼接
 
 `llama_cpp_unload_model` 为 any 透传节点, 可串接在任意连线上, 不参与上图数据流.
 
-`LLAMACPPLLM`(llm Loader 输出)与 `LLAMACPPVLM`(vlm Loader 输出)完全独立: llm 配置只能连 text Instruct, vlm 配置只能连 image/video/audio Instruct, 连错在连线阶段即被 ComfyUI 类型系统拦截. 两种配置 dict 结构相同(llm 侧 mmproj/chat_handler 固定为 "None"), 底层共用 `core/storage.py` 的加载路径.
+`LLAMACPPLLM`(llm Loader 输出)与 `LLAMACPPVLM`(vlm Loader 输出)完全独立: llm 配置只能连 text Instruct, vlm 配置只能连 image/video/audio Instruct, 连错在连线阶段即被 ComfyUI 类型系统拦截. 两种配置 dict 结构相同(llm 侧 mmproj/chat_handler 固定为 "None", thinking 固定 False), 底层共用 `core/storage.py` 的加载路径.
 
 ## 架构要点
 
@@ -137,7 +139,7 @@ image 逐张模式的多图结果以 "====== Image N ======" 分隔行拼接
 
 ### Chat Handler 注册表
 
-`src/core/handlers.py` 的 `_HANDLER_SPECS` 表集中定义全部 handler, 数据形态, 排序约定与新增须知见该表头注释. 要点: 构造期固定参数(thinking 开关, Generic-MTMD 兜底的 `chat_format` 等)经 `functools.partial` 预绑定进 `HANDLERS` 的构造器, `storage.py` 因此不感知 thinking 逻辑; 启动时解析失败的类只从下拉框剔除并打 warning(防御 wheel 升级时的类变动, 不静默, 不阻断 import); `-Thinking` 后缀与开关值的一致性由 `tests/test_handlers.py` 契约测试锁定.
+`src/core/handlers.py` 的 `_HANDLER_SPECS` 表集中定义全部 handler, 数据形态, 排序约定与新增须知见该表头注释. 要点: 每个条目附 thinking 三态元数据(可切换档记构造参数名 / 不支持 / 强制思考), vlm loader 的 `thinking` 开关值经 `handler_constructor` 按三态绑定, 不可切换档由 `clamp_thinking` 钳制并打 warning(覆盖绕过前端的 API 提交路径), `storage.py` 因此不感知 thinking 逻辑; 构造期固定参数(Generic-MTMD 兜底的 `chat_format` 等)经 `functools.partial` 预绑定进 `HANDLERS` 的构造器; 启动时解析失败的类只从下拉框剔除并打 warning(防御 wheel 升级时的类变动, 不静默, 不阻断 import); 三态元数据与类签名的一致性由 `tests/test_handlers.py` 契约测试锁定. 前端 `web/vlm_thinking.js` 按 `chat_handler` widget options 的 `thinking_modes` 自定义 key(经 `/object_info` 原样透传, 与注册表单一真源)对 thinking 开关做三态置灰, JS 失效只损失置灰效果, 行为正确性由钳制保证.
 
 ### 多模态输入
 

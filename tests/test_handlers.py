@@ -1,4 +1,4 @@
-"""src/core/handlers.py 注册表契约的单元测试: 类名存在性, kwargs 合法性, thinking 后缀一致性."""
+"""src/core/handlers.py 注册表契约的单元测试: 类名存在性, kwargs 合法性, thinking 三态元数据与类签名的一致性, 钳制与绑定行为."""
 
 import inspect
 import unittest
@@ -11,7 +11,15 @@ comfy_stubs.install()
 import llama_cpp.llama_multimodal as _handler_module  # noqa: E402
 
 from src.core import handlers  # noqa: E402
-from src.core.handlers import _HANDLER_SPECS  # noqa: E402
+from src.core.handlers import (  # noqa: E402
+    _HANDLER_SPECS,
+    HANDLERS,
+    THINK_FORCED,
+    THINK_UNSUPPORTED,
+    clamp_thinking,
+    handler_constructor,
+    thinking_modes,
+)
 
 # 思考相关构造参数名单: 仅收录影响单轮输出的开关. 多轮对话保留历史思考块
 # 类参数豁免不收录 (当前 wheel 有两个: LFM25VLChatHandler 的 keep_past_thinking,
@@ -22,6 +30,8 @@ _THINK_PARAM_NAMES = ("enable_thinking", "force_reasoning")
 # storage.load_model 构造 handler 时固定注入的 kwargs
 _STORAGE_KWARGS = ("mmproj_path", "verbose", "image_max_tokens", "image_min_tokens", "use_gpu")
 
+_SENTINELS = (THINK_UNSUPPORTED, THINK_FORCED)
+
 
 def _init_params(cls_name):
     return inspect.signature(getattr(_handler_module, cls_name).__init__).parameters
@@ -29,7 +39,7 @@ def _init_params(cls_name):
 
 class TestHandlerSpecs(unittest.TestCase):
     def test_all_classes_exist_in_wheel(self):
-        for label, (cls_name, _) in _HANDLER_SPECS.items():
+        for label, (cls_name, _kwargs, _think) in _HANDLER_SPECS.items():
             self.assertTrue(
                 hasattr(_handler_module, cls_name),
                 f'"{label}": {cls_name} 不在当前 wheel 的 llama_multimodal 中',
@@ -37,7 +47,7 @@ class TestHandlerSpecs(unittest.TestCase):
 
     def test_kwargs_accepted_by_init(self):
         # 全部构造 kwargs 必须被类 __init__ 显式接受(基类对未知 kwargs 抛 TypeError)
-        for label, (cls_name, kwargs) in _HANDLER_SPECS.items():
+        for label, (cls_name, kwargs, _think) in _HANDLER_SPECS.items():
             for key in kwargs or {}:
                 self.assertIn(
                     key,
@@ -45,42 +55,37 @@ class TestHandlerSpecs(unittest.TestCase):
                     f'"{label}": {cls_name}.__init__ 不接受 {key}',
                 )
 
-    def test_thinking_capable_classes_are_wired(self):
-        # 回归: 类签名带 thinking 开关的条目必须在 kwargs 中显式声明开关值,
-        # 否则库侧默认值恒生效且用户无法从 UI 控制 (Gemma4/Step3-VL 曾踩此坑)
-        for label, (cls_name, kwargs) in _HANDLER_SPECS.items():
+    def test_toggle_param_accepted_by_init(self):
+        # 可切换档声明的参数名必须被类 __init__ 显式接受
+        for label, (cls_name, _kwargs, think) in _HANDLER_SPECS.items():
+            if think in _SENTINELS:
+                continue
+            self.assertIn(
+                think,
+                _init_params(cls_name),
+                f'"{label}": {cls_name}.__init__ 不接受三态元数据声明的 {think}',
+            )
+
+    def test_non_toggle_classes_accept_no_think_param(self):
+        # 不支持/强制档的类签名不得含思考开关参数, 否则该条目应改为可切换档
+        # (防 wheel 升级给类加开关而注册表未接线, 库侧默认值恒生效且 UI 不可控)
+        for label, (cls_name, _kwargs, think) in _HANDLER_SPECS.items():
+            if think not in _SENTINELS:
+                continue
             params = _init_params(cls_name)
-            capable = [p for p in _THINK_PARAM_NAMES if p in params]
-            for param in capable:
-                self.assertIn(
+            for param in _THINK_PARAM_NAMES:
+                self.assertNotIn(
                     param,
-                    kwargs or {},
-                    f'"{label}": {cls_name} 的 __init__ 接受 {param} 但注册表未显式声明',
+                    params,
+                    f'"{label}": {cls_name}.__init__ 接受 {param} 但三态元数据标注为 {think}',
                 )
 
-    def test_thinking_suffix_matches_value(self):
-        # -Thinking 后缀 <=> thinking 开关值为 True (类不接受开关的条目豁免,
-        # 如 GLM-4.1V-Thinking 的后缀仅描述模型本身)
-        for label, (_cls_name, kwargs) in _HANDLER_SPECS.items():
-            declared = [p for p in _THINK_PARAM_NAMES if p in (kwargs or {})]
-            if not declared:
-                continue
-            expected = label.endswith("-Thinking")
-            for param in declared:
-                self.assertEqual(
-                    kwargs[param],
-                    expected,
-                    f'"{label}": {param}={kwargs[param]} 与显示名后缀语义不符',
-                )
-
-    def test_thinking_variant_shares_class_with_base(self):
-        # -Thinking 变体必须与无后缀基名共享同一个类
-        for label, (cls_name, _) in _HANDLER_SPECS.items():
-            if not label.endswith("-Thinking"):
-                continue
-            base = label[: -len("-Thinking")]
-            if base in _HANDLER_SPECS:
-                self.assertEqual(_HANDLER_SPECS[base][0], cls_name)
+    def test_thinking_suffix_only_on_forced(self):
+        # "-Thinking" 后缀只允许出现在强制思考档 (后缀描述模型本身,
+        # 如 GLM-4.1V-Thinking); 可切换档由 vlm loader 的 thinking 开关承载
+        for label, (_cls_name, _kwargs, think) in _HANDLER_SPECS.items():
+            if label.endswith("-Thinking"):
+                self.assertIs(think, THINK_FORCED, f'"{label}": 带 -Thinking 后缀但非强制思考档')
 
     def test_storage_construction_kwargs_reach_every_class(self):
         # storage.load_model 对所有 handler 注入五个构造 kwargs, 可用性依赖
@@ -89,7 +94,7 @@ class TestHandlerSpecs(unittest.TestCase):
         base_params = inspect.signature(_handler_module.MTMDChatHandler.__init__).parameters
         for key in _STORAGE_KWARGS:
             self.assertIn(key, base_params, f"基类 MTMDChatHandler.__init__ 不接受 {key}")
-        for label, (cls_name, _) in _HANDLER_SPECS.items():
+        for label, (cls_name, _kwargs, _think) in _HANDLER_SPECS.items():
             params = _init_params(cls_name)
             has_var_kw = any(p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values())
             for key in _STORAGE_KWARGS:
@@ -99,13 +104,62 @@ class TestHandlerSpecs(unittest.TestCase):
                 )
 
 
+class TestClampThinking(unittest.TestCase):
+    def test_unsupported_true_clamped_off_with_warning(self):
+        with mock.patch.object(handlers.logger, "warning") as warn:
+            self.assertFalse(clamp_thinking("Gemma3", True))
+        warn.assert_called_once()
+
+    def test_forced_false_clamped_on_with_warning(self):
+        with mock.patch.object(handlers.logger, "warning") as warn:
+            self.assertTrue(clamp_thinking("GLM-4.1V-Thinking", False))
+        warn.assert_called_once()
+
+    def test_legal_values_pass_through_silently(self):
+        with mock.patch.object(handlers.logger, "warning") as warn:
+            self.assertFalse(clamp_thinking("Gemma3", False))
+            self.assertTrue(clamp_thinking("GLM-4.1V-Thinking", True))
+            self.assertTrue(clamp_thinking("Qwen3.6", True))
+            self.assertFalse(clamp_thinking("Qwen3.6", False))
+        warn.assert_not_called()
+
+
+class TestHandlerConstructor(unittest.TestCase):
+    def test_toggle_binds_declared_param(self):
+        ctor = handler_constructor("Qwen3.6", True)
+        self.assertEqual(ctor.keywords, {"enable_thinking": True})
+        ctor = handler_constructor("Qwen3-VL", False)
+        self.assertEqual(ctor.keywords, {"force_reasoning": False})
+
+    def test_non_toggle_returns_base_constructor(self):
+        # 不支持/强制档的类没有开关参数, 原样返回注册表构造器
+        self.assertIs(handler_constructor("Gemma3", True), HANDLERS["Gemma3"])
+        self.assertIs(handler_constructor("GLM-4.1V-Thinking", False), HANDLERS["GLM-4.1V-Thinking"])
+
+    def test_unknown_label_raises_key_error(self):
+        with self.assertRaises(KeyError):
+            handler_constructor("No-Such-Handler", False)
+
+
+class TestThinkingModes(unittest.TestCase):
+    def test_keys_match_available_handlers(self):
+        self.assertEqual(set(thinking_modes()), set(HANDLERS))
+
+    def test_values_are_tri_state(self):
+        modes = thinking_modes()
+        self.assertLessEqual(set(modes.values()), {"toggle", "forced", "none"})
+        self.assertEqual(modes["Qwen3.6"], "toggle")
+        self.assertEqual(modes["GLM-4.1V-Thinking"], "forced")
+        self.assertEqual(modes["Gemma3"], "none")
+
+
 class TestResolveHandlers(unittest.TestCase):
     def test_missing_class_dropped_others_kept(self):
         # wheel 升级导致类缺失时: 该选项从下拉框剔除 (打 warning),
         # 不静默吞错也不阻断整个注册表
         specs = {
-            "Fake-Handler": ("NoSuchHandlerClass", None),
-            "Gemma3": ("Gemma3ChatHandler", None),
+            "Fake-Handler": ("NoSuchHandlerClass", None, handlers.THINK_UNSUPPORTED),
+            "Gemma3": ("Gemma3ChatHandler", None, handlers.THINK_UNSUPPORTED),
         }
         with mock.patch.object(handlers, "_HANDLER_SPECS", specs):
             resolved = handlers._resolve_handlers()
@@ -113,11 +167,11 @@ class TestResolveHandlers(unittest.TestCase):
         self.assertIn("Gemma3", resolved)
 
     def test_kwargs_prebound_via_partial(self):
-        # 声明了 kwargs 的条目须经 functools.partial 预绑定构造参数
-        specs = {"Gemma4": ("Gemma4ChatHandler", {"enable_thinking": False})}
+        # 声明了固定 kwargs 的条目须经 functools.partial 预绑定构造参数
+        specs = {"Generic-MTMD": ("GenericMTMDChatHandler", {"chat_format": None}, handlers.THINK_UNSUPPORTED)}
         with mock.patch.object(handlers, "_HANDLER_SPECS", specs):
             resolved = handlers._resolve_handlers()
-        self.assertEqual(resolved["Gemma4"].keywords, {"enable_thinking": False})
+        self.assertEqual(resolved["Generic-MTMD"].keywords, {"chat_format": None})
 
 
 if __name__ == "__main__":
