@@ -36,6 +36,9 @@ class llama_cpp_text_instruct(llama_cpp_instruct_base):
         parameters=None,
         queue_handler=None,
     ):
+        # queue_handler 仅靠连线本身控制执行顺序, 值无用途; del 显式声明有意不使用
+        del queue_handler
+
         def runner(messages, user_content, seed, params, extract_text, watcher):
             return self._single_completion(messages, user_content, seed, params, extract_text)
 
