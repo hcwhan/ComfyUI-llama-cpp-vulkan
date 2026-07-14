@@ -40,11 +40,11 @@ Legacy handlers (LLaVA-1.6 / 1.5, llama3-Vision-Alpha, nanoLLaVA, Moondream2, Ob
 
 | Handler | Type |
 |---------|------|
-| Qwen3-ASR | Speech |
-| DeepSeek-OCR | OCR |
-| PaddleOCR-VL-1.5 | OCR |
-| MinerU2.5-Pro | Document (based on Qwen2.5-VL) |
-| Granite-Docling | Document |
+| (ASR) Qwen3-ASR | Speech |
+| (OCR) DeepSeek-OCR | OCR |
+| (OCR) PaddleOCR-VL-1.5 | OCR |
+| (OCR) MinerU2.5-Pro | Document (based on Qwen2.5-VL) |
+| (OCR) Granite-Docling | Document |
 | Generic-MTMD | Fallback (renders the model's built-in chat template) |
 
 > VLMs without a dedicated handler can use the `Generic-MTMD` fallback handler. Text-only GGUF models need no handler at all and run in generic text mode via `llm Model Loader`.
@@ -91,7 +91,7 @@ One wheel per platform covers all Python versions. Download from [Releases](http
 
 ## Notes
 
-- **Audio input (ASR)**: connect a ComfyUI `AUDIO` output to the `audio Instruct` node and load the model with `vlm Model Loader` using an audio-capable handler (e.g. Qwen3-ASR) with its matching mmproj. Audio is sent as 16-bit mono WAV; resampling is handled by llama.cpp.
+- **Audio input (ASR)**: connect a ComfyUI `AUDIO` output to the `audio Instruct` node and load the model with `vlm Model Loader` using an audio-capable handler (e.g. `(ASR) Qwen3-ASR`) with its matching mmproj. Audio is sent as 16-bit mono WAV; resampling is handled by llama.cpp.
 - **Stateless inference**: every run is an independent one-shot request (system prompt + current prompt). No conversation history is kept between runs.
 - **GPU not detected?** Run `python tools/check_devices.py` (with ComfyUI's Python) to list every device the GGML backend enumerates (CPU/GPU/IGPU/ACCEL) without starting ComfyUI - useful for diagnosing Vulkan driver issues.
 

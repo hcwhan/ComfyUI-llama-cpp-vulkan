@@ -17,7 +17,7 @@ from ..shared.logger import logger
 # 带 "-Thinking" 后缀的显示名与基名共享同一个类, 仅 thinking 值不同,
 # 后缀与开关值的一致性由 tests/test_handlers.py 契约测试锁定.
 # dict 声明顺序即 UI 下拉框顺序(首项为默认选项), 排序约定: 同家族聚组,
-# 家族内新版本在上, -Thinking 变体紧随普通版之下; 常用家族在前,
+# 组内按模型发布时间从新到旧, -Thinking 变体紧随普通版之下; 常用家族在前,
 # OCR/文档专用类居中, 早期模型在后, Generic-MTMD 兜底收尾.
 _HANDLER_SPECS = {
     # ---- Qwen ----
@@ -26,9 +26,10 @@ _HANDLER_SPECS = {
     "Qwen3.6-Thinking": ("Qwen35ChatHandler", {"enable_thinking": True}),
     "Qwen3.5": ("Qwen35ChatHandler", {"enable_thinking": False}),
     "Qwen3.5-Thinking": ("Qwen35ChatHandler", {"enable_thinking": True}),
+    # 显示名带 "(ASR) " 前缀, 在下拉框中标注音频(语音识别)模型
+    "(ASR) Qwen3-ASR": ("Qwen3ASRChatHandler", None),
     "Qwen3-VL": ("Qwen3VLChatHandler", {"force_reasoning": False}),
     "Qwen3-VL-Thinking": ("Qwen3VLChatHandler", {"force_reasoning": True}),
-    "Qwen3-ASR": ("Qwen3ASRChatHandler", None),
     "Qwen2.5-VL": ("Qwen25VLChatHandler", None),
     # ---- GLM ----
     "GLM-4.6V": ("GLM46VChatHandler", {"enable_thinking": False}),
@@ -55,17 +56,18 @@ _HANDLER_SPECS = {
     "LFM2.5-VL": ("LFM25VLChatHandler", None),
     "LFM2-VL": ("LFM2VLChatHandler", None),
     # ---- OCR / 文档专用 ----
-    "DeepSeek-OCR": ("MTMDChatHandler", None),
-    "PaddleOCR-VL-1.5": ("PaddleOCRChatHandler", None),
+    # 显示名带 "(OCR) " 前缀, 在下拉框中与通用视觉模型区分
     # MinerU2.5-Pro 基于 Qwen2.5-VL, 复用其 handler
-    "MinerU2.5-Pro": ("Qwen25VLChatHandler", None),
-    "Granite-Docling": ("GraniteDoclingChatHandler", None),
+    "(OCR) MinerU2.5-Pro": ("Qwen25VLChatHandler", None),
+    "(OCR) PaddleOCR-VL-1.5": ("PaddleOCRChatHandler", None),
+    "(OCR) DeepSeek-OCR": ("MTMDChatHandler", None),
+    "(OCR) Granite-Docling": ("GraniteDoclingChatHandler", None),
     # ---- 早期模型 ----
-    "LLaVA-1.6": ("Llava16ChatHandler", None),
-    "LLaVA-1.5": ("Llava15ChatHandler", None),
     "llama3-Vision-Alpha": ("Llama3VisionAlphaChatHandler", None),
     "nanoLLaVA": ("NanoLlavaChatHandler", None),
     "Moondream2": ("MoondreamChatHandler", None),
+    "LLaVA-1.6": ("Llava16ChatHandler", None),
+    "LLaVA-1.5": ("Llava15ChatHandler", None),
     "Obsidian": ("ObsidianChatHandler", None),
     # ---- 兜底 ----
     # 渲染 GGUF 内置 chat template 并归一化媒体占位符,
