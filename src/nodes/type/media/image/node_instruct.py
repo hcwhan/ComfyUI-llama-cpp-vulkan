@@ -13,6 +13,9 @@ from .....core.storage import LLAMA_CPP_STORAGE
 from .....shared.logger import logger
 from ..encoding import image_content_item, scale_image, tensor_to_uint8
 
+_IMAGE_MODE_EACH = "逐张模式"
+_IMAGE_MODE_BATCH = "批量模式"
+
 
 class llama_cpp_image_instruct(llama_cpp_media_instruct_base):
     MEDIA_WORD = "图像"
@@ -26,11 +29,11 @@ class llama_cpp_image_instruct(llama_cpp_media_instruct_base):
                 "images": ("IMAGE",),
                 **cls.seed_input(),
                 **cls.prompt_inputs(),
-                "batch_images": (
-                    "BOOLEAN",
+                "mode": (
+                    [_IMAGE_MODE_EACH, _IMAGE_MODE_BATCH],
                     {
-                        "default": False,
-                        "tooltip": "关: 逐张推理, 每张图各得一条结果.\n开: 全部图片并入单次请求 (多图时缩放到 max_size, 单图保持原分辨率).",
+                        "default": _IMAGE_MODE_EACH,
+                        "tooltip": "逐张模式: 逐张推理, 每张图各得一条结果.\n批量模式: 全部图片并入单次请求 (多图时缩放到 max_size, 单图保持原分辨率).",
                     },
                 ),
                 "max_size": (
@@ -48,7 +51,7 @@ class llama_cpp_image_instruct(llama_cpp_media_instruct_base):
             "optional": cls.optional_inputs(),
         }
 
-    def _infer_one_by_one(self, messages, user_content, images, seed, params, extract_text, watcher):
+    def _infer_each(self, messages, user_content, images, seed, params, extract_text, watcher):
         image_content = {"type": "image_url", "image_url": {"url": ""}}
         user_content.append(image_content)
         messages.append({"role": "user", "content": user_content})
@@ -83,7 +86,7 @@ class llama_cpp_image_instruct(llama_cpp_media_instruct_base):
         preset_prompt,
         custom_prompt,
         system_prompt,
-        batch_images,
+        mode,
         max_size,
         strip_thinking,
         force_offload,
@@ -95,8 +98,8 @@ class llama_cpp_image_instruct(llama_cpp_media_instruct_base):
 
         def runner(messages, user_content, seed, params, extract_text, watcher):
             self.require_mmproj("Image")
-            if batch_images:
+            if mode == _IMAGE_MODE_BATCH:
                 return self._infer_batch(messages, user_content, images, max_size, seed, params, extract_text)
-            return self._infer_one_by_one(messages, user_content, images, seed, params, extract_text, watcher)
+            return self._infer_each(messages, user_content, images, seed, params, extract_text, watcher)
 
         return self._run(vlm_model, seed, preset_prompt, custom_prompt, system_prompt, strip_thinking, force_offload, parameters, runner)

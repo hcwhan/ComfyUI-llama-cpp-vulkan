@@ -143,7 +143,7 @@ image 逐张模式的多图结果以 "====== Image N ======" 分隔行拼接
 
 ### 多模态输入
 
-- image Instruct: `batch_images` 开关切换逐张推理(多图结果以 `====== Image N ======` 分隔行拼接, `split_instruct_output` 节点与 `json_to_bboxes` 的内建拆分均可还原为逐张列表)与批量单请求; 批量多图时缩放到 `max_size`, 单图保持原分辨率
+- image Instruct: `mode` 下拉框切换逐张模式(逐张推理, 多图结果以 `====== Image N ======` 分隔行拼接, `split_instruct_output` 节点与 `json_to_bboxes` 的内建拆分均可还原为逐张列表)与批量模式(全部图片并入单次请求); 批量多图时缩放到 `max_size`, 单图保持原分辨率
 - video Instruct: `frames` 输入为 IMAGE 帧批次(ComfyUI 生态的视频通行形态), 按 `max_frames` linspace 均匀抽帧后缩放, 并在 system prompt 前注入"连续视频"语义提示
 - audio Instruct: ComfyUI `AUDIO` dict 由 `media/encoding.py` 的 `audio2base64()` 均值混为单声道 16-bit WAV, 以 `input_audio` 内容项注入(重采样由 llama.cpp 的 mtmd 解码端完成), 服务 Qwen3-ASR 等音频 handler; 音频是否被 mmproj 支持由 llama-cpp-python 侧校验
 
