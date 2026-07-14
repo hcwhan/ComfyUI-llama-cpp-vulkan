@@ -41,6 +41,7 @@ def _ctx_size_field(default):
         },
     )
 
+
 _VRAM_LIMIT_FIELD = (
     "INT",
     {

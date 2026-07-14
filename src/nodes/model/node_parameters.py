@@ -20,7 +20,7 @@ class llama_cpp_parameters:
                         "min": 0,
                         "max": 65536,
                         "step": 1,
-                        "tooltip": f"单次生成的 token 数上限, 0 = 不限制.\n实际上限 = min(本值, 上下文长度 - prompt token 数),\n达到上限时静默截断 (finish_reason=\"length\", 不报错).\n默认 {_DEFAULTS['max_gen_tokens']}.",
+                        "tooltip": f'单次生成的 token 数上限, 0 = 不限制.\n实际上限 = min(本值, 上下文长度 - prompt token 数),\n达到上限时静默截断 (finish_reason="length", 不报错).\n默认 {_DEFAULTS["max_gen_tokens"]}.',
                     },
                 ),
                 "top_k": (
