@@ -37,6 +37,10 @@ SEG = namedtuple(
 
 
 class json_to_bboxes:
+    CATEGORY = "llama-cpp-vulkan"
+    FUNCTION = "process"
+
+    INPUT_IS_LIST = True
     @classmethod
     def INPUT_TYPES(s):
         return {
@@ -57,12 +61,9 @@ class json_to_bboxes:
             }
         }
 
+    OUTPUT_IS_LIST = (True, True)
     RETURN_TYPES = ("BBOX", "IMAGE")
     RETURN_NAMES = ("bboxes", "image_list")
-    OUTPUT_IS_LIST = (True, True)
-    INPUT_IS_LIST = True
-    FUNCTION = "process"
-    CATEGORY = "llama-cpp-vulkan"
 
     def process(self, json, mode, label, image=None):
         # INPUT_IS_LIST 下 widget 参数也会被包成列表
@@ -148,6 +149,9 @@ class json_to_bboxes:
 
 
 class bboxes_to_segs:
+    CATEGORY = "llama-cpp-vulkan"
+    FUNCTION = "process"
+
     @classmethod
     def INPUT_TYPES(s):
         # label/confidence 是检测结果本身的元数据(紧跟 bboxes 输入),
@@ -166,8 +170,6 @@ class bboxes_to_segs:
 
     RETURN_TYPES = ("SEGS",)
     RETURN_NAMES = ("segs",)
-    FUNCTION = "process"
-    CATEGORY = "llama-cpp-vulkan"
 
     def process(self, bboxes, image, label, confidence, dilation, feather, crop_factor):
         batch_size, height, width, _channels = image.shape
@@ -236,6 +238,9 @@ class bboxes_to_segs:
 
 
 class bboxes_to_mask:
+    CATEGORY = "llama-cpp-vulkan"
+    FUNCTION = "process"
+
     @classmethod
     def INPUT_TYPES(s):
         return {
@@ -249,8 +254,6 @@ class bboxes_to_mask:
 
     RETURN_TYPES = ("MASK",)
     RETURN_NAMES = ("mask",)
-    FUNCTION = "process"
-    CATEGORY = "llama-cpp-vulkan"
 
     def process(self, bboxes, image, dilation, feather):
         _batch_size, height, width, _channels = image.shape
@@ -297,6 +300,13 @@ class bboxes_to_mask:
 
 
 class bboxes_to_bbox:
+    CATEGORY = "llama-cpp-vulkan"
+    FUNCTION = "process"
+
+    # 上游 json_to_bboxes 的 BBOX 输出是 OUTPUT_IS_LIST（每元素一组）。
+    # 必须声明 INPUT_IS_LIST 才能在单次调用中拿到完整的组列表，
+    # 否则 ComfyUI 按组 map 执行，image_index/bbox_index 的二级索引语义失效。
+    INPUT_IS_LIST = True
     @classmethod
     def INPUT_TYPES(s):
         return {
@@ -315,12 +325,6 @@ class bboxes_to_bbox:
 
     RETURN_TYPES = ("BBOX",)
     RETURN_NAMES = ("bbox",)
-    # 上游 json_to_bboxes 的 BBOX 输出是 OUTPUT_IS_LIST（每元素一组）。
-    # 必须声明 INPUT_IS_LIST 才能在单次调用中拿到完整的组列表，
-    # 否则 ComfyUI 按组 map 执行，image_index/bbox_index 的二级索引语义失效。
-    INPUT_IS_LIST = True
-    FUNCTION = "process"
-    CATEGORY = "llama-cpp-vulkan"
 
     def process(self, bboxes, image_index, bbox_index):
         # INPUT_IS_LIST 下 widget 参数也会被包成列表

@@ -6,8 +6,8 @@ llama_cpp 使用真实安装(纯函数测试不触发推理).
 """
 
 import sys
-import types
 import tempfile
+import types
 
 
 def install():

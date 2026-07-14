@@ -20,6 +20,7 @@ _GPU_DEVICE_FIELD = (gpu_device_choices, {
     "tooltip": "选择 LLM 推理使用的 GPU 设备.\nAuto = llama.cpp 默认行为: 独显优先, 多独显按层切分.\n显式选择某设备时, 整个模型加载到该单卡.\n(仅当系统没有独显时, 核显才可选)"
 })
 
+# TODO
 _N_CTX_FIELD = ("INT", {
     "default": 8192,
     "min": 1024, "max": 327680, "step": 128,
@@ -50,28 +51,30 @@ def _mmproj_list():
 
 
 class llama_cpp_llm_model_loader:
+    CATEGORY = "llama-cpp-vulkan"
+    FUNCTION = "loadmodel"
+
     @classmethod
     def INPUT_TYPES(s):
         return {"required": {
             "gpu_device": _GPU_DEVICE_FIELD,
             "model": (_model_list(),),
+            # TODO 是否开启思考
             "n_ctx": _N_CTX_FIELD,
             "vram_limit": _VRAM_LIMIT_FIELD,
         }}
 
     RETURN_TYPES = ("LLAMACPPLLM",)
     RETURN_NAMES = ("llm_model",)
-    FUNCTION = "loadmodel"
-    CATEGORY = "llama-cpp-vulkan"
 
     def loadmodel(self, gpu_device, model, n_ctx, vram_limit):
         if model == "None":
             raise ValueError("Please select a gguf model.")
         config = {
+            "gpu_device": gpu_device,
             "model": model,
             "mmproj": "None",
             "chat_handler": "None",
-            "gpu_device": gpu_device,
             "n_ctx": n_ctx,
             "vram_limit": vram_limit,
             "image_min_tokens": 0,
@@ -82,6 +85,9 @@ class llama_cpp_llm_model_loader:
 
 
 class llama_cpp_vlm_model_loader:
+    CATEGORY = "llama-cpp-vulkan"
+    FUNCTION = "loadmodel"
+
     @classmethod
     def INPUT_TYPES(s):
         return {"required": {
@@ -105,8 +111,6 @@ class llama_cpp_vlm_model_loader:
 
     RETURN_TYPES = ("LLAMACPPVLM",)
     RETURN_NAMES = ("vlm_model",)
-    FUNCTION = "loadmodel"
-    CATEGORY = "llama-cpp-vulkan"
 
     def loadmodel(self, gpu_device, model, mmproj, chat_handler, n_ctx, vram_limit, image_min_tokens, image_max_tokens):
         if model == "None":
@@ -119,10 +123,10 @@ class llama_cpp_vlm_model_loader:
         if 0 < image_max_tokens < image_min_tokens:
             raise ValueError(f"image_max_tokens ({image_max_tokens}) cannot be less than image_min_tokens ({image_min_tokens}).")
         config = {
+            "gpu_device": gpu_device,
             "model": model,
             "mmproj": mmproj,
             "chat_handler": chat_handler,
-            "gpu_device": gpu_device,
             "n_ctx": n_ctx,
             "vram_limit": vram_limit,
             "image_min_tokens": image_min_tokens,

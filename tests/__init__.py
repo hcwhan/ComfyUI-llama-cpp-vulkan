@@ -9,9 +9,9 @@ comfy/folder_paths 由 comfy_stubs 注入最小替身.
 保证测试导入的是本仓库的代码.
 """
 
-import sys
 import importlib.machinery
 import importlib.util
+import sys
 from pathlib import Path
 
 _SRC_DIR = Path(__file__).resolve().parent.parent / "src"

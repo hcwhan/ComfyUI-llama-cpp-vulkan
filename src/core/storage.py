@@ -1,7 +1,7 @@
 """模型生命周期管理: 全局单例存储, 配置校验, 显存折算, ComfyUI 卸载钩子."""
 
-import os
 import gc
+import os
 import sys
 import time
 
@@ -10,7 +10,7 @@ from llama_cpp import Llama
 import comfy.model_management as mm
 
 from ..shared.logger import logger
-from .devices import AUTO_LABEL, resolve_device_selection, log_backend_summary
+from .devices import AUTO_LABEL, log_backend_summary, resolve_device_selection
 from .gguf_layers import get_model_meta
 from .handlers import HANDLERS
 from .model_paths import get_llm_full_path
@@ -193,9 +193,9 @@ class LLAMA_CPP_STORAGE:
         model_path, mmproj_path, handler_cls = resolve_config(config)
 
         cls.clean()
+        gpu_device = config.get("gpu_device", AUTO_LABEL)
         model = config["model"]
         mmproj = config["mmproj"]
-        gpu_device = config.get("gpu_device", AUTO_LABEL)
         main_gpu, split_mode = resolve_device_selection(gpu_device)
 
         n_gpu_layers, mmproj_on_gpu = _estimate_n_gpu_layers(model_path, mmproj_path, config["vram_limit"], config["n_ctx"])
@@ -226,8 +226,8 @@ class LLAMA_CPP_STORAGE:
                 "mmproj_path": mmproj_path,
                 "verbose": False,
                 # <=0 视为未设置,与库内默认值 -1 语义一致
-                "image_max_tokens": config["image_max_tokens"],
                 "image_min_tokens": config["image_min_tokens"],
+                "image_max_tokens": config["image_max_tokens"],
                 # vram_limit=0(纯 CPU)或预算装不下 mmproj 时,mmproj(mtmd 编码器)
                 # 留在 CPU 以严格遵守显存预算;mtmd 只有 use_gpu 布尔开关,
                 # 无法指定设备(见 AGENTS.md 已知问题)

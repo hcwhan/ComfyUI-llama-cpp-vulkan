@@ -1,8 +1,8 @@
 """媒体编码工具, ComfyUI 张量/音频 dict 转 base64, 供 image/video/audio Instruct 注入消息."""
 
+import base64
 import io
 import wave
-import base64
 
 import torch
 import numpy as np

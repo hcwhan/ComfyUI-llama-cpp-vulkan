@@ -1,7 +1,7 @@
 """BBox 节点的强相关工具: 坐标换算, 画框, 羽化 mask, 结构校验."""
 
-import math
 import hashlib
+import math
 from functools import lru_cache
 
 import torch

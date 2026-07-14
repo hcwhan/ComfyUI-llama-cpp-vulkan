@@ -1,12 +1,12 @@
 """src/nodes/type/media/encoding.py 的单元测试: 张量转 uint8, 音频打包, 图片缩放."""
 
-import io
 import base64
+import io
 import unittest
 import wave
 
-import numpy as np
 import torch
+import numpy as np
 
 from tests import comfy_stubs
 

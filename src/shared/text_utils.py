@@ -1,7 +1,7 @@
 """LLM 输出文本处理: 代码围栏剥离, 逐张结果拆分, JSON 解析, 嵌套取值. 被 util 文本节点与 bbox 节点共同使用."""
 
-import re
 import json
+import re
 
 # 开头的 ```label(标签限单词类字符,可无,如 json/python/c++;CommonMark
 # 允许标签前有空格,少数模型会输出 "``` json" 形态);结尾的 ```。
@@ -11,6 +11,25 @@ _FENCE_OPEN_RE = re.compile(r"^```[ \t]*[\w+.-]*[ \t]*\r?\n?")
 _FENCE_CLOSE_RE = re.compile(r"\r?\n?```$")
 # 文本中部的完整围栏块(用于 "前导说明 + 围栏块" 形态的回退提取)
 _FENCE_BLOCK_RE = re.compile(r"```[ \t]*[\w+.-]*[ \t]*\r?\n(.*?)\r?\n?```", re.DOTALL)
+
+
+def strip_code_fence(text):
+    """去除 LLM 输出首尾的 ```label ... ``` 代码块标记.
+
+    兼容任意标签和裸 ``` 围栏:
+    模型即使被要求输出 json 也可能给出不带标签的围栏.
+    模型输出 "好的, 结果如下:" 之类前导说明时首部不是围栏,
+    此时回退为提取文本中第一个完整围栏块的内容.
+    """
+    text = text.strip()
+    stripped = _FENCE_OPEN_RE.sub("", text)
+    if stripped != text:
+        return _FENCE_CLOSE_RE.sub("", stripped)
+    block = _FENCE_BLOCK_RE.search(text)
+    if block:
+        return block.group(1)
+    return _FENCE_CLOSE_RE.sub("", text)
+
 
 # image Instruct 逐张模式在多图结果间插入的分隔行(独占一行, 行首行尾锚定,
 # 降低正文文本误匹配的概率; JSON 文本中换行均为 \n 转义, 不会产生真实分隔行)
@@ -30,24 +49,6 @@ def split_image_results(text):
     if not parts[0]:
         parts = parts[1:]
     return parts
-
-
-def strip_code_fence(text):
-    """去除 LLM 输出首尾的 ```label ... ``` 代码块标记.
-
-    兼容任意标签和裸 ``` 围栏:
-    模型即使被要求输出 json 也可能给出不带标签的围栏.
-    模型输出 "好的, 结果如下:" 之类前导说明时首部不是围栏,
-    此时回退为提取文本中第一个完整围栏块的内容.
-    """
-    text = text.strip()
-    stripped = _FENCE_OPEN_RE.sub("", text)
-    if stripped != text:
-        return _FENCE_CLOSE_RE.sub("", stripped)
-    block = _FENCE_BLOCK_RE.search(text)
-    if block:
-        return block.group(1)
-    return _FENCE_CLOSE_RE.sub("", text)
 
 
 def parse_json(json_str):

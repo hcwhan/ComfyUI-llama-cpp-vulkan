@@ -127,6 +127,7 @@ class InterruptWatcher:
 class llama_cpp_instruct_base:
     CATEGORY = "llama-cpp-vulkan"
     FUNCTION = "process"
+
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("output",)
 
@@ -148,7 +149,7 @@ class llama_cpp_instruct_base:
         return {
             "preset_prompt": (presets, {"default": presets[0]}),
             "custom_prompt": ("STRING", {"default": "", "multiline": True, "placeholder": '用户提示词\n\n预设含占位符时(如 BBox 检测的目标类别、待改写的提示词), 此内容用于填充占位符\n否则, 此内容会整体覆盖预设提示词.'}),
-            "system_prompt": ("STRING", {"multiline": True, "default": ""}),
+            "system_prompt": ("STRING", {"default": "", "multiline": True, "placeholder": '系统提示词\n\n用于设置模型的人设。'}),
         }
 
     @classmethod

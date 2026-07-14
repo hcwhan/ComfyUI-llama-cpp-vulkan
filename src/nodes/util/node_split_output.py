@@ -9,6 +9,9 @@ from ...shared.text_utils import split_image_results
 
 
 class split_instruct_output:
+    CATEGORY = "llama-cpp-vulkan"
+    FUNCTION = "process"
+
     @classmethod
     def INPUT_TYPES(s):
         return {
@@ -17,11 +20,9 @@ class split_instruct_output:
             }
         }
 
+    OUTPUT_IS_LIST = (True,)
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("list",)
-    OUTPUT_IS_LIST = (True,)
-    FUNCTION = "process"
-    CATEGORY = "llama-cpp-vulkan"
 
     def process(self, text):
         return (split_image_results(text),)

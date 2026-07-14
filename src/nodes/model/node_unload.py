@@ -7,20 +7,21 @@
 force_offload 开关兜底.
 """
 
+from ...core.storage import LLAMA_CPP_STORAGE
 from ...shared.logger import logger
 from ...shared.types import any_type
-from ...core.storage import LLAMA_CPP_STORAGE
 
 
 class llama_cpp_unload_model:
+    CATEGORY = "llama-cpp-vulkan"
+    FUNCTION = "process"
+
     @classmethod
     def INPUT_TYPES(s):
         return {"required": {"any": (any_type, {"tooltip": "any 透传端口, 串接在需要先卸载模型的连线上.\n注意: 仅在上游输出变化时执行 (ComfyUI 缓存语义),\n重跑未改动的工作流不会重复卸载."})}}
 
     RETURN_TYPES = (any_type,)
     RETURN_NAMES = ("any",)
-    FUNCTION = "process"
-    CATEGORY = "llama-cpp-vulkan"
 
     def process(self, any):
         logger.info("[llama-cpp-vulkan] Unloading llama model...")

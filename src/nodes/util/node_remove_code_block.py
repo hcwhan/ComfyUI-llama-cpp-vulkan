@@ -4,6 +4,9 @@ from ...shared.text_utils import strip_code_fence
 
 
 class remove_code_block:
+    CATEGORY = "llama-cpp-vulkan"
+    FUNCTION = "process"
+
     @classmethod
     def INPUT_TYPES(s):
         return {
@@ -14,8 +17,6 @@ class remove_code_block:
 
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("output",)
-    FUNCTION = "process"
-    CATEGORY = "llama-cpp-vulkan"
 
     def process(self, input):
         return (strip_code_fence(input),)

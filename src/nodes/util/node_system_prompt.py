@@ -4,6 +4,9 @@ from .system_prompt_presets import PRESETS
 
 
 class system_prompt_preset:
+    CATEGORY = "llama-cpp-vulkan"
+    FUNCTION = "main"
+
     @classmethod
     def INPUT_TYPES(s):
         return {
@@ -14,8 +17,6 @@ class system_prompt_preset:
 
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("system_prompt",)
-    FUNCTION = "main"
-    CATEGORY = "llama-cpp-vulkan"
 
     def main(self, preset):
         # 经连线传入的失配预设名不暴露裸 KeyError (widget 常量有 combo 前置校验)

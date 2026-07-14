@@ -90,6 +90,9 @@ def _device_label(dev):
     return f"{dev['name']} - {dev['desc']} [{dev['type']}]"
 
 
+gpu_device_choices = [AUTO_LABEL] + [_device_label(d) for d in _selectable_devices()]
+
+
 def resolve_device_selection(gpu_device):
     """把下拉框选项翻译为 (main_gpu, split_mode).
 
@@ -106,9 +109,6 @@ def resolve_device_selection(gpu_device):
         # 前置校验(value_not_in_list)拒绝, 正常执行走不到这里
         logger.warning(f"[llama-cpp-vulkan] device '{gpu_device}' is not selectable, falling back to Auto")
     return 0, SPLIT_MODE_LAYER
-
-
-gpu_device_choices = [AUTO_LABEL] + [_device_label(d) for d in _selectable_devices()]
 
 
 def log_backend_summary(main_gpu, split_mode):

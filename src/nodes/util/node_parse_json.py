@@ -2,12 +2,14 @@
 
 import json
 
-from ...shared.types import any_type
 from ...shared.text_utils import get_nested_value, parse_json
+from ...shared.types import any_type
 
 
 # from: https://github.com/crystian/ComfyUI-Crystools
 class parse_json_node:
+    CATEGORY = "llama-cpp-vulkan"
+    FUNCTION = "process"
     DESCRIPTION = (
         "解析 JSON 字符串并按点分 key 取值, 同一个值以五种类型输出.\n"
         "转换规则: string 对 dict/list 输出合法 JSON 文本, 其余为 str() 结果;\n"
@@ -30,8 +32,6 @@ class parse_json_node:
 
     RETURN_TYPES = (any_type, "STRING", "INT", "FLOAT", "BOOLEAN")
     RETURN_NAMES = ("any", "string", "int", "float", "boolean")
-    FUNCTION = "process"
-    CATEGORY = "llama-cpp-vulkan"
 
     def process(self, input, key, default=None):
         if not key.strip():

@@ -4,6 +4,9 @@ from ...core.instruct import DEFAULT_SAMPLING_PARAMS as _DEFAULTS
 
 
 class llama_cpp_parameters:
+    CATEGORY = "llama-cpp-vulkan"
+    FUNCTION = "process"
+
     @classmethod
     def INPUT_TYPES(s):
         # widget 默认值与 Instruct 未连接 parameters 端口时的生效值同源
@@ -28,8 +31,6 @@ class llama_cpp_parameters:
 
     RETURN_TYPES = ("LLAMACPPARAMS",)
     RETURN_NAMES = ("parameters",)
-    FUNCTION = "process"
-    CATEGORY = "llama-cpp-vulkan"
 
     def process(self, **kwargs):
         return (kwargs,)

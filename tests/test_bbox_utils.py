@@ -9,14 +9,14 @@ from tests import comfy_stubs
 comfy_stubs.install()
 
 from src.nodes.type.media.bbox.bbox_utils import (  # noqa: E402
+    _label_color,
+    _label_font,
+    bbox_label,
     draw_bbox,
+    feathered_rect_mask,
     json_to_pixel_bboxes,
     qwen25_smart_resize,
     valid_int_bbox,
-    feathered_rect_mask,
-    bbox_label,
-    _label_color,
-    _label_font,
 )
 from src.nodes.type.media.bbox.node_bbox import SEG  # noqa: E402
 
