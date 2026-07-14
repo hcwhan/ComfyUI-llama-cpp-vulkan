@@ -20,9 +20,9 @@ from .storage import LLAMA_CPP_STORAGE
 # 采样参数的统一默认值: Parameters 节点的 widget 默认值与 Instruct 未连接
 # parameters 端口时的生效值均取自此表, 保证连不连默认参数节点行为一致
 # (否则未连接时会落到 wheel 库签名默认值: temperature 0.2 / top_k 40 /
-# top_p 0.95 / max_tokens 不限, 与节点默认差异明显)
+# top_p 0.95 等, 与节点默认差异明显).
 DEFAULT_SAMPLING_PARAMS = {
-    "max_tokens": 8192,
+    "max_gen_tokens": 0,
     "top_k": 40,
     "top_p": 0.95,
     "min_p": 0.05,
@@ -266,6 +266,7 @@ class llama_cpp_instruct_base:
         # 合并生成新 dict 兼作防御性复制(parameters 是 ComfyUI 缓存的共享 dict,
         # 防止 runner 修改时污染); 未连接 parameters 端口时整体落到统一默认值
         params = {**DEFAULT_SAMPLING_PARAMS, **(parameters or {})}
+        params["max_tokens"] = params.pop("max_gen_tokens")
         extract_text = self._make_extract(strip_thinking)
 
         # 监视线程让长时间生成也能响应 ComfyUI 的取消操作;

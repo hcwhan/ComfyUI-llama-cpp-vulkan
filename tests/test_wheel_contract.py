@@ -63,9 +63,11 @@ class TestWheelPrivateApiContract(unittest.TestCase):
         self.assertTrue(hasattr(llama_cpp_lib.llama_split_mode, "LLAMA_SPLIT_MODE_LAYER"))
 
     def test_create_chat_completion_accepts_all_sampling_params(self):
-        # Parameters 节点全部字段 + seed 必须被 create_chat_completion 签名接受
+        # Parameters 节点全部字段 + seed 必须被 create_chat_completion 签名接受;
+        # UI 键 max_gen_tokens 按 instruct._run() 的映射折算为 max_tokens 后校验
         params = inspect.signature(Llama.create_chat_completion).parameters
-        for name in (*DEFAULT_SAMPLING_PARAMS, "seed"):
+        wheel_names = ["max_tokens" if name == "max_gen_tokens" else name for name in DEFAULT_SAMPLING_PARAMS]
+        for name in (*wheel_names, "seed"):
             self.assertIn(name, params, f"create_chat_completion missing param: {name}")
 
 

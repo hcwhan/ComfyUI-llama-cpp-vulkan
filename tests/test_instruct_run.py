@@ -113,6 +113,19 @@ class TestRunFinalization(unittest.TestCase):
         out = self._run(lambda *args: "ok")
         self.assertEqual(out, ("ok",))
 
+    def test_params_map_max_gen_tokens_to_wheel_key(self):
+        # UI 键 max_gen_tokens 必须在进入 runner 前映射回 wheel 的 max_tokens
+        self._install(_FakeRunLlm())
+        captured = {}
+
+        def runner(messages, user_content, seed, params, extract_text, watcher):
+            captured.update(params)
+            return "ok"
+
+        self._run(runner)
+        self.assertIn("max_tokens", captured)
+        self.assertNotIn("max_gen_tokens", captured)
+
     def test_force_offload_cleans_after_success(self):
         self._install(_FakeRunLlm())
         self._run(lambda *args: "ok", force_offload=True)

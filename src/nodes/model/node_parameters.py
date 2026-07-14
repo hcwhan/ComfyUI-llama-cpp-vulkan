@@ -1,4 +1,4 @@
-"""采样参数配置节点, 打包成 kwargs dict 透传给 create_chat_completion."""
+"""采样参数配置节点, 打包成 kwargs dict 供 Instruct 传给 create_chat_completion."""
 
 from ...core.instruct import DEFAULT_SAMPLING_PARAMS as _DEFAULTS
 
@@ -13,14 +13,14 @@ class llama_cpp_parameters:
         # (core/instruct.py 的 DEFAULT_SAMPLING_PARAMS), 保证两种接法行为一致
         return {
             "required": {
-                "max_tokens": (
+                "max_gen_tokens": (
                     "INT",
                     {
-                        "default": _DEFAULTS["max_tokens"],
+                        "default": _DEFAULTS["max_gen_tokens"],
                         "min": 0,
                         "max": 65536,
                         "step": 1,
-                        "tooltip": f"生成 token 数上限, 0 = 不限制 (受 n_ctx 约束).\n默认 {_DEFAULTS['max_tokens']}.",
+                        "tooltip": f"单次生成的 token 数上限, 0 = 不限制.\n实际上限 = min(本值, 上下文长度 - prompt token 数),\n达到上限时静默截断 (finish_reason=\"length\", 不报错).\n默认 {_DEFAULTS['max_gen_tokens']}.",
                     },
                 ),
                 "top_k": (
