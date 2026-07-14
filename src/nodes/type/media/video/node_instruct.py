@@ -29,7 +29,7 @@ class llama_cpp_video_instruct(llama_cpp_media_instruct_base):
                 "frames": ("IMAGE", {"tooltip": "IMAGE 帧批次形式的视频帧(如 VHS Load Video 或视频模型 VAE Decode 的输出)."}),
                 **cls.seed_input(),
                 **cls.prompt_inputs(),
-                "max_frames": ("INT", {"default": 24, "min": 2, "max": 1024, "step": 1, "tooltip": "从输入帧中均匀采样的帧数上限."}),
+                "max_frames": ("INT", {"default": 30, "min": 2, "max": 1024, "step": 1, "tooltip": "从输入帧中均匀采样的帧数上限."}),
                 "max_size": (
                     "INT",
                     {
