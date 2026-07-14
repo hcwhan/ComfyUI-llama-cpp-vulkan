@@ -17,6 +17,7 @@ class llama_cpp_text_instruct(llama_cpp_instruct_base):
         return {
             "required": {
                 "llm_model": (cls.MODEL_TYPE,),
+                **cls.seed_input(),
                 **cls.prompt_inputs(),
                 **cls.runtime_inputs(),
             },
@@ -26,16 +27,16 @@ class llama_cpp_text_instruct(llama_cpp_instruct_base):
     def process(
         self,
         llm_model,
+        seed,
         preset_prompt,
         custom_prompt,
         system_prompt,
-        seed,
-        force_offload,
         strip_thinking,
+        force_offload,
         parameters=None,
         queue_handler=None,
     ):
         def runner(messages, user_content, seed, params, extract_text, watcher):
             return self._single_completion(messages, user_content, seed, params, extract_text)
 
-        return self._run(llm_model, preset_prompt, custom_prompt, system_prompt, seed, force_offload, strip_thinking, parameters, runner)
+        return self._run(llm_model, seed, preset_prompt, custom_prompt, system_prompt, strip_thinking, force_offload, parameters, runner)

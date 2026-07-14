@@ -18,6 +18,7 @@ class llama_cpp_audio_instruct(llama_cpp_media_instruct_base):
             "required": {
                 "vlm_model": (cls.MODEL_TYPE,),
                 "audio": ("AUDIO", {"tooltip": "供 ASR/omni 模型使用的音频片段.\n需要支持音频的 mmproj(如 Qwen3-ASR)."}),
+                **cls.seed_input(),
                 **cls.prompt_inputs(),
                 **cls.runtime_inputs(),
             },
@@ -28,12 +29,12 @@ class llama_cpp_audio_instruct(llama_cpp_media_instruct_base):
         self,
         vlm_model,
         audio,
+        seed,
         preset_prompt,
         custom_prompt,
         system_prompt,
-        seed,
-        force_offload,
         strip_thinking,
+        force_offload,
         parameters=None,
         queue_handler=None,
     ):
@@ -47,4 +48,4 @@ class llama_cpp_audio_instruct(llama_cpp_media_instruct_base):
             )
             return self._single_completion(messages, user_content, seed, params, extract_text)
 
-        return self._run(vlm_model, preset_prompt, custom_prompt, system_prompt, seed, force_offload, strip_thinking, parameters, runner)
+        return self._run(vlm_model, seed, preset_prompt, custom_prompt, system_prompt, strip_thinking, force_offload, parameters, runner)

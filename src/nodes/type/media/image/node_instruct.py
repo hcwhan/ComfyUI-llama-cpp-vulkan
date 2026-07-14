@@ -24,6 +24,7 @@ class llama_cpp_image_instruct(llama_cpp_media_instruct_base):
             "required": {
                 "vlm_model": (cls.MODEL_TYPE,),
                 "images": ("IMAGE",),
+                **cls.seed_input(),
                 **cls.prompt_inputs(),
                 "batch_images": (
                     "BOOLEAN",
@@ -78,14 +79,14 @@ class llama_cpp_image_instruct(llama_cpp_media_instruct_base):
         self,
         vlm_model,
         images,
+        seed,
         preset_prompt,
         custom_prompt,
         system_prompt,
         batch_images,
         max_size,
-        seed,
-        force_offload,
         strip_thinking,
+        force_offload,
         parameters=None,
         queue_handler=None,
     ):
@@ -95,4 +96,4 @@ class llama_cpp_image_instruct(llama_cpp_media_instruct_base):
                 return self._infer_batch(messages, user_content, images, max_size, seed, params, extract_text)
             return self._infer_one_by_one(messages, user_content, images, seed, params, extract_text, watcher)
 
-        return self._run(vlm_model, preset_prompt, custom_prompt, system_prompt, seed, force_offload, strip_thinking, parameters, runner)
+        return self._run(vlm_model, seed, preset_prompt, custom_prompt, system_prompt, strip_thinking, force_offload, parameters, runner)

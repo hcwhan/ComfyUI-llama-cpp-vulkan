@@ -98,12 +98,12 @@ class TestRunFinalization(unittest.TestCase):
     def _run(self, runner, force_offload=False):
         return self.node._run(
             llama_model=self.config,
+            seed=0,
             preset_prompt="空白 - 空",
             custom_prompt="一只猫",
             system_prompt="",
-            seed=0,
-            force_offload=force_offload,
             strip_thinking=True,
+            force_offload=force_offload,
             parameters=None,
             runner=runner,
         )

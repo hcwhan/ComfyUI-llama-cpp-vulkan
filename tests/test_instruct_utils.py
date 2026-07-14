@@ -177,12 +177,12 @@ class TestRequireUserText(unittest.TestCase):
         with self.assertRaises(ValueError):
             node._run(
                 llama_model={},
+                seed=0,
                 preset_prompt="空白 - 空",
                 custom_prompt="  ",
                 system_prompt="",
-                seed=0,
-                force_offload=False,
                 strip_thinking=True,
+                force_offload=False,
                 parameters=None,
                 runner=lambda *args: self.fail("runner should not run"),
             )
@@ -194,12 +194,12 @@ class TestRequireUserText(unittest.TestCase):
         with self.assertRaises(KeyError):
             node._run(
                 llama_model={},
+                seed=0,
                 preset_prompt="空白 - 空",
                 custom_prompt="一只猫",
                 system_prompt="",
-                seed=0,
-                force_offload=False,
                 strip_thinking=True,
+                force_offload=False,
                 parameters=None,
                 runner=lambda *args: self.fail("runner should not run"),
             )

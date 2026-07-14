@@ -124,7 +124,7 @@ image 逐张模式的多图结果以 "====== Image N ======" 分隔行拼接
 
 `src/core/instruct.py` 提供两级基类, 四个 Instruct 节点只声明 `INPUT_TYPES` 与模态专属的 runner 闭包:
 
-- `llama_cpp_instruct_base`: 通用骨架. `_run()` 负责组消息(system + user), 复制采样参数, `InterruptWatcher` 监视, force_offload / hybrid KV 重置收尾; `prompt_inputs()/runtime_inputs()/optional_inputs()` 是 INPUT_TYPES 字段组装块
+- `llama_cpp_instruct_base`: 通用骨架. `_run()` 负责组消息(system + user), 复制采样参数, `InterruptWatcher` 监视, force_offload / hybrid KV 重置收尾; `seed_input()/prompt_inputs()/runtime_inputs()/optional_inputs()` 是 INPUT_TYPES 字段组装块
 - `llama_cpp_media_instruct_base`: 多模态骨架, `MODEL_TYPE = "LLAMACPPVLM"`, 附 `require_mmproj()` 兜底校验
 
 ### 任务预设系统
@@ -187,7 +187,7 @@ image 逐张模式的多图结果以 "====== Image N ======" 分隔行拼接
 
 修改代码时不考虑兼容旧工作流(ComfyUI 的 widget 值按 `INPUT_TYPES` 声明顺序序列化, 调整顺序会使已保存工作流的 widget 值错位, 属预期代价), 只考虑代码本身的合理性. 特别是后加的配置项, 不要为迁就旧工作流而堆在末尾, 应按语义放到合理位置(与相关字段分组).
 
-Instruct 子类的字段顺序约定: 模型端口 -> 媒体输入 -> `prompt_inputs()` -> 模态专属字段 -> `runtime_inputs()`.
+Instruct 子类的字段顺序约定: 模型端口 -> 媒体输入 -> `seed_input()` -> `prompt_inputs()` -> 模态专属字段 -> `runtime_inputs()`(strip_thinking -> force_offload, 收尾动作垫底).
 
 ### Wheel 构建与发布 (CI)
 

@@ -143,6 +143,23 @@ class llama_cpp_instruct_base:
     # ---- INPUT_TYPES 字段组装块(子类按需拼接, 顺序由子类的声明决定) ----
 
     @classmethod
+    def seed_input(cls):
+        return {
+            # 上限取 0xFFFFFFFE: 0xFFFFFFFF 是 llama.cpp 的 LLAMA_DEFAULT_SEED
+            # 哨兵值(随机种子), 落在该值会静默失去可复现性
+            "seed": (
+                "INT",
+                {
+                    "default": 0,
+                    "min": 0,
+                    "max": 0xFFFFFFFE,
+                    "step": 1,
+                    "tooltip": "32 位种子; 上限 0xFFFFFFFE, 避开 llama.cpp 的随机种子哨兵值 0xFFFFFFFF.",
+                },
+            ),
+        }
+
+    @classmethod
     def prompt_inputs(cls):
         presets = instruct_presets(cls.MODALITY)
         return {
@@ -160,21 +177,10 @@ class llama_cpp_instruct_base:
 
     @classmethod
     def runtime_inputs(cls):
+        # force_offload 是执行结束后的收尾动作, 垫底; 输出后处理 (strip_thinking) 靠前
         return {
-            # 上限取 0xFFFFFFFE: 0xFFFFFFFF 是 llama.cpp 的 LLAMA_DEFAULT_SEED
-            # 哨兵值(随机种子), 落在该值会静默失去可复现性
-            "seed": (
-                "INT",
-                {
-                    "default": 0,
-                    "min": 0,
-                    "max": 0xFFFFFFFE,
-                    "step": 1,
-                    "tooltip": "32 位种子; 上限 0xFFFFFFFE, 避开 llama.cpp 的随机种子哨兵值 0xFFFFFFFF.",
-                },
-            ),
-            "force_offload": ("BOOLEAN", {"default": False, "tooltip": "推理结束后立即卸载模型, 释放显存."}),
             "strip_thinking": ("BOOLEAN", {"default": True, "tooltip": "移除输出中的思考/推理块\n(适用于 Thinking 模型)"}),
+            "force_offload": ("BOOLEAN", {"default": False, "tooltip": "推理结束后立即卸载模型, 释放显存."}),
         }
 
     @classmethod
@@ -244,7 +250,7 @@ class llama_cpp_instruct_base:
         output = LLAMA_CPP_STORAGE.llm.create_chat_completion(messages=messages, seed=seed, **params)
         return extract_text(output)
 
-    def _run(self, llama_model, preset_prompt, custom_prompt, system_prompt, seed, force_offload, strip_thinking, parameters, runner):
+    def _run(self, llama_model, seed, preset_prompt, custom_prompt, system_prompt, strip_thinking, force_offload, parameters, runner):
         """通用执行骨架: 组消息 -> 中断监视下执行 runner -> 收尾清理.
 
         runner(messages, user_content, seed, params, extract_text, watcher)
