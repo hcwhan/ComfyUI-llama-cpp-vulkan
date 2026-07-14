@@ -1,5 +1,6 @@
-"""src/core/instruct.py 的单元测试: thinking 块剥离, 预设/自定义提示词组装, 预设配置一致性, 以及 FakeLlm 打桩的 content 扁平化与 REQUIRE_USER_TEXT 守卫 (走 _run)."""
+"""src/core/instruct.py 的单元测试: thinking 块剥离, 预设/自定义提示词组装, 预设配置一致性, 以及 FakeLlm 打桩的 content 扁平化, allow_thinking 折算与 REQUIRE_USER_TEXT 守卫 (走 _run)."""
 
+import types
 import unittest
 
 from tests import comfy_stubs
@@ -156,6 +157,53 @@ class TestSingleCompletionContentFlattening(unittest.TestCase):
         ]
         self.node._single_completion([], content, 0, {}, self._extract)
         self.assertIs(self.fake.captured_messages[-1]["content"], content)
+
+
+class TestAllowThinkingMapping(unittest.TestCase):
+    """text Instruct 的 allow_thinking 开关折算为 wheel 的 reasoning_budget."""
+
+    class _FakeLlm:
+        def __init__(self):
+            self.captured_params = None
+            self._model = types.SimpleNamespace(is_hybrid=lambda: False, is_recurrent=lambda: False)
+
+        def abort(self):
+            pass
+
+        def create_chat_completion(self, messages, seed, **params):
+            self.captured_params = params
+            return {"choices": [{"message": {"content": "ok"}}]}
+
+    def setUp(self):
+        self.config = {"model": "m.gguf"}
+        self.fake = self._FakeLlm()
+        self._orig_state = (LLAMA_CPP_STORAGE.llm, LLAMA_CPP_STORAGE.current_config)
+        LLAMA_CPP_STORAGE.llm = self.fake
+        # current_config 与 llm_model 相同, _prepare_messages 不触发真实加载
+        LLAMA_CPP_STORAGE.current_config = self.config
+        self.addCleanup(self._restore_state)
+
+    def _restore_state(self):
+        (LLAMA_CPP_STORAGE.llm, LLAMA_CPP_STORAGE.current_config) = self._orig_state
+
+    def _process(self, allow_thinking):
+        llama_cpp_text_instruct().process(
+            llm_model=self.config,
+            seed=0,
+            preset_prompt="空白 - 空",
+            custom_prompt="一只猫",
+            system_prompt="",
+            allow_thinking=allow_thinking,
+            strip_thinking=True,
+            force_offload=False,
+        )
+        return self.fake.captured_params
+
+    def test_disallow_maps_to_zero_budget(self):
+        self.assertEqual(self._process(False)["reasoning_budget"], 0)
+
+    def test_allow_maps_to_minus_one(self):
+        self.assertEqual(self._process(True)["reasoning_budget"], -1)
 
 
 class TestRequireUserText(unittest.TestCase):

@@ -72,7 +72,6 @@ class llama_cpp_llm_model_loader:
             "required": {
                 "gpu_device": _GPU_DEVICE_FIELD,
                 "model": (_model_list(),),
-                # TODO 是否开启思考
                 "ctx_size": _CTX_SIZE_FIELD,
                 "vram_limit": _VRAM_LIMIT_FIELD,
             }

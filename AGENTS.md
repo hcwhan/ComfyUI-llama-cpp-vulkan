@@ -148,6 +148,7 @@ image 逐张模式的多图结果以 "====== Image N ======" 分隔行拼接
 ### 推理输出与中断
 
 - 无会话状态: 每次执行都是全新的一次性请求(system prompt + 本次提问), 不保留任何跨执行的对话历史
+- text Instruct 的 `allow_thinking` 开关(默认关): 关闭时以 `reasoning_budget=0` 让思考块开启即强制闭合(请求期参数, 切换零成本; 非思考模型由 wheel 采样器的 reasoning_start 安全窗自动失效). 放 Instruct 而非 llm loader 是因为 text 侧 wheel 无模板级开关, reasoning_budget 采样器是唯一通用机制; 与 vlm 侧构造期 thinking 开关(切换需重载)的位置不对称是机制差异的忠实反映. 采样器按生成的 `<think>` 标签计数, 模板预注入 `<think>` 的形态无法被抑制, 残留思考块由 strip_thinking 剥离
 - `strip_thinking` 开关(默认开): 剥离三种思考形态 - `<think>...</think>` 推理块(兼容 generation prompt 已注入 `<think>` 导致输出只含闭合标签的情况), Gemma4 的 channel 格式(取最后一个 `<channel|>` 之后, 覆盖 E 系列无开标签的纯文本思考形态), GLM-4.1V 的 `<answer>` 包裹(handler 以 `</answer>` 为 stop token 导致开标签残留); 未闭合(生成截断)时均保持原样
 - `InterruptWatcher`: 推理期间守护线程每 200ms 轮询 `mm.processing_interrupted()`, 命中后调用 `Llama.abort()` 使生成立即停止; llama-cpp-python 在每次请求开始会 clear abort 事件, 因此监视线程命中后持续重复 set 以抗竞态
 - 每次节点执行结束后按 `is_hybrid_arch()`(`_model.is_hybrid()`/`is_recurrent()` C API)判断是否整体重置 KV cache(重置在 `_run()` 的 finally 中, image 逐张模式中间的多次请求之间不重置, 依赖 wheel 内置的 hybrid checkpoint 前缀匹配): hybrid/recurrent 架构(Qwen3.5, LFM2 系等)的线性注意力状态无法跨请求前缀复用; 纯 SWA 模型(Gemma3)不受影响
@@ -181,7 +182,7 @@ image 逐张模式的多图结果以 "====== Image N ======" 分隔行拼接
 
 项目代码只对接 `requirements.txt` 中固定的依赖版本(特别是 llama-cpp-python 的 JamePeng Vulkan wheel), 不为历史版本或官方构建编写兼容/回退代码. mmproj 路径统一用 `mmproj_path` 键传入 handler.
 
-当前依赖的 wheel 对接面清单(升级 wheel 时按单复核, 与 `tests/test_wheel_contract.py` 一一对应): `llm.n_tokens`, `llm._ctx.memory_clear`, `llm._hybrid_cache_mgr`, `llm._model.is_hybrid()/is_recurrent()`, `llama_cpp._ggml`(设备枚举符号), chat handler 的 `mmproj_path` 实例属性(`require_mmproj` 的判定依据, getattr 兜底使重命名不报错而是恒判"未配置"), `Llama.close()/abort()`(公开方法, 但同为按单复核的对接面), `llama_cpp.llama_cpp.llama_split_mode` 枚举(NONE/LAYER), `create_chat_completion` 接受 Parameters 节点全部 12 个采样参数(UI 键 `max_gen_tokens` 由 instruct 的 `_run()` 映射回 `max_tokens`)与 `seed`. 契约测试静态检查上述接口存在性(不加载模型), 升级 wheel 后运行即可发现断裂; 公开 handler 类的契约另由 `tests/test_handlers.py` 锁定.
+当前依赖的 wheel 对接面清单(升级 wheel 时按单复核, 与 `tests/test_wheel_contract.py` 一一对应): `llm.n_tokens`, `llm._ctx.memory_clear`, `llm._hybrid_cache_mgr`, `llm._model.is_hybrid()/is_recurrent()`, `llama_cpp._ggml`(设备枚举符号), chat handler 的 `mmproj_path` 实例属性(`require_mmproj` 的判定依据, getattr 兜底使重命名不报错而是恒判"未配置"), `Llama.close()/abort()`(公开方法, 但同为按单复核的对接面), `llama_cpp.llama_cpp.llama_split_mode` 枚举(NONE/LAYER), `create_chat_completion` 接受 Parameters 节点全部 12 个采样参数(UI 键 `max_gen_tokens` 由 instruct 的 `_run()` 映射回 `max_tokens`), `seed` 与 `reasoning_budget`(text Instruct 的 `allow_thinking` 开关折算). 契约测试静态检查上述接口存在性(不加载模型), 升级 wheel 后运行即可发现断裂; 公开 handler 类的契约另由 `tests/test_handlers.py` 锁定.
 
 ### INPUT_TYPES 字段顺序
 
