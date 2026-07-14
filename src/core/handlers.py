@@ -131,3 +131,16 @@ def thinking_modes():
     """
     sentinel = {THINK_UNSUPPORTED: "none", THINK_FORCED: "forced"}
     return {label: sentinel.get(_HANDLER_SPECS[label][2], "toggle") for label in HANDLERS}
+
+
+# 音频专用 handler: 无视觉编码路径, loader 的 image_min/max_tokens 对其无效
+_AUDIO_ONLY_LABELS = frozenset({"(ASR) Qwen3-ASR"})
+
+
+def image_token_handlers():
+    """支持 image_min/max_tokens 的 handler 名单 (视觉类, 音频专用档除外).
+
+    经 vlm loader 的 chat_handler widget options 透传给前端 JS,
+    控制两个 token 字段的显隐; Generic-MTMD 可能服务任意模态, 保守按支持处理.
+    """
+    return [label for label in HANDLERS if label not in _AUDIO_ONLY_LABELS]

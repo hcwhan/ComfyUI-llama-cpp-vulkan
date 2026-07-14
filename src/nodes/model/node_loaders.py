@@ -11,7 +11,7 @@
 import os
 
 from ...core.devices import AUTO_LABEL, gpu_device_choices
-from ...core.handlers import HANDLERS, clamp_thinking, thinking_modes
+from ...core.handlers import HANDLERS, clamp_thinking, image_token_handlers, thinking_modes
 from ...core.model_paths import get_llm_filename_list
 from ...core.storage import resolve_config
 
@@ -111,9 +111,13 @@ class llama_cpp_vlm_model_loader:
                 "mmproj": (_mmproj_list(),),
                 # "None" 占位在首位作为默认值, 强制用户显式选择匹配的 handler
                 # (loadmodel 做非空校验), 避免默认首个 handler 被误用于不匹配的模型.
-                # thinking_modes 是自定义 key, 经 /object_info 原样透传给前端 JS
-                # 做 thinking 开关的三态置灰(与注册表单一真源)
-                "chat_handler": (["None"] + list(HANDLERS), {"thinking_modes": thinking_modes()}),
+                # thinking_modes / image_token_handlers 是自定义 key, 经 /object_info
+                # 原样透传给前端 JS: 前者做 thinking 开关的三态置灰, 后者控制
+                # image_min/max_tokens 的显隐(均与注册表单一真源)
+                "chat_handler": (
+                    ["None"] + list(HANDLERS),
+                    {"thinking_modes": thinking_modes(), "image_token_handlers": image_token_handlers()},
+                ),
                 "thinking": (
                     "BOOLEAN",
                     {

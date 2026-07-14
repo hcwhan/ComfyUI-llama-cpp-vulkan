@@ -12,12 +12,14 @@ import llama_cpp.llama_multimodal as _handler_module  # noqa: E402
 
 from src.core import handlers  # noqa: E402
 from src.core.handlers import (  # noqa: E402
+    _AUDIO_ONLY_LABELS,
     _HANDLER_SPECS,
     HANDLERS,
     THINK_FORCED,
     THINK_UNSUPPORTED,
     clamp_thinking,
     handler_constructor,
+    image_token_handlers,
     thinking_modes,
 )
 
@@ -151,6 +153,19 @@ class TestThinkingModes(unittest.TestCase):
         self.assertEqual(modes["Qwen3.6"], "toggle")
         self.assertEqual(modes["GLM-4.1V-Thinking"], "forced")
         self.assertEqual(modes["Gemma3"], "none")
+
+
+class TestImageTokenHandlers(unittest.TestCase):
+    def test_audio_only_labels_exist_in_specs(self):
+        # 防注册表改名后名单指向不存在的条目而静默失效
+        self.assertLessEqual(_AUDIO_ONLY_LABELS, set(_HANDLER_SPECS))
+
+    def test_audio_only_excluded_others_kept(self):
+        labels = image_token_handlers()
+        self.assertNotIn("(ASR) Qwen3-ASR", labels)
+        self.assertIn("Qwen3-VL", labels)
+        self.assertIn("Generic-MTMD", labels)
+        self.assertEqual(set(labels) | _AUDIO_ONLY_LABELS, set(HANDLERS))
 
 
 class TestResolveHandlers(unittest.TestCase):
