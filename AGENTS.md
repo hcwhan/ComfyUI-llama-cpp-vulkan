@@ -139,7 +139,7 @@ image 逐张模式的多图结果以 "====== Image N ======" 分隔行拼接
 
 ### Chat Handler 注册表
 
-`src/core/handlers.py` 的 `_HANDLER_SPECS` 表集中定义全部 handler, 数据形态, 排序约定与新增须知见该表头注释. 要点: 每个条目附 thinking 三态元数据(可切换档记构造参数名 / 不支持 / 强制思考), vlm loader 的 `thinking` 开关值经 `handler_constructor` 按三态绑定, 不可切换档由 `clamp_thinking` 钳制并打 warning(覆盖绕过前端的 API 提交路径), `storage.py` 因此不感知 thinking 逻辑; 构造期固定参数(Generic-MTMD 兜底的 `chat_format` 等)经 `functools.partial` 预绑定进 `HANDLERS` 的构造器; 启动时解析失败的类只从下拉框剔除并打 warning(防御 wheel 升级时的类变动, 不静默, 不阻断 import); 三态元数据与类签名的一致性由 `tests/test_handlers.py` 契约测试锁定. 前端 `web/vlm_loader.js` 按 `chat_handler` widget options 的自定义 key(经 `/object_info` 原样透传, 与注册表单一真源)做联动: `thinking_modes` 对 thinking 开关三态置灰, `image_token_handlers` 控制 image_min/max_tokens 仅在视觉类 handler 下显示(音频专用与 "None" 隐藏; widget 值本身不动, 重新显示时保留原值, loadmodel 对无视觉路径的 handler 把两值折算为 0 落盘); JS 失效只损失置灰/显隐效果, 行为正确性由 Python 侧保证.
+`src/core/handlers.py` 的 `_HANDLER_SPECS` 表集中定义全部 handler, 数据形态, 排序约定与新增须知见该表头注释. 要点: 每个条目附 thinking 三态元数据(可切换档记构造参数名 / 不支持 / 强制思考), vlm loader 的 `thinking` 开关值经 `handler_constructor` 按三态绑定, 不可切换档由 `clamp_thinking` 钳制并打 warning(覆盖绕过前端的 API 提交路径), `storage.py` 因此不感知 thinking 逻辑; 构造期固定参数(-Generic- 兜底的 `chat_format` 等)经 `functools.partial` 预绑定进 `HANDLERS` 的构造器; 启动时解析失败的类只从下拉框剔除并打 warning(防御 wheel 升级时的类变动, 不静默, 不阻断 import); 三态元数据与类签名的一致性由 `tests/test_handlers.py` 契约测试锁定. 前端 `web/vlm_loader.js` 按 `chat_handler` widget options 的自定义 key(经 `/object_info` 原样透传, 与注册表单一真源)做联动: `thinking_modes` 对 thinking 开关三态置灰, `image_token_handlers` 控制 image_min/max_tokens 仅在视觉类 handler 下显示(音频专用与 "None" 隐藏; widget 值本身不动, 重新显示时保留原值, loadmodel 对无视觉路径的 handler 把两值折算为 0 落盘); JS 失效只损失置灰/显隐效果, 行为正确性由 Python 侧保证.
 
 ### 多模态输入
 

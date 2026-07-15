@@ -164,7 +164,7 @@ class TestImageTokenHandlers(unittest.TestCase):
         labels = image_token_handlers()
         self.assertNotIn("(ASR) Qwen3-ASR", labels)
         self.assertIn("Qwen3-VL", labels)
-        self.assertIn("Generic-MTMD", labels)
+        self.assertIn("-Generic-", labels)
         self.assertEqual(set(labels) | _AUDIO_ONLY_LABELS, set(HANDLERS))
 
 
@@ -183,10 +183,10 @@ class TestResolveHandlers(unittest.TestCase):
 
     def test_kwargs_prebound_via_partial(self):
         # 声明了固定 kwargs 的条目须经 functools.partial 预绑定构造参数
-        specs = {"Generic-MTMD": ("GenericMTMDChatHandler", {"chat_format": None}, handlers.THINK_UNSUPPORTED)}
+        specs = {"-Generic-": ("GenericMTMDChatHandler", {"chat_format": None}, handlers.THINK_UNSUPPORTED)}
         with mock.patch.object(handlers, "_HANDLER_SPECS", specs):
             resolved = handlers._resolve_handlers()
-        self.assertEqual(resolved["Generic-MTMD"].keywords, {"chat_format": None})
+        self.assertEqual(resolved["-Generic-"].keywords, {"chat_format": None})
 
 
 if __name__ == "__main__":

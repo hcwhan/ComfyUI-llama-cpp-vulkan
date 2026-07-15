@@ -45,9 +45,9 @@ Legacy handlers (LLaVA-1.6 / 1.5, llama3-Vision-Alpha, nanoLLaVA, Moondream2, Ob
 | (OCR) PaddleOCR-VL-1.5 | OCR |
 | (OCR) MinerU2.5-Pro | Document (based on Qwen2.5-VL) |
 | (OCR) Granite-Docling | Document |
-| Generic-MTMD | Fallback (renders the model's built-in chat template) |
+| -Generic- | Fallback (renders the model's built-in chat template) |
 
-> VLMs without a dedicated handler can use the `Generic-MTMD` fallback handler. Text-only GGUF models need no handler at all and run in generic text mode via `llm Model Loader`.
+> VLMs without a dedicated handler can use the `-Generic-` fallback handler. Text-only GGUF models need no handler at all and run in generic text mode via `llm Model Loader`.
 
 ## Installation
 
