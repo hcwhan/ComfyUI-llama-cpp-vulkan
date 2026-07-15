@@ -38,5 +38,7 @@ BBOX_MODE_QWEN25_VL = "Qwen2.5-VL"
 
 # image Instruct 逐张模式多图输出的前缀行模板, {n} 为图片序号 (从 1 起);
 # 生成端 (image Instruct) 与识别端 (shared/text_utils.py 的拆分正则,
-# 由本模板派生) 必须同源, 修改模板即同时更新两端
+# 由本模板派生) 必须同源, 修改模板即同时更新两端.
+# 注意: 两份 language_*.py 各有两处以字面量内嵌该样式 (文件头 docstring
+# 与 image Instruct 的 mode tooltip), 修改模板时须手工同步
 IMAGE_RESULT_SEPARATOR_TEMPLATE = "======== Image {n} ========"
