@@ -9,6 +9,7 @@ from tests import comfy_stubs
 
 comfy_stubs.install()
 
+from src.core.gguf_layers import get_model_meta  # noqa: E402
 from src.core.storage import (  # noqa: E402
     _BASE_OVERHEAD,
     _estimate_kv_bytes,
@@ -17,6 +18,15 @@ from src.core.storage import (  # noqa: E402
 )
 
 _GB = 1024**3
+
+
+# 生产路径 (load_model) 解析一次 meta 后传入各估算函数, 测试以同款方式组装参数
+def _n_gpu_layers(model_path, mmproj_path, vram_limit, n_ctx):
+    return _estimate_n_gpu_layers(model_path, get_model_meta(model_path), mmproj_path, vram_limit, n_ctx)
+
+
+def _vram_bytes(model_path, mmproj_path, n_gpu_layers, n_ctx):
+    return _estimate_vram_bytes(model_path, get_model_meta(model_path), mmproj_path, n_gpu_layers, n_ctx)
 
 
 def _kv_u32(key, value):
@@ -69,28 +79,28 @@ class TestEstimateNGpuLayers(unittest.TestCase):
         return path
 
     def test_minus_one_passthrough_auto(self):
-        self.assertEqual(_estimate_n_gpu_layers(self._model_path(), None, -1, 8192), (-1, False))
+        self.assertEqual(_n_gpu_layers(self._model_path(), None, -1, 8192), (-1, False))
 
     def test_zero_means_pure_cpu(self):
-        self.assertEqual(_estimate_n_gpu_layers(self._model_path(), None, 0, 8192), (0, False))
+        self.assertEqual(_n_gpu_layers(self._model_path(), None, 0, 8192), (0, False))
 
     def test_budget_fits_all_layers_capped_by_estimate(self):
         # 32 层 x 32MB 文件, 预算远大于折算体积, 折算层数应超过实际层数(由 llama.cpp 截断)
         path = self._model_path(block_count=32, pad_to_bytes=32 * 1024 * 1024)
-        n_layers, _mmproj_on_gpu = _estimate_n_gpu_layers(path, None, 8, 8192)
+        n_layers, _mmproj_on_gpu = _n_gpu_layers(path, None, 8, 8192)
         self.assertGreaterEqual(n_layers, 32)
 
     def test_mmproj_exceeding_budget_keeps_all_on_cpu(self):
         # 回归 (严格守预算): mmproj 2GB > 预算 1GB, 主模型全留 CPU 且 mmproj 不进显存
         model = self._model_path(block_count=32, pad_to_bytes=32 * 1024 * 1024)
         mmproj = self._write_sparse(2 * _GB)
-        self.assertEqual(_estimate_n_gpu_layers(model, mmproj, 1, 8192), (0, False))
+        self.assertEqual(_n_gpu_layers(model, mmproj, 1, 8192), (0, False))
 
     def test_mmproj_within_budget_goes_to_gpu(self):
         # mmproj 体积在预算内时正常进显存, 主模型至少 1 层
         model = self._model_path(block_count=32, pad_to_bytes=32 * 1024 * 1024)
         mmproj = self._write_sparse(1 * _GB)
-        n_layers, mmproj_on_gpu = _estimate_n_gpu_layers(model, mmproj, 8, 8192)
+        n_layers, mmproj_on_gpu = _n_gpu_layers(model, mmproj, 8, 8192)
         self.assertGreaterEqual(n_layers, 1)
         self.assertTrue(mmproj_on_gpu)
 
@@ -98,13 +108,13 @@ class TestEstimateNGpuLayers(unittest.TestCase):
         # 回归 (严格守预算): 预算低于单层折算体积时返回 0 层,
         # 不再强制 1 层突破 vram_limit 上限
         path = self._sparse_model(block_count=2, size=2 * _GB)  # 每层折算约 1.55 GB
-        self.assertEqual(_estimate_n_gpu_layers(path, None, 1, 8192), (0, False))
+        self.assertEqual(_n_gpu_layers(path, None, 1, 8192), (0, False))
 
     def test_mmproj_fits_but_no_layer_budget_keeps_model_on_cpu(self):
         # mmproj 在预算内照常进显存, 扣除后不足主模型 1 层时主模型留 CPU
         model = self._sparse_model(block_count=2, size=2 * _GB)
         mmproj = self._write_sparse(_GB // 2)  # 折算约 0.575 GB, 预算剩 1.425 GB < 1 层
-        self.assertEqual(_estimate_n_gpu_layers(model, mmproj, 2, 8192), (0, True))
+        self.assertEqual(_n_gpu_layers(model, mmproj, 2, 8192), (0, True))
 
 
 class TestEstimateKvBytes(unittest.TestCase):
@@ -159,12 +169,12 @@ class TestEstimateVramBytes(unittest.TestCase):
 
     def test_zero_layers_counts_only_mmproj(self):
         # 主模型 0 层不进显存, 估算只含 mmproj 体积
-        size = _estimate_vram_bytes(self.model, self.mmproj, 0, 8192)
+        size = _vram_bytes(self.model, self.mmproj, 0, 8192)
         self.assertLess(size, os.path.getsize(self.model))
         self.assertGreater(size, 0)
 
     def test_auto_layers_counts_full_model(self):
-        size = _estimate_vram_bytes(self.model, None, -1, 8192)
+        size = _vram_bytes(self.model, None, -1, 8192)
         self.assertGreaterEqual(size, os.path.getsize(self.model))
 
     def test_precise_kv_used_when_metadata_present(self):
@@ -181,7 +191,7 @@ class TestEstimateVramBytes(unittest.TestCase):
         model = self._write_temp(data)
         kv = 8192 * 2 * 2 * (16 + 16) * 2
         expected = int(os.path.getsize(model) * (1.0 + _BASE_OVERHEAD) + kv)
-        self.assertEqual(_estimate_vram_bytes(model, None, -1, 8192), expected)
+        self.assertEqual(_vram_bytes(model, None, -1, 8192), expected)
 
 
 if __name__ == "__main__":

@@ -79,9 +79,12 @@ def _estimate_kv_bytes(meta, layers, n_ctx):
     return int(kv_tokens * layers * kv_heads * (key_dim + value_dim) * 2)
 
 
-def _estimate_per_layer_bytes(model_path, n_ctx):
-    """估算每层显存占用(权重+固定开销+KV), 返回 (per_layer_bytes, layers)."""
-    meta = get_model_meta(model_path)
+def _estimate_per_layer_bytes(model_path, meta, n_ctx):
+    """估算每层显存占用(权重+固定开销+KV), 返回 (per_layer_bytes, layers).
+
+    meta 为 get_model_meta 的解析结果, 由 load_model 解析一次后传入,
+    避免同一次加载反复打开文件扫描 GGUF 头.
+    """
     layers = _as_number(meta.get("block_count")) or 32
     size = os.path.getsize(model_path)
     kv_bytes = _estimate_kv_bytes(meta, layers, n_ctx)
@@ -93,7 +96,7 @@ def _estimate_per_layer_bytes(model_path, n_ctx):
     return total / layers, layers
 
 
-def _estimate_n_gpu_layers(model_path, mmproj_path, vram_limit, n_ctx):
+def _estimate_n_gpu_layers(model_path, meta, mmproj_path, vram_limit, n_ctx):
     """按 GGUF 层数把 vram_limit (GB) 折算成 (n_gpu_layers, mmproj 是否进显存).
 
     -1 透传给 llama.cpp 的 auto 语义(自动按空闲显存适配, 通常为全部层);
@@ -106,7 +109,7 @@ def _estimate_n_gpu_layers(model_path, mmproj_path, vram_limit, n_ctx):
         return -1, mmproj_path is not None
     if vram_limit == 0:
         return 0, False
-    per_layer_bytes, _layers = _estimate_per_layer_bytes(model_path, n_ctx)
+    per_layer_bytes, _layers = _estimate_per_layer_bytes(model_path, meta, n_ctx)
     layer_size = per_layer_bytes / (1024**3)
     if layer_size <= 0:
         return -1, mmproj_path is not None
@@ -124,9 +127,9 @@ def _estimate_n_gpu_layers(model_path, mmproj_path, vram_limit, n_ctx):
     return n_layers, mmproj_path is not None
 
 
-def _estimate_vram_bytes(model_path, mmproj_path, n_gpu_layers, n_ctx):
+def _estimate_vram_bytes(model_path, meta, mmproj_path, n_gpu_layers, n_ctx):
     """估算本次加载的显存需求(字节), 用于请求 ComfyUI 先腾挪 torch 侧显存."""
-    per_layer_bytes, layers = _estimate_per_layer_bytes(model_path, n_ctx)
+    per_layer_bytes, layers = _estimate_per_layer_bytes(model_path, meta, n_ctx)
     gpu_layers = layers if n_gpu_layers < 0 else min(n_gpu_layers, layers)
     size = per_layer_bytes * gpu_layers
     if mmproj_path:
@@ -225,7 +228,10 @@ class LLAMA_CPP_STORAGE:
         mmproj = config["mmproj"]
         main_gpu, split_mode = resolve_device_selection(gpu_device)
 
-        n_gpu_layers, mmproj_on_gpu = _estimate_n_gpu_layers(model_path, mmproj_path, config["vram_limit"], config["n_ctx"])
+        # GGUF 头只解析一次, 显存折算与 n_layer 日志共用同一份 meta
+        # (解析失败为空 dict, 各消费点自带回退)
+        meta = get_model_meta(model_path)
+        n_gpu_layers, mmproj_on_gpu = _estimate_n_gpu_layers(model_path, meta, mmproj_path, config["vram_limit"], config["n_ctx"])
 
         # Vulkan 与 PyTorch 共享同一张物理卡但分配器互不感知, 先请求 ComfyUI
         # 卸载 torch 侧模型腾出显存, 否则 SD 模型占满显存时 Vulkan 分配直接失败;
@@ -236,7 +242,7 @@ class LLAMA_CPP_STORAGE:
         if n_gpu_layers != 0 or mmproj_on_gpu:
             try:
                 mm.free_memory(
-                    _estimate_vram_bytes(model_path, mmproj_path if mmproj_on_gpu else None, n_gpu_layers, config["n_ctx"]),
+                    _estimate_vram_bytes(model_path, meta, mmproj_path if mmproj_on_gpu else None, n_gpu_layers, config["n_ctx"]),
                     mm.get_torch_device(),
                 )
             except Exception as e:
@@ -277,7 +283,7 @@ class LLAMA_CPP_STORAGE:
         logger.info(LOG_PREFIX + _LOGS["loading_model"].format(model=model))
         # n_layer(GGUF block_count)供对照 n_gpu_layers: 折算值可超过实际层数
         # (超出即全量 offload, llama.cpp 侧自行钳制), 元数据缺失时显示 "?"
-        n_layer = _as_number(get_model_meta(model_path).get("block_count")) or "?"
+        n_layer = _as_number(meta.get("block_count")) or "?"
         logger.info(
             LOG_PREFIX + _LOGS["load_params"].format(n_gpu_layers=n_gpu_layers, n_layer=n_layer, main_gpu=main_gpu, split_mode=split_mode)
         )
@@ -310,7 +316,7 @@ class LLAMA_CPP_STORAGE:
                     raise mm.InterruptProcessingException() from None
                 try:
                     mm.free_memory(
-                        _estimate_vram_bytes(model_path, mmproj_path if mmproj_on_gpu else None, n_gpu_layers, config["n_ctx"]),
+                        _estimate_vram_bytes(model_path, meta, mmproj_path if mmproj_on_gpu else None, n_gpu_layers, config["n_ctx"]),
                         mm.get_torch_device(),
                     )
                 except Exception as free_err:
