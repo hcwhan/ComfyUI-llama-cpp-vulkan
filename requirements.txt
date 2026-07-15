@@ -5,7 +5,7 @@ scipy
 tqdm
 
 # for Windows (Vulkan) - ABI3 universal wheel, supports CPython 3.10+
-llama-cpp-python @ https://github.com/hcwhan/ComfyUI-llama-cpp-vulkan/releases/download/v0.3.42-vulkan-abi3-20260713/llama_cpp_python-0.3.42+vulkan-cp310-abi3-win_amd64.whl; platform_system == "Windows"
+llama-cpp-python @ https://github.com/hcwhan/ComfyUI-llama-cpp-vulkan/releases/download/v0.3.42-vulkan-abi3-20260715/llama_cpp_python-0.3.42+vulkan-cp310-abi3-win_amd64.whl; platform_system == "Windows"
 
 # for Linux (Vulkan) - ABI3 universal wheel, supports CPython 3.10+ (glibc >= 2.31)
-llama-cpp-python @ https://github.com/hcwhan/ComfyUI-llama-cpp-vulkan/releases/download/v0.3.42-vulkan-abi3-20260713/llama_cpp_python-0.3.42+vulkan-cp310-abi3-manylinux_2_31_x86_64.whl; platform_system == "Linux"
+llama-cpp-python @ https://github.com/hcwhan/ComfyUI-llama-cpp-vulkan/releases/download/v0.3.42-vulkan-abi3-20260715/llama_cpp_python-0.3.42+vulkan-cp310-abi3-manylinux_2_31_x86_64.whl; platform_system == "Linux"
