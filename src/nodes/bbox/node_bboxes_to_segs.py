@@ -114,8 +114,10 @@ class bboxes_to_segs:
             # 掩码矩形在 crop 窗口坐标系中的位置
             inner_rect = (mx1 - cx1, my1 - cy1, mx2 - cx1, my2 - cy1)
             cropped_mask_np = feathered_rect_mask(cy2 - cy1, cx2 - cx1, inner_rect, feather)
-            # Impact Pack 的 SEG 约定 cropped_image 为 [1, H, W, C]
-            cropped_image_tensor = image_for_cropping[cy1:cy2, cx1:cx2, :].unsqueeze(0)
+            # Impact Pack 的 SEG 约定 cropped_image 为 [1, H, W, C];
+            # 恒在 CPU 上构建与输出, 与 bboxes_to_mask / json_to_bboxes 策略一致:
+            # --gpu-only 下跟随 image.device 会让直接 .numpy() 的下游第三方节点报错
+            cropped_image_tensor = image_for_cropping[cy1:cy2, cx1:cx2, :].unsqueeze(0).cpu()
 
             seg = SEG(
                 cropped_image=cropped_image_tensor,

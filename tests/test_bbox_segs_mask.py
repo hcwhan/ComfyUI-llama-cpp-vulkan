@@ -33,6 +33,8 @@ class TestBBoxesToSegs(unittest.TestCase):
         self.assertEqual(seg.confidence, 0.8)
         self.assertEqual(seg.crop_region, [4, 4, 12, 12])
         self.assertEqual(tuple(seg.cropped_image.shape), (1, 8, 8, 3))
+        # 恒 CPU 输出 (与 bboxes_to_mask / json_to_bboxes 策略一致)
+        self.assertEqual(seg.cropped_image.device.type, "cpu")
         self.assertEqual(seg.cropped_mask.shape, (8, 8))
         self.assertTrue((seg.cropped_mask == 1.0).all())
         self.assertIsNone(seg.control_net_wrapper)
