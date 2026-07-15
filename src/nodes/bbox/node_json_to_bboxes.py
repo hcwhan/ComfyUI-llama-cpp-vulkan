@@ -15,10 +15,11 @@ _LOGS = LANG["logs"]["bbox"]
 
 
 def _normalized_label(value):
-    """label 匹配归一化: 忽略大小写与首尾空格; None(字段缺失)视为不匹配.
+    """label 匹配归一化: 忽略大小写与首尾空格; None(字段缺失)不参与匹配.
 
     LLM 可能输出数字等非字符串标签, 与 bbox_label 的显示路径一致地强转 str,
     保证画得出的标签在过滤框中也能匹配到.
+    (两字段均缺失的项由过滤分支经 bbox_label 取 fallback 标签 "bbox" 参与匹配)
     """
     if value is None:
         return None
@@ -99,13 +100,20 @@ class json_to_bboxes:
                 raise ValueError(_ERRORS["not_a_list"].format(type_name=type(items).__name__))
             if wanted_label:
                 # 兼容 label / text_content 混用的输出, 任一字段匹配即保留;
+                # bbox_label 与画框显示同源, 为两字段均缺失的项补上可匹配的
+                # fallback 标签 "bbox" (字段存在时其取值已被前两项覆盖);
                 # 非 dict 项原样保留, 由 json_to_pixel_bboxes 的结构校验给出
                 # 带期望格式的报错, 而非在此抛裸 AttributeError
                 items = [
                     b
                     for b in items
                     if not isinstance(b, dict)
-                    or wanted_label in (_normalized_label(b.get("label")), _normalized_label(b.get("text_content")))
+                    or wanted_label
+                    in (
+                        _normalized_label(b.get("label")),
+                        _normalized_label(b.get("text_content")),
+                        _normalized_label(bbox_label(b)),
+                    )
                 ]
 
             if flat_images:

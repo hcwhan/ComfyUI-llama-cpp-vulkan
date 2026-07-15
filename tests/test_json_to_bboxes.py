@@ -99,6 +99,16 @@ class TestJsonToBBoxesLabelFilter(unittest.TestCase):
         bboxes, _ = self.node.process([json_str], ["simple"], ["5"], None)
         self.assertEqual(bboxes[0], [(1, 1, 4, 4)])
 
+    def test_missing_label_fields_matched_by_fallback(self):
+        # 回归: 无 label/text_content 字段的项画框显示 fallback 标签 "bbox",
+        # 过滤框填 "bbox" 须能匹配到该项 (与 bbox_label 显示路径同源取值);
+        # 填其他标签时缺字段项不得被误保留
+        json_str = '[{"bbox_2d": [1, 1, 4, 4]}, {"bbox_2d": [2, 2, 5, 5], "label": "cat"}]'
+        bboxes, _ = self.node.process([json_str], ["simple"], ["bbox"], None)
+        self.assertEqual(bboxes[0], [(1, 1, 4, 4)])
+        bboxes, _ = self.node.process([json_str], ["simple"], ["cat"], None)
+        self.assertEqual(bboxes[0], [(2, 2, 5, 5)])
+
 
 class TestJsonToBBoxesQwenMode(unittest.TestCase):
     def setUp(self):
