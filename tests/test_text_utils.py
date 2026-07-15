@@ -26,6 +26,12 @@ class TestStripCodeFence(unittest.TestCase):
     def test_unclosed_fence_strips_opening_only(self):
         self.assertEqual(strip_code_fence('```json\n{"a": 1'), '{"a": 1')
 
+    def test_fenced_block_with_trailing_prose(self):
+        # 回归: 围栏块之后追加尾随说明时, 回退提取第一个完整块,
+        # 不得残留闭合围栏与尾随文字 (下游 parse_json 会报 Extra data)
+        text = '```json\n{"a": 1}\n```\n以上就是结果.'
+        self.assertEqual(strip_code_fence(text), '{"a": 1}')
+
     def test_fence_with_crlf(self):
         self.assertEqual(strip_code_fence('```json\r\n{"a": 1}\r\n```'), '{"a": 1}')
 

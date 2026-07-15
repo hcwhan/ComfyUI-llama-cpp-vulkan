@@ -22,16 +22,23 @@ def strip_code_fence(text):
 
     兼容任意标签和裸 ``` 围栏:
     模型即使被要求输出 json 也可能给出不带标签的围栏.
-    模型输出 "好的, 结果如下:" 之类前导说明时首部不是围栏,
-    此时回退为提取文本中第一个完整围栏块的内容.
+    模型在围栏块之外追加说明时 (前导说明 / 尾随说明, 出现概率同量级),
+    回退为提取文本中第一个完整围栏块的内容.
     """
     text = text.strip()
     stripped = _FENCE_OPEN_RE.sub("", text)
     if stripped != text:
-        return _FENCE_CLOSE_RE.sub("", stripped)
+        closed = _FENCE_CLOSE_RE.sub("", stripped)
+        # 闭合围栏剥离必缩短文本, 相等即结尾不是围栏: 可能是 "围栏块 + 尾随
+        # 说明" 形态, 与前导说明分支对称地回退提取; 无完整块 (生成截断的
+        # 未闭合围栏) 时保持仅剥开头标记的现状行为
+        if closed != stripped:
+            return closed
     block = _FENCE_BLOCK_RE.search(text)
     if block:
         return block.group(1)
+    if stripped != text:
+        return stripped
     return _FENCE_CLOSE_RE.sub("", text)
 
 
