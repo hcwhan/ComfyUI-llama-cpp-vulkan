@@ -16,6 +16,7 @@ from src.core.storage import (  # noqa: E402
     _estimate_n_gpu_layers,
     _estimate_vram_bytes,
 )
+from src.i18n.lang import LANG  # noqa: E402
 
 _GB = 1024**3
 
@@ -115,6 +116,45 @@ class TestEstimateNGpuLayers(unittest.TestCase):
         model = self._sparse_model(block_count=2, size=2 * _GB)
         mmproj = self._write_sparse(_GB // 2)  # 折算约 0.575 GB, 预算剩 1.425 GB < 1 层
         self.assertEqual(_n_gpu_layers(model, mmproj, 2, 8192), (0, True))
+
+    def test_kv_fallback_logs_warning_once_per_load(self):
+        # 注意力元数据不全导致 KV 降级体积粗估时打 warning; 同一次加载
+        # (共享同一份 meta) 内层数折算与腾挪估算多次触发也只打一条
+        path = self._model_path(block_count=32, pad_to_bytes=32 * 1024 * 1024)
+        meta = get_model_meta(path)
+        with self.assertLogs("llama-cpp-vulkan", level="WARNING") as cm:
+            _estimate_n_gpu_layers(path, meta, None, 8, 8192)
+            _estimate_vram_bytes(path, meta, None, -1, 8192)
+        fallback_lines = [line for line in cm.output if LANG["logs"]["storage"]["kv_meta_fallback"] in line]
+        self.assertEqual(len(fallback_lines), 1)
+
+    def test_kv_fallback_warns_on_auto_via_vram_bytes(self):
+        # vram_limit=-1 (auto) 不经层数折算, 降级警告经腾挪估算路径同样发出
+        path = self._model_path(block_count=32, pad_to_bytes=32 * 1024 * 1024)
+        with self.assertLogs("llama-cpp-vulkan", level="WARNING") as cm:
+            _vram_bytes(path, None, -1, 8192)
+        self.assertTrue(any(LANG["logs"]["storage"]["kv_meta_fallback"] in line for line in cm.output))
+
+    def test_no_kv_fallback_warning_when_metadata_complete(self):
+        data = _gguf_bytes(
+            [
+                _kv_u32("llama.block_count", 32),
+                _kv_u32("llama.embedding_length", 4096),
+                _kv_u32("llama.attention.head_count", 32),
+                _kv_u32("llama.attention.head_count_kv", 8),
+            ]
+        )
+        data += b"\x00" * (32 * 1024 * 1024 - len(data))
+        path = self._write_temp(data)
+        with self.assertNoLogs("llama-cpp-vulkan", level="WARNING"):
+            _n_gpu_layers(path, None, 8, 8192)
+            _vram_bytes(path, None, -1, 8192)
+
+    def test_kv_fallback_silent_on_cpu_shortcut(self):
+        # vram_limit=0 (纯 CPU) 不做任何估算, 元数据不全也不打降级 warning
+        path = self._model_path(block_count=32, pad_to_bytes=32 * 1024 * 1024)
+        with self.assertNoLogs("llama-cpp-vulkan", level="WARNING"):
+            _n_gpu_layers(path, None, 0, 8192)
 
 
 class TestEstimateKvBytes(unittest.TestCase):

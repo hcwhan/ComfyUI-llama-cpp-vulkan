@@ -88,8 +88,13 @@ def _estimate_per_layer_bytes(model_path, meta, n_ctx):
     layers = _as_number(meta.get("block_count")) or 32
     size = os.path.getsize(model_path)
     kv_bytes = _estimate_kv_bytes(meta, layers, n_ctx)
-    if kv_bytes is None:  # noqa: SIM108 -- 回退分支的注释与两个公式的对照价值高于三元式的紧凑
-        # 元数据不全时回退按体积折算的经验系数
+    if kv_bytes is None:
+        # 元数据不全时回退按体积折算的经验系数. 降级警告以 meta 内标记去重:
+        # 本函数在一次加载内被多处调用(层数折算/腾挪估算/重试), 而 meta
+        # 每次加载只解析一次, 借其生命周期实现"每次加载只打一条"
+        if "_kv_fallback_warned" not in meta:
+            meta["_kv_fallback_warned"] = True
+            logger.warning(LOG_PREFIX + _LOGS["kv_meta_fallback"])
         total = size * _vram_factor(n_ctx)
     else:
         total = size * (1.0 + _BASE_OVERHEAD) + kv_bytes

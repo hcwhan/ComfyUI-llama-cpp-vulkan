@@ -465,6 +465,7 @@ LANG = {
         "storage": {
             "vram_cannot_fit_mmproj": "vram_limit ({vram_limit} GB) 装不下 mmproj 文件 (约 {mmproj_gb:.1f} GB), 主模型与 mmproj 均留在 CPU 以严格守预算",
             "vram_no_room_for_layer": "vram_limit ({vram_limit} GB) 装不下模型的任何一层 (每层约 {layer_size:.1f} GB), 主模型留在 CPU 以严格守预算",
+            "kv_meta_fallback": "GGUF 注意力元数据不全, KV cache 改按文件体积折算, vram_limit 折算精度下降, 显存估算偏粗 (强量化模型的 KV 会被低估)",
             # 以下两条为 debug 级, 默认不输出
             "llm_close_failed": "llm 关闭失败: {e}",
             "handler_close_failed": "chat_handler 关闭失败: {e}",
@@ -481,8 +482,8 @@ LANG = {
 
         # core/gguf_layers.py
         "gguf": {
-            "block_count_missing": "GGUF 元数据中找不到 block_count",
             "parse_failed": "GGUF 解析失败: {e}",
+            "block_count_missing": "GGUF 元数据中找不到 block_count",
         },
 
         # core/cqdm.py (tqdm 终端进度条的描述文字, 非 logger 输出)

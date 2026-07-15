@@ -465,6 +465,7 @@ LANG = {
         "storage": {
             "vram_cannot_fit_mmproj": "vram_limit ({vram_limit} GB) cannot fit the mmproj file (~{mmproj_gb:.1f} GB), keeping the main model and mmproj on CPU to honor the budget",
             "vram_no_room_for_layer": "vram_limit ({vram_limit} GB) leaves no room for even one model layer (~{layer_size:.1f} GB/layer), keeping the main model on CPU to honor the budget",
+            "kv_meta_fallback": "GGUF attention metadata incomplete; estimating KV cache from file size instead, vram_limit folding and VRAM estimates are coarser (KV underestimated for heavily quantized models)",
             # The next two are debug level, silent by default
             "llm_close_failed": "llm close failed: {e}",
             "handler_close_failed": "chat_handler close failed: {e}",
@@ -481,8 +482,8 @@ LANG = {
 
         # core/gguf_layers.py
         "gguf": {
-            "block_count_missing": "block_count not found in GGUF metadata",
             "parse_failed": "GGUF parse failed: {e}",
+            "block_count_missing": "block_count not found in GGUF metadata",
         },
 
         # core/cqdm.py (description text of the tqdm terminal progress bar, not logger output)
