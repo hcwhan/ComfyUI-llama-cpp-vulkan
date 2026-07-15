@@ -171,7 +171,13 @@ class LLAMA_CPP_STORAGE:
 
     @classmethod
     def clean(cls):
-        # 未加载(llm/chat_handler 为 None)是常态路径, 显式判空;
+        # 未加载(llm/chat_handler 均为 None)是常态路径(Unload 节点空跑兜底,
+        # load_model 开头对空单例的清场): 只归零配置即返回, 跳过收尾的全量
+        # gc.collect() - 对象数量庞大的 ComfyUI 进程里单次可达几十毫秒
+        if cls.llm is None and cls.chat_handler is None:
+            cls.current_config = None
+            return
+
         # close 失败不阻断清理, 但留日志供排查显存未释放问题
         if cls.llm is not None:
             try:

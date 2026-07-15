@@ -181,6 +181,22 @@ class TestLoadModelStateMachine(unittest.TestCase):
         self.assertIsNone(LLAMA_CPP_STORAGE.current_config)
         LLAMA_CPP_STORAGE.clean()
 
+    def test_clean_when_empty_skips_gc(self):
+        # 空载 clean (Unload 节点空跑兜底等) 只归零配置即返回,
+        # 不触发全量 gc.collect (大进程中单次可达几十毫秒)
+        LLAMA_CPP_STORAGE.current_config = {"stale": True}
+        with mock.patch.object(storage.gc, "collect") as collect:
+            LLAMA_CPP_STORAGE.clean()
+        collect.assert_not_called()
+        self.assertIsNone(LLAMA_CPP_STORAGE.current_config)
+
+    def test_clean_after_load_runs_gc(self):
+        # 真实卸载路径仍执行 gc.collect, 及时回收 ctypes 资源引用
+        LLAMA_CPP_STORAGE.load_model(self._config())
+        with mock.patch.object(storage.gc, "collect") as collect:
+            LLAMA_CPP_STORAGE.clean()
+        collect.assert_called_once()
+
     def test_unload_hook_cleans_storage(self):
         # monkey-patch 后的 mm.unload_all_models 经 sys.modules 动态取当前
         # 生效模块的类 (热重载加固), 调用即清理单例并级联原函数
