@@ -196,9 +196,12 @@ class TestLabelHelpers(unittest.TestCase):
         self.assertEqual(bbox_label({}), "bbox")
 
     def test_bbox_label_non_string_coerced(self):
-        # 回归: LLM 输出数字标签时须强转 str, 不得让画框整张图失败
+        # 回归: LLM 输出数字标签时须强转 str, 不得让画框整张图失败;
+        # falsy 标签以 is None 判缺失(0 显示 "0" 而非落兜底),
+        # 与过滤路径 _normalized_label 语义对齐
         self.assertEqual(bbox_label({"label": 1}), "1")
-        self.assertEqual(bbox_label({"label": 0, "text_content": 2.5}), "2.5")
+        self.assertEqual(bbox_label({"label": 0}), "0")
+        self.assertEqual(bbox_label({"label": 0, "text_content": 2.5}), "0")
 
     def test_label_color_stable_and_in_range(self):
         c1 = _label_color("cat")

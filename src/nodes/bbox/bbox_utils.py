@@ -81,10 +81,16 @@ def _label_font(size):
 def bbox_label(item):
     """取 bbox JSON 项的标签, 兼容 label / text_content 两种字段.
 
+    以 is None 判字段缺失, 与过滤路径 _normalized_label 的语义对齐,
+    falsy 标签(如数字 0)按实际值显示, 保证画得出的标签过滤框能匹配到.
     LLM 可能输出数字等非字符串标签, 强转 str 保证下游
     _label_color(label.encode) 与 PIL draw.text 不因单个标签放弃整张图.
     """
-    return str(item.get("label") or item.get("text_content") or "bbox")
+    for key in ("label", "text_content"):
+        value = item.get(key)
+        if value is not None:
+            return str(value)
+    return "bbox"
 
 
 def json_to_pixel_bboxes(json_items, mode, width=0, height=0):
