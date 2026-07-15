@@ -23,11 +23,14 @@ from src.core.handlers import (  # noqa: E402
     thinking_modes,
 )
 
-# 思考相关构造参数名单: 仅收录影响单轮输出的开关. 多轮对话保留历史思考块
-# 类参数豁免不收录 (当前 wheel 有两个: LFM25VLChatHandler 的 keep_past_thinking,
-# Qwen35ChatHandler 的 preserve_thinking) - 本插件无会话状态, 单轮请求不受
-# 其影响, 无需接线; 升级 wheel 复核时顺带扫一遍新 handler 签名有无新增思考开关
+# 思考相关构造参数名单: 仅收录影响单轮输出的开关
 _THINK_PARAM_NAMES = ("enable_thinking", "force_reasoning")
+
+# 多轮对话保留历史思考块类参数的豁免名单 (当前 wheel 有两个:
+# LFM25VLChatHandler 的 keep_past_thinking, Qwen35ChatHandler 的
+# preserve_thinking) - 本插件无会话状态, 单轮请求不受其影响, 无需接线;
+# wheel 新增的其他思考开关名由模糊扫描用例报出
+_MULTI_TURN_THINK_EXEMPT = ("keep_past_thinking", "preserve_thinking")
 
 # storage.load_model 构造 handler 时固定注入的 kwargs
 _STORAGE_KWARGS = ("mmproj_path", "verbose", "image_max_tokens", "image_min_tokens", "use_gpu")
@@ -80,6 +83,21 @@ class TestHandlerSpecs(unittest.TestCase):
                     param,
                     params,
                     f'"{label}": {cls_name}.__init__ 接受 {param} 但三态元数据标注为 {think}',
+                )
+
+    def test_fuzzy_scan_flags_unaccounted_think_params(self):
+        # 防 wheel 新增第三种思考开关名 (_THINK_PARAM_NAMES 是静态清单):
+        # 扫描全部注册类签名, 参数名含 think/reason 且既非该条目声明的
+        # 可切换参数也不在多轮豁免名单内的, 一律报出提示复核
+        # (确认是单轮开关则改注册表三态接线, 是多轮参数则入豁免名单)
+        for label, (cls_name, _kwargs, think) in _HANDLER_SPECS.items():
+            declared = think if think not in _SENTINELS else None
+            for param in _init_params(cls_name):
+                if "think" not in param and "reason" not in param:
+                    continue
+                self.assertTrue(
+                    param == declared or param in _MULTI_TURN_THINK_EXEMPT,
+                    f'"{label}": {cls_name}.__init__ 的 {param} 是未接线的思考开关, 复核应改为可切换档还是加入多轮豁免名单',
                 )
 
     def test_thinking_suffix_only_on_forced(self):
