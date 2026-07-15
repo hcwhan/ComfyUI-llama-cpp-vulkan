@@ -10,12 +10,12 @@
 
 import os
 
-from ...core.devices import AUTO_LABEL, gpu_device_choices
+from ...core.devices import gpu_device_choices
 from ...core.handlers import HANDLERS, clamp_thinking, image_token_handlers, thinking_modes
 from ...core.model_paths import get_llm_filename_list
 from ...core.storage import resolve_config
+from ...i18n.common_static import AUTO_LABEL, NONE_OPTION
 from ...i18n.common_static import CATEGORY as _CATEGORY
-from ...i18n.common_static import NONE_OPTION
 from ...i18n.lang import LANG
 
 _COMMON_TIPS = LANG["nodes"]["model"]["common"]["tooltips"]

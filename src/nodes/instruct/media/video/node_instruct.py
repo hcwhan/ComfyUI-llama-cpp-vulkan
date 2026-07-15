@@ -1,7 +1,7 @@
 """llama.cpp video Instruct 节点, 视频帧序列推理.
 
 frames 输入为 IMAGE 帧批次(ComfyUI 生态的视频通行形态, VHS/视频生成模型均输出帧批次).
-按 max_frames 均匀采样 -> 缩放到 max_size -> 全部帧并入一条消息,
+按 max_frames 均匀采样 -> 缩放到 max_size(单帧不缩放, 保持原分辨率) -> 全部帧并入一条消息,
 并在 system prompt 前注入"连续视频"语义提示.
 """
 
