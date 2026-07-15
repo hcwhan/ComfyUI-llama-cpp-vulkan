@@ -100,6 +100,8 @@ One wheel per platform covers all Python versions. Download from [Releases](http
 - **Single model instance**: the plugin keeps one global model slot. Loading a different configuration automatically unloads the previous model; two models cannot be resident at the same time.
 - **Multi-shard GGUF (split shards) not supported**: VRAM estimation only counts the selected file, and non-first shards listed in the dropdown fail to load. Merge shards into a single file first with `llama-gguf-split --merge`.
 - **mmproj does not follow explicit GPU selection**: mtmd only exposes a boolean `use_gpu` switch (upstream limitation), so on multi-GPU systems the vision encoder may stay on mtmd's default device when a non-default GPU is selected.
+- **iGPU not selectable when a dGPU is present**: llama.cpp's device collection rule only reaches the iGPU when no discrete GPU exists. To force iGPU inference, set the `GGML_VK_VISIBLE_DEVICES` environment variable before the ComfyUI process starts - the plugin initializes Vulkan at import time, so setting it any later has no effect.
+- **Vulkan initializes at plugin import**: device enumeration runs synchronously while the plugin loads (a few hundred ms, by design - the GPU dropdown needs the device list at startup). Keep this in mind when attributing ComfyUI startup time.
 
 ## Credits
 

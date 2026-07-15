@@ -100,6 +100,8 @@ pip install -r ComfyUI-llama-cpp-vulkan/requirements.txt
 - **单模型实例**: 插件维护一个全局模型槽位, 加载不同配置时自动卸载旧模型, 无法同时驻留两个模型.
 - **多分片 GGUF (split shards) 不支持**: 显存折算只计所选文件的体积, 且下拉框中列出的非首分片选中会加载失败. 请先用 `llama-gguf-split --merge` 合并为单文件.
 - **mmproj 不跟随显式选卡**: mtmd 只有 `use_gpu` 布尔开关 (上游限制), 多卡下显式选择非默认 GPU 时, 视觉编码器可能仍落在 mtmd 默认挑选的设备上.
+- **有独显时核显不可选**: llama.cpp 的设备收集规则决定了存在独显时核显无法被选中. 如需强制核显推理, 只能在 ComfyUI 进程启动前设置 `GGML_VK_VISIBLE_DEVICES` 环境变量 - 插件在 import 时即初始化 Vulkan, 之后再设置无效.
+- **import 期初始化 Vulkan**: 设备枚举在插件加载时同步执行 (约几百 ms, 有意设计 - GPU 下拉框需要启动期确定设备列表). 排查 ComfyUI 启动耗时归因时请将此纳入考虑.
 
 ## 致谢
 
