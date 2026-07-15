@@ -76,7 +76,7 @@ pip install -r ComfyUI-llama-cpp-vulkan/requirements.txt
 
 #### 3. 模型路径:
 
-- 请将下载的 `.gguf` 模型放置在 `ComfyUI/models/LLM` 目录中 (`llm` 与 `LLM` 两个目录名均已注册, Linux 大小写敏感文件系统下任选其一).
+- 请将下载的 `.gguf` 模型放置在 `ComfyUI/models/llm` 目录中 (`llm` 与 `LLM` 两个目录名均已注册, Linux 大小写敏感文件系统下任选其一).
 - 也支持通过 `extra_model_paths.yaml` 配置自定义路径.
 
   > 在使用 VLM 模型进行图像推理之前, 请确保已经下载并选择了主模型对应的 `mmproj` 权重文件.
@@ -85,7 +85,7 @@ pip install -r ComfyUI-llama-cpp-vulkan/requirements.txt
 ## 节点说明 (v2.1.0)
 
 - **加载器**: `llm Model Loader` 加载纯文本 GGUF 模型, `vlm Model Loader` 加载视觉/音频模型 (mmproj 与 chat handler 必选). 两者输出类型完全独立: llm 只能连 `text Instruct`, vlm 只能连 `image / video / audio Instruct`.
-- **推理节点**: 每个模态一个节点 - `text` (prompt 改写等), `image` (逐张或合并批量), `video` (输入为 IMAGE 帧批次, 均匀抽帧), `audio` (语音识别 / omni).
+- **推理节点**: 每个模态一个节点 - `text` (prompt 改写等), `image` (逐张或批量), `video` (输入为 IMAGE 帧批次, 均匀抽帧), `audio` (语音识别 / omni).
 - **BBox 工具链**: `JSON to BBoxes` (解析检测 JSON 并画框), `BBoxes to SEGS` (兼容 Impact Pack), `BBoxes to MASK`, `BBoxes to BBox`.
 - **实用工具**: `Parameters` (采样参数), `Unload Model`, `Parse JSON`, `Unpack Code Block`, `Split Instruct Output`, `System Prompt Preset` (Qwen-Image / Z-Image / Flux.2 / Wan 的中文提示词增强预设).
 

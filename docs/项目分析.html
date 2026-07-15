@@ -276,7 +276,7 @@ table.io td.dim{color:var(--muted)}
   <div class="brand">
     <div class="k">项目分析报告</div>
     <h1>ComfyUI<br>llama-cpp-<span>vulkan</span></h1>
-    <div class="v">v2.1.0 · 2026-07-15 · commit d31eb4c</div>
+    <div class="v">v2.1.0 · 2026-07-15 · commit f3be0c0</div>
   </div>
   <button class="nav-btn" data-view="overview"><span class="num">01</span>概览</button>
   <button class="nav-btn" data-view="flow"><span class="num">02</span>数据流图</button>
@@ -289,7 +289,7 @@ table.io td.dim{color:var(--muted)}
 <main class="main">
 
 <div style="margin:0 0 28px;padding:10px 16px;border:1px solid var(--line2);border-left:3px solid var(--accent);border-radius:8px;background:var(--surface2);color:var(--muted);font-size:13px">
-  本报告生成于 commit <code>d31eb4c</code>, 不会自动跟随后续代码变更, 仅供参考; 当前实现以仓库源码与 AGENTS.md 为准.
+  本报告生成于 commit <code>f3be0c0</code>, 不会自动跟随后续代码变更, 仅供参考; 当前实现以仓库源码与 AGENTS.md 为准.
 </div>
 
 <!-- ================= 概览 ================= -->
@@ -818,7 +818,7 @@ const NODES = [
 /* ============ 用户可见功能 ============ */
 const FEATURES = [
 { g:'模型加载与硬件控制', items:[
-  {t:'本地 GGUF 模型推理', d:'直接加载 ComfyUI-X/models/llm(及 extra_model_paths.yaml 挂载目录)下的 GGUF 量化模型, 无需外部 API.'},
+  {t:'本地 GGUF 模型推理', d:'直接加载 ComfyUI/models/llm(及 extra_model_paths.yaml 挂载目录)下的 GGUF 量化模型, 无需外部 API.'},
   {t:'Vulkan GPU 加速', d:'跨厂商 GPU 通吃(AMD / NVIDIA / Intel), 与 PyTorch 的 CUDA / ROCm 完全独立, 适合 AMD 显卡等非 CUDA 环境.'},
   {t:'GPU 设备选择', d:'下拉框列出可达 GPU 设备: Auto (GPU First)(独显优先, 多独显按层切分)或显式指定某张卡(整模型单卡加载).'},
   {t:'显存上限控制 (vram_limit)', d:'按 GB 设置上限, 自动折算加载到 GPU 的层数; -1 自动(llama.cpp 按空闲显存适配), 0 纯 CPU 推理.'},
