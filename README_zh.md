@@ -74,7 +74,7 @@ pip install -r ComfyUI-llama-cpp-vulkan/requirements.txt
 
 > 仅支持 requirements.txt 固定的预编译 wheel. 插件依赖该 Vulkan 构建 ([JamePeng 分支](https://github.com/JamePeng/llama-cpp-python)) 特有的 API, PyPI 官方包 (`pip install llama-cpp-python`) 缺少这些接口, 无法工作.
 
-#### 3. 模型路径:
+#### 3. 下载模型:
 
 - 请将下载的 `.gguf` 模型放置在 `ComfyUI/models/llm` 目录中 (`llm` 与 `LLM` 两个目录名均已注册, Linux 大小写敏感文件系统下任选其一).
 - 也支持通过 `extra_model_paths.yaml` 配置自定义路径.
