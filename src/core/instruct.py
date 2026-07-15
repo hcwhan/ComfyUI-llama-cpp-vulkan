@@ -26,8 +26,8 @@ _ERRORS = _COMMON["errors"]
 
 # 采样参数的统一默认值: Parameters 节点的 widget 默认值与 Instruct 未连接
 # parameters 端口时的生效值均取自此表, 保证连不连默认参数节点行为一致
-# (否则未连接时会落到 wheel 库签名默认值: temperature 0.2 / top_k 40 /
-# top_p 0.95 等, 与节点默认差异明显).
+# (否则未连接时会落到 wheel 库签名默认值: temperature 0.2 (节点默认 0.8) /
+# repeat_penalty 1.0 (节点默认 1.1) 等, 与节点默认差异明显).
 DEFAULT_SAMPLING_PARAMS = {
     "max_gen_tokens": 0,
     "top_k": 40,
