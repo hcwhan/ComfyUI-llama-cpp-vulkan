@@ -9,6 +9,7 @@ from tests import comfy_stubs
 
 comfy_stubs.install()
 
+from src.i18n.common_static import BBOX_MODE_QWEN3, BBOX_MODE_SIMPLE  # noqa: E402
 from src.i18n.lang import LANG  # noqa: E402
 from src.nodes.bbox.node_json_to_bboxes import json_to_bboxes  # noqa: E402
 
@@ -24,7 +25,7 @@ class TestJsonToBBoxesRestructure(unittest.TestCase):
         self.node = json_to_bboxes()
 
     def _process(self, n_json, batch_sizes):
-        return self.node.process([_JSON_ONE_BOX] * n_json, ["simple"], [""], _frames(batch_sizes))
+        return self.node.process([_JSON_ONE_BOX] * n_json, [BBOX_MODE_SIMPLE], [""], _frames(batch_sizes))
 
     def test_matched_counts_keep_batch_structure(self):
         bboxes, image_list = self._process(4, [2, 2])
@@ -49,7 +50,7 @@ class TestJsonToBBoxesRestructure(unittest.TestCase):
         self.assertEqual([b.shape[0] for b in image_list], [2, 1, 1])
 
     def test_no_images_returns_empty_image_list(self):
-        bboxes, image_list = self.node.process([_JSON_ONE_BOX], ["simple"], [""], None)
+        bboxes, image_list = self.node.process([_JSON_ONE_BOX], [BBOX_MODE_SIMPLE], [""], None)
         self.assertEqual(len(bboxes), 1)
         self.assertEqual(image_list, [])
 
@@ -57,7 +58,7 @@ class TestJsonToBBoxesRestructure(unittest.TestCase):
         # 回归: 逐段解析失败的报错须带分段索引 (从 1 起, 与前缀行 Image N 对齐),
         # 便于定位坏在哪张图的输出; 坏段是第 2 段, 报错应为 JSON #2
         with self.assertRaises(ValueError) as ctx:
-            self.node.process([_JSON_ONE_BOX, "not json"], ["simple"], [""], None)
+            self.node.process([_JSON_ONE_BOX, "not json"], [BBOX_MODE_SIMPLE], [""], None)
         self.assertIn("JSON #2", str(ctx.exception))
 
 
@@ -74,29 +75,29 @@ class TestJsonToBBoxesLabelFilter(unittest.TestCase):
 
     def test_filter_ignores_case_and_matches_text_content(self):
         # label 匹配忽略大小写与首尾空格, label / text_content 任一字段命中即保留
-        bboxes, _ = self.node.process([_JSON_LABELED], ["simple"], ["cat"], None)
+        bboxes, _ = self.node.process([_JSON_LABELED], [BBOX_MODE_SIMPLE], ["cat"], None)
         self.assertEqual(len(bboxes), 1)
         self.assertEqual(bboxes[0], [(1, 1, 4, 4), (3, 3, 6, 6)])
 
     def test_empty_label_keeps_all(self):
-        bboxes, _ = self.node.process([_JSON_LABELED], ["simple"], [""], None)
+        bboxes, _ = self.node.process([_JSON_LABELED], [BBOX_MODE_SIMPLE], [""], None)
         self.assertEqual(len(bboxes[0]), 3)
 
     def test_no_match_returns_empty_group(self):
-        bboxes, _ = self.node.process([_JSON_LABELED], ["simple"], ["bird"], None)
+        bboxes, _ = self.node.process([_JSON_LABELED], [BBOX_MODE_SIMPLE], ["bird"], None)
         self.assertEqual(bboxes[0], [])
 
     def test_non_dict_item_with_filter_reports_structure_error(self):
         # 回归: label 过滤开启时非 dict 项(如坐标数组)不得抛裸 AttributeError,
         # 应留给结构校验报出带期望格式的 ValueError
         with self.assertRaises(ValueError):
-            self.node.process(["[[10, 20, 30, 40]]"], ["simple"], ["cat"], None)
+            self.node.process(["[[10, 20, 30, 40]]"], [BBOX_MODE_SIMPLE], ["cat"], None)
 
     def test_numeric_label_matched_by_string_filter(self):
         # 回归: LLM 输出数字标签时画框显示 "5" (bbox_label 强转 str),
         # 过滤框填 "5" 须能匹配到该框, 匹配与显示路径行为一致
         json_str = '[{"bbox_2d": [1, 1, 4, 4], "label": 5}, {"bbox_2d": [2, 2, 5, 5], "label": "cat"}]'
-        bboxes, _ = self.node.process([json_str], ["simple"], ["5"], None)
+        bboxes, _ = self.node.process([json_str], [BBOX_MODE_SIMPLE], ["5"], None)
         self.assertEqual(bboxes[0], [(1, 1, 4, 4)])
 
     def test_missing_label_fields_matched_by_fallback(self):
@@ -104,9 +105,9 @@ class TestJsonToBBoxesLabelFilter(unittest.TestCase):
         # 过滤框填 "bbox" 须能匹配到该项 (与 bbox_label 显示路径同源取值);
         # 填其他标签时缺字段项不得被误保留
         json_str = '[{"bbox_2d": [1, 1, 4, 4]}, {"bbox_2d": [2, 2, 5, 5], "label": "cat"}]'
-        bboxes, _ = self.node.process([json_str], ["simple"], ["bbox"], None)
+        bboxes, _ = self.node.process([json_str], [BBOX_MODE_SIMPLE], ["bbox"], None)
         self.assertEqual(bboxes[0], [(1, 1, 4, 4)])
-        bboxes, _ = self.node.process([json_str], ["simple"], ["cat"], None)
+        bboxes, _ = self.node.process([json_str], [BBOX_MODE_SIMPLE], ["cat"], None)
         self.assertEqual(bboxes[0], [(2, 2, 5, 5)])
 
 
@@ -118,12 +119,12 @@ class TestJsonToBBoxesQwenMode(unittest.TestCase):
         # Qwen 坐标系换算依赖原图尺寸, 未连 image 时须明确报错
         expected = re.escape(LANG["nodes"]["bbox"]["json_to_bboxes"]["errors"]["image_required"])
         with self.assertRaisesRegex(ValueError, expected):
-            self.node.process(['[{"bbox_2d": [0, 0, 500, 1000]}]'], ["Qwen3-VL"], [""], None)
+            self.node.process(['[{"bbox_2d": [0, 0, 500, 1000]}]'], [BBOX_MODE_QWEN3], [""], None)
 
     def test_qwen3_normalized_coords_scaled_to_frame(self):
         # Qwen3-VL 输出 0-1000 归一化坐标, 按帧尺寸 (w=200, h=100) 换算
         frames = [torch.zeros(1, 100, 200, 3)]
-        bboxes, image_list = self.node.process(['[{"bbox_2d": [0, 0, 500, 1000], "label": "x"}]'], ["Qwen3-VL"], [""], frames)
+        bboxes, image_list = self.node.process(['[{"bbox_2d": [0, 0, 500, 1000], "label": "x"}]'], [BBOX_MODE_QWEN3], [""], frames)
         self.assertEqual(bboxes[0], [(0.0, 0.0, 100.0, 100.0)])
         self.assertEqual(tuple(image_list[0].shape), (1, 100, 200, 3))
 

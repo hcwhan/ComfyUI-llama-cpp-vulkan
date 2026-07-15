@@ -8,6 +8,7 @@ from tests import comfy_stubs
 
 comfy_stubs.install()
 
+from src.i18n.common_static import BBOX_MODE_QWEN3, BBOX_MODE_QWEN25_VL, BBOX_MODE_SIMPLE  # noqa: E402
 from src.nodes.bbox.bbox_utils import (  # noqa: E402
     _label_color,
     _label_font,
@@ -24,45 +25,51 @@ from src.nodes.bbox.node_bboxes_to_segs import SEG  # noqa: E402
 class TestJsonToPixelBboxes(unittest.TestCase):
     def test_simple_mode_passthrough(self):
         items = [{"bbox_2d": [10, 20, 30, 40], "label": "cat"}]
-        self.assertEqual(json_to_pixel_bboxes(items, "simple"), [(10, 20, 30, 40)])
+        self.assertEqual(json_to_pixel_bboxes(items, BBOX_MODE_SIMPLE), [(10, 20, 30, 40)])
 
     def test_qwen_mode_scales_normalized_coords(self):
         items = [{"bbox_2d": [0, 0, 500, 1000]}]
-        result = json_to_pixel_bboxes(items, "Qwen3-VL", width=200, height=100)
+        result = json_to_pixel_bboxes(items, BBOX_MODE_QWEN3, width=200, height=100)
         self.assertEqual(result, [(0.0, 0.0, 100.0, 100.0)])
 
     def test_reversed_coords_normalized(self):
         # 回归: LLM 常见输出反向坐标 (x0 > x1 / y0 > y1), 按 min/max 归一为
         # 规范 xyxy 次序, 画框 / SEGS / MASK 三条消费路径因此天然一致
         items = [{"bbox_2d": [30, 40, 10, 20], "label": "cat"}]
-        self.assertEqual(json_to_pixel_bboxes(items, "simple"), [(10, 20, 30, 40)])
+        self.assertEqual(json_to_pixel_bboxes(items, BBOX_MODE_SIMPLE), [(10, 20, 30, 40)])
 
     def test_reversed_coords_normalized_with_scaling(self):
         # 仅 x 反向, 且经 Qwen3 归一化坐标缩放
         items = [{"bbox_2d": [500, 0, 0, 1000]}]
-        result = json_to_pixel_bboxes(items, "Qwen3-VL", width=200, height=100)
+        result = json_to_pixel_bboxes(items, BBOX_MODE_QWEN3, width=200, height=100)
         self.assertEqual(result, [(0.0, 0.0, 100.0, 100.0)])
 
     def test_numeric_string_coords_accepted(self):
         # 回归: 弱模型常见输出数字字符串坐标, 须与 valid_int_bbox 一样经 float 接受
         items = [{"bbox_2d": ["10", "20", "30", "40"], "label": "cat"}]
-        self.assertEqual(json_to_pixel_bboxes(items, "simple"), [(10, 20, 30, 40)])
+        self.assertEqual(json_to_pixel_bboxes(items, BBOX_MODE_SIMPLE), [(10, 20, 30, 40)])
 
     def test_non_numeric_coords_raise_value_error(self):
         with self.assertRaises(ValueError):
-            json_to_pixel_bboxes([{"bbox_2d": [1, 2, 3, None]}], "simple")
+            json_to_pixel_bboxes([{"bbox_2d": [1, 2, 3, None]}], BBOX_MODE_SIMPLE)
 
     def test_missing_bbox_2d_raises_value_error(self):
         with self.assertRaises(ValueError):
-            json_to_pixel_bboxes([{"label": "cat"}], "simple")
+            json_to_pixel_bboxes([{"label": "cat"}], BBOX_MODE_SIMPLE)
 
     def test_wrong_length_bbox_raises_value_error(self):
         with self.assertRaises(ValueError):
-            json_to_pixel_bboxes([{"bbox_2d": [1, 2, 3]}], "simple")
+            json_to_pixel_bboxes([{"bbox_2d": [1, 2, 3]}], BBOX_MODE_SIMPLE)
 
     def test_non_dict_item_raises_value_error(self):
         with self.assertRaises(ValueError):
-            json_to_pixel_bboxes(["not a dict"], "simple")
+            json_to_pixel_bboxes(["not a dict"], BBOX_MODE_SIMPLE)
+
+    def test_unknown_mode_passthrough(self):
+        # 显式锁定 fallthrough 行为: 两种 Qwen 模式之外的任意 mode 字符串
+        # 一律视为已是原图像素坐标透传 (Simple 档位即经由该分支到达)
+        items = [{"bbox_2d": [10, 20, 30, 40]}]
+        self.assertEqual(json_to_pixel_bboxes(items, "unknown-mode"), [(10, 20, 30, 40)])
 
 
 class TestDrawBbox(unittest.TestCase):
@@ -163,7 +170,7 @@ class TestQwen25ModeConversion(unittest.TestCase):
 
     def test_restores_original_coordinates(self):
         items = [{"bbox_2d": [1534, 769, 1789, 1025], "label": "红色方块"}]
-        (box,) = json_to_pixel_bboxes(items, "Qwen2.5-VL", width=3200, height=2400)
+        (box,) = json_to_pixel_bboxes(items, BBOX_MODE_QWEN25_VL, width=3200, height=2400)
         expected = (2400, 1200, 2800, 1600)
         for got, want in zip(box, expected, strict=True):
             self.assertAlmostEqual(got, want, delta=5)
@@ -171,7 +178,7 @@ class TestQwen25ModeConversion(unittest.TestCase):
     def test_identity_scale_below_cap(self):
         # 812x588 (28 对齐后与原图 800x600 略有差异), 坐标按比例微调而非除以 1000
         items = [{"bbox_2d": [609, 294, 711, 392]}]
-        (box,) = json_to_pixel_bboxes(items, "Qwen2.5-VL", width=800, height=600)
+        (box,) = json_to_pixel_bboxes(items, BBOX_MODE_QWEN25_VL, width=800, height=600)
         expected = (600, 300, 700, 400)
         for got, want in zip(box, expected, strict=True):
             self.assertAlmostEqual(got, want, delta=1)
