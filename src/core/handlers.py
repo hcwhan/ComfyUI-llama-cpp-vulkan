@@ -16,7 +16,9 @@ from ..shared.logger import logger
 _LOGS = LANG["logs"]["handlers"]
 
 # thinking 三态: 可切换档直接记 handler 构造参数名(enable_thinking /
-# Qwen3-VL 的 force_reasoning), 另两档用哨兵常量; 钳制规则见 clamp_thinking
+# Qwen3-VL 的 force_reasoning), 另两档用哨兵常量; 钳制规则见 clamp_thinking.
+# 哨兵消费点统一按相等比较(==/in/dict-get), 勿用 is(字符串同一性依赖
+# CPython 驻留实现细节)
 THINK_UNSUPPORTED = "unsupported"  # 不支持思考: thinking 恒按关处理
 THINK_FORCED = "forced"  # 强制思考(模板固定输出思考块): thinking 恒按开处理
 
@@ -105,10 +107,10 @@ def clamp_thinking(label, thinking):
     这是前端 JS 三态置灰的后端兜底, 覆盖 API 提交/旧工作流等绕过 UI 的路径.
     """
     think = _HANDLER_SPECS[label][2]
-    if think is THINK_UNSUPPORTED and thinking:
+    if think == THINK_UNSUPPORTED and thinking:
         logger.warning(LOG_PREFIX + _LOGS["thinking_unsupported"].format(label=label))
         return False
-    if think is THINK_FORCED and not thinking:
+    if think == THINK_FORCED and not thinking:
         logger.warning(LOG_PREFIX + _LOGS["thinking_forced"].format(label=label))
         return True
     return thinking

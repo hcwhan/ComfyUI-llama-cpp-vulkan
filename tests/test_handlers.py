@@ -105,7 +105,7 @@ class TestHandlerSpecs(unittest.TestCase):
         # 如 GLM-4.1V-Thinking); 可切换档由 VLM Loader 的 thinking 开关承载
         for label, (_cls_name, _kwargs, think) in _HANDLER_SPECS.items():
             if label.endswith("-Thinking"):
-                self.assertIs(think, THINK_FORCED, f'"{label}": 带 -Thinking 后缀但非强制思考档')
+                self.assertEqual(think, THINK_FORCED, f'"{label}": 带 -Thinking 后缀但非强制思考档')
 
     def test_storage_construction_kwargs_reach_every_class(self):
         # storage.load_model 对所有 handler 注入五个构造 kwargs, 可用性依赖
