@@ -314,7 +314,7 @@ LANG = {
                 "tooltips": {
                     "mode": (
                         "How model output coordinates are mapped to original-image pixel coordinates (both Qwen modes require the Image input):\n"
-                        "simple = passthrough (model output is already original-image pixel coordinates)\n"
+                        "Simple = passthrough (model output is already original-image pixel coordinates)\n"
                         "Qwen3-VL = 0-1000 normalized coordinates, restored by the original image size\n"
                         "Qwen2.5-VL = absolute coordinates in the model's internal resize space, restored to the original image automatically\n"
                         "  the mapping skews if the loader changed image_min/max_tokens;\n"

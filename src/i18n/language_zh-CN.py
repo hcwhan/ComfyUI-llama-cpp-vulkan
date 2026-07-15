@@ -314,7 +314,7 @@ LANG = {
                 "tooltips": {
                     "mode": (
                         "将模型输出坐标换算为原图像素坐标的方式 (两种 Qwen 模式均需连接 Image):\n"
-                        "simple = 原样透传 (模型输出即为原图像素坐标)\n"
+                        "Simple = 原样透传 (模型输出即为原图像素坐标)\n"
                         "Qwen3-VL = 0-1000 归一化坐标, 按原图尺寸还原\n"
                         "Qwen2.5-VL = 模型内部 resize 空间的绝对坐标, 自动还原到原图\n"
                         "  loader 修改过 image_min/max_tokens 时换算会有偏差;\n"
