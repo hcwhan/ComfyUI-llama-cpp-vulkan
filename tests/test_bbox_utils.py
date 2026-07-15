@@ -31,6 +31,18 @@ class TestJsonToPixelBboxes(unittest.TestCase):
         result = json_to_pixel_bboxes(items, "Qwen3-VL", width=200, height=100)
         self.assertEqual(result, [(0.0, 0.0, 100.0, 100.0)])
 
+    def test_reversed_coords_normalized(self):
+        # 回归: LLM 常见输出反向坐标 (x0 > x1 / y0 > y1), 按 min/max 归一为
+        # 规范 xyxy 次序, 画框 / SEGS / MASK 三条消费路径因此天然一致
+        items = [{"bbox_2d": [30, 40, 10, 20], "label": "cat"}]
+        self.assertEqual(json_to_pixel_bboxes(items, "simple"), [(10, 20, 30, 40)])
+
+    def test_reversed_coords_normalized_with_scaling(self):
+        # 仅 x 反向, 且经 Qwen3 归一化坐标缩放
+        items = [{"bbox_2d": [500, 0, 0, 1000]}]
+        result = json_to_pixel_bboxes(items, "Qwen3-VL", width=200, height=100)
+        self.assertEqual(result, [(0.0, 0.0, 100.0, 100.0)])
+
     def test_numeric_string_coords_accepted(self):
         # 回归: 弱模型常见输出数字字符串坐标, 须与 valid_int_bbox 一样经 float 接受
         items = [{"bbox_2d": ["10", "20", "30", "40"], "label": "cat"}]
@@ -55,10 +67,11 @@ class TestJsonToPixelBboxes(unittest.TestCase):
 
 class TestDrawBbox(unittest.TestCase):
     def test_bad_box_skipped_other_boxes_drawn(self):
-        # 回归: 单个坏框(反向坐标使 PIL 抛 ValueError)只跳过该框,
+        # 回归: 单个坏框(非有限值使 PIL 抛错; 反向坐标已在
+        # json_to_pixel_bboxes 归一, 不再到达画框路径)只跳过该框,
         # 不放弃整张图 - 与 SEGS/MASK 路径的逐框容错粒度一致
         image = torch.zeros(32, 32, 3)
-        boxes = [(20.0, 10.0, 5.0, 15.0), (2.0, 2.0, 12.0, 12.0)]
+        boxes = [(float("nan"), 10.0, 5.0, 15.0), (2.0, 2.0, 12.0, 12.0)]
         out = draw_bbox(image, boxes, ["bad", "good"])
         self.assertEqual(tuple(out.shape), (1, 32, 32, 3))
         # 正常框已画出: 全黑输入的输出不再全零

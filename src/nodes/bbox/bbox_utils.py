@@ -99,6 +99,9 @@ def json_to_pixel_bboxes(json_items, mode, width=0, height=0):
     - Qwen3-VL:   输出 0-1000 归一化坐标, 按原图尺寸换算
     - Qwen2.5-VL: 输出 smart_resize 后图像空间的绝对坐标, 按 原图/resize 比例还原
     - simple:     视为已是原图像素坐标, 原样透传
+
+    反向坐标 (x0 > x1 或 y0 > y1, LLM 常见错误) 按 min/max 归一为规范 xyxy
+    次序, 下游三条消费路径 (画框 / SEGS / MASK) 因此天然一致.
     """
     if mode == BBOX_MODE_QWEN25_VL:
         rw, rh = qwen25_smart_resize(width, height)
@@ -121,7 +124,10 @@ def json_to_pixel_bboxes(json_items, mode, width=0, height=0):
             x0, y0, x1, y1 = (float(v) for v in coords)
         except (TypeError, ValueError):
             raise ValueError(_ERRORS["coords_not_numeric"].format(item=item)) from None
-        bboxes.append((x0 * sx, y0 * sy, x1 * sx, y1 * sy))
+        # 反向坐标按 min/max 归一(缩放系数恒为正, 归一与缩放先后无关);
+        # 非有限值(NaN/inf)不在此拦截, 由 draw_bbox 的逐框容错与
+        # valid_int_bbox 的数值校验兜底
+        bboxes.append((min(x0, x1) * sx, min(y0, y1) * sy, max(x0, x1) * sx, max(y0, y1) * sy))
     return bboxes
 
 
@@ -153,8 +159,9 @@ def draw_bbox(image, pixel_bboxes, labels):
             draw.rectangle([text_size[0], text_size[1] - 2, text_size[2] + 4, text_size[3] + 2], fill=color)
             draw.text((x0 + 2, text_y), label, fill=(255, 255, 255), font=font)
         except Exception as e:
-            # 反向坐标(x1 < x0, LLM 常见错误)或非有限值会让 PIL 抛错;
-            # 逐框跳过, 与 SEGS/MASK 路径的逐框容错粒度一致,
+            # 非有限值(NaN/inf)等坏坐标会让 PIL 抛错(反向坐标已在
+            # json_to_pixel_bboxes 归一, 不会到达此处); 逐框跳过,
+            # 与 SEGS/MASK 路径的逐框容错粒度一致,
             # 单个坏框不放弃整张图的其余框
             logger.warning(LOG_PREFIX + _LOGS["bbox_draw_failed"].format(label=label, x0=x0, y0=y0, x1=x1, y1=y1, e=e))
     return torch.from_numpy(np.array(img).astype(np.float32) / 255.0).unsqueeze(0)
