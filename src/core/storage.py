@@ -255,7 +255,12 @@ class LLAMA_CPP_STORAGE:
             cls.chat_handler = None
 
         logger.info(LOG_PREFIX + _LOGS["loading_model"].format(model=model))
-        logger.info(LOG_PREFIX + _LOGS["load_params"].format(n_gpu_layers=n_gpu_layers, main_gpu=main_gpu, split_mode=split_mode))
+        # n_layer(GGUF block_count)供对照 n_gpu_layers: 折算值可超过实际层数
+        # (超出即全量 offload, llama.cpp 侧自行钳制), 元数据缺失时显示 "?"
+        n_layer = _as_number(get_model_meta(model_path).get("block_count")) or "?"
+        logger.info(
+            LOG_PREFIX + _LOGS["load_params"].format(n_gpu_layers=n_gpu_layers, n_layer=n_layer, main_gpu=main_gpu, split_mode=split_mode)
+        )
 
         def _create_llama():
             return Llama(

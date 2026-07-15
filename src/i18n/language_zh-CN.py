@@ -468,7 +468,7 @@ LANG = {
             "free_vram_failed": "加载前释放 torch 显存失败: {e}",
             "preparing_mmproj": "正在准备 mmproj: {mmproj}",
             "loading_model": "正在加载模型: {model}",
-            "load_params": "n_gpu_layers = {n_gpu_layers}, main_gpu = {main_gpu}, split_mode = {split_mode}",
+            "load_params": "n_gpu_layers = {n_gpu_layers}, n_layer = {n_layer}, main_gpu = {main_gpu}, split_mode = {split_mode}",
             "load_failed_retry": "模型加载失败 ({e}), 释放 torch 显存后重试一次",
             "free_vram_retry_failed": "重试前释放 torch 显存失败: {free_err}",
             "cpu_only": "纯 CPU 推理: 模型层与 mmproj 均未上 GPU",

@@ -468,7 +468,7 @@ LANG = {
             "free_vram_failed": "failed to free torch VRAM before load: {e}",
             "preparing_mmproj": "Preparing mmproj: {mmproj}",
             "loading_model": "Loading model: {model}",
-            "load_params": "n_gpu_layers = {n_gpu_layers}, main_gpu = {main_gpu}, split_mode = {split_mode}",
+            "load_params": "n_gpu_layers = {n_gpu_layers}, n_layer = {n_layer}, main_gpu = {main_gpu}, split_mode = {split_mode}",
             "load_failed_retry": "model load failed ({e}), freeing torch VRAM and retrying once",
             "free_vram_retry_failed": "failed to free torch VRAM before retry: {free_err}",
             "cpu_only": "CPU-only inference: no layers or mmproj offloaded to GPU",
