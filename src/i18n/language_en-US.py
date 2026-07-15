@@ -473,6 +473,7 @@ LANG = {
             "load_failed_retry": "model load failed ({e}), freeing torch VRAM and retrying once",
             "free_vram_retry_failed": "failed to free torch VRAM before retry: {free_err}",
             "cpu_only": "CPU-only inference: no layers or mmproj offloaded to GPU",
+            "mmproj_only_gpu": "all main model layers stay on CPU; only the mmproj (vision encoder) goes to VRAM (device picked by mtmd)",
             "cleanup_hook_applied": "Model cleanup hook applied!",
         },
 

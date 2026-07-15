@@ -330,6 +330,11 @@ class LLAMA_CPP_STORAGE:
         if n_gpu_layers == 0 and not mmproj_on_gpu:
             # 纯 CPU 推理时打印 Active GPU 会误导排查
             logger.info(LOG_PREFIX + _LOGS["cpu_only"])
+        elif n_gpu_layers == 0:
+            # 预算装得下 mmproj 装不下主模型任何一层 (vram_no_room_for_layer):
+            # 打印 "启用的 GPU" 会双重误导 - 主模型并不在 GPU 上, 且 mmproj
+            # 落点由 mtmd 自选, 显式选非默认卡时未必是所示设备
+            logger.info(LOG_PREFIX + _LOGS["mmproj_only_gpu"])
         else:
             log_backend_summary(main_gpu, split_mode)
 

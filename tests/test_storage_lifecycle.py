@@ -18,6 +18,7 @@ comfy_stubs.install()
 from src.core import storage  # noqa: E402
 from src.core.storage import LLAMA_CPP_STORAGE  # noqa: E402
 from src.i18n.common_static import AUTO_LABEL  # noqa: E402
+from src.i18n.lang import LANG  # noqa: E402
 
 
 def _minimal_gguf_bytes(block_count=4):
@@ -170,6 +171,34 @@ class TestLoadModelStateMachine(unittest.TestCase):
         self.assertIsNone(LLAMA_CPP_STORAGE.current_config)
         # 重试未发生: 首次加载前腾挪一次后即中止, 无重试前的第二次腾挪
         self.assertEqual(self.free_memory.call_count, 1)
+
+    def test_cpu_only_logs_cpu_message(self):
+        # 纯 CPU 推理 (0 层且 mmproj 不上卡) 打 cpu_only, 不打 "启用的 GPU"
+        with (
+            mock.patch.object(storage, "log_backend_summary") as summary,
+            self.assertLogs("llama-cpp-vulkan", level="INFO") as logs,
+        ):
+            LLAMA_CPP_STORAGE.load_model(self._config(vram_limit=0))
+        summary.assert_not_called()
+        self.assertTrue(any(LANG["logs"]["storage"]["cpu_only"] in m for m in logs.output))
+
+    def test_mmproj_only_on_gpu_logs_dedicated_message(self):
+        # 回归: (0 层, mmproj 进显存) 组合 (vram_no_room_for_layer 分支) 不得打
+        # "启用的 GPU" (主模型不在 GPU 上, 且 mmproj 落点由 mtmd 自选), 打专门日志
+        with (
+            mock.patch.object(storage, "_estimate_n_gpu_layers", lambda *a: (0, True)),
+            mock.patch.object(storage, "log_backend_summary") as summary,
+            self.assertLogs("llama-cpp-vulkan", level="INFO") as logs,
+        ):
+            LLAMA_CPP_STORAGE.load_model(self._config(vram_limit=1))
+        summary.assert_not_called()
+        self.assertTrue(any(LANG["logs"]["storage"]["mmproj_only_gpu"] in m for m in logs.output))
+
+    def test_gpu_layers_log_backend_summary(self):
+        # 有层上卡时走 log_backend_summary (单卡/多卡文案由 devices.py 内部分支)
+        with mock.patch.object(storage, "log_backend_summary") as summary:
+            LLAMA_CPP_STORAGE.load_model(self._config())
+        summary.assert_called_once()
 
     def test_clean_closes_and_is_idempotent(self):
         LLAMA_CPP_STORAGE.load_model(self._config())

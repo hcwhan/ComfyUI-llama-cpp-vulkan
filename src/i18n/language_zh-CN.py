@@ -473,6 +473,7 @@ LANG = {
             "load_failed_retry": "模型加载失败 ({e}), 释放 torch 显存后重试一次",
             "free_vram_retry_failed": "重试前释放 torch 显存失败: {free_err}",
             "cpu_only": "纯 CPU 推理: 模型层与 mmproj 均未上 GPU",
+            "mmproj_only_gpu": "主模型全部层留在 CPU, 仅 mmproj (视觉编码器) 进显存 (落点由 mtmd 自选)",
             "cleanup_hook_applied": "模型清理钩子已挂载!",
         },
 
