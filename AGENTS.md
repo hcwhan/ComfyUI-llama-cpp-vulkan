@@ -79,6 +79,9 @@ ComfyUI-llama-cpp-vulkan/
     check_devices.py          # 独立诊断脚本: 列出 GGML 后端检测到的所有设备
   tests/                      # 单元测试(标准库 unittest, 用 ComfyUI 嵌入式 Python 运行)
     comfy_stubs.py            #   comfy/folder_paths 最小替身, 满足 import 期依赖
+    web/                      # web/*.js 逻辑测试(Node 内置 test runner, 零 npm 依赖)
+      comfy_app_stub.mjs      #   ComfyUI 前端 app 对象替身
+      harness.mjs             #   import 重定向钩子 + widget/node 工厂
 ```
 
 ## 数据流与类型隔离
@@ -182,6 +185,7 @@ image 逐张模式的多图结果以 "======== Image N ========" 前缀行拼接
 ### 提交前检查
 
 - 每次 git commit 前必须先修复全部 ruff 问题: 依次运行 `python -m ruff check src tests --fix` 与 `python -m ruff format src tests`(用 ComfyUI 嵌入式 Python, 即 `python_embeded/python.exe`), 两者均无报告后再提交
+- 改动 `web/*.js` 时必须运行 JS 测试并全部通过: `node --test "tests/web/*.test.mjs"`(需本机 Node >= 22.15, 零 npm 依赖, 无 package.json; app 对象与 widget 均为替身, 只锁 JS 自身逻辑, 与 ComfyUI 前端渲染层的真实契约仍靠手动验证)
 
 ### Commit message 规范
 
