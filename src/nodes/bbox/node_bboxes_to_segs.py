@@ -83,22 +83,27 @@ class bboxes_to_segs:
             if coords is None:
                 continue
             x1, y1, x2, y2 = coords
-            # LLM 输出的坐标不可信, 先裁剪到图像范围
-            x1 = max(0, min(x1, width))
-            x2 = max(0, min(x2, width))
-            y1 = max(0, min(y1, height))
-            y2 = max(0, min(y2, height))
-            if x2 <= x1 or y2 <= y1:
-                logger.warning(LOG_PREFIX + _LOGS["bbox_out_of_bounds"].format(bbox=bbox))
+
+            # dilation 先在原始坐标上外扩掩码矩形(重绘区域), 再裁剪判空,
+            # 与 bboxes_to_mask 的时序一致: 零面积检测框(LLM 对小目标
+            # 常输出退化点)经外扩仍是有效重绘区域, 不提前丢弃
+            x1_exp = x1 - dilation
+            y1_exp = y1 - dilation
+            x2_exp = x2 + dilation
+            y2_exp = y2 + dilation
+            if x2_exp - x1_exp <= 0 or y2_exp - y1_exp <= 0:
+                logger.warning(LOG_PREFIX + _LOGS["bbox_empty_area"].format(bbox=bbox))
                 continue
 
-            # dilation 直接外扩掩码矩形(重绘区域), 与 bboxes_to_mask 及
-            # Impact Pack 检测器的 dilation 语义一致; 限制在图像内,
+            # LLM 输出的坐标不可信, 扩张框裁剪到图像内,
             # 保证坐标不为负(Impact Pack 约定)
-            mx1 = max(0, x1 - dilation)
-            my1 = max(0, y1 - dilation)
-            mx2 = min(width, x2 + dilation)
-            my2 = min(height, y2 + dilation)
+            mx1 = max(0, x1_exp)
+            my1 = max(0, y1_exp)
+            mx2 = min(width, x2_exp)
+            my2 = min(height, y2_exp)
+            if mx2 <= mx1 or my2 <= my1:
+                logger.warning(LOG_PREFIX + _LOGS["bbox_out_of_bounds"].format(bbox=bbox))
+                continue
 
             # crop_region 以掩码矩形为中心按 crop_factor 放大(Impact Pack 惯例),
             # 供下游 Detailer 携带周边上下文重绘
@@ -119,14 +124,20 @@ class bboxes_to_segs:
             # --gpu-only 下跟随 image.device 会让直接 .numpy() 的下游第三方节点报错
             cropped_image_tensor = image_for_cropping[cy1:cy2, cx1:cx2, :].unsqueeze(0).cpu()
 
+            # bbox 保留原始检测框(Impact Pack 约定 dilation 不改变 seg.bbox),
+            # 仅裁剪到图像内保证坐标不为负
+            bx1 = max(0, min(x1, width))
+            by1 = max(0, min(y1, height))
+            bx2 = max(0, min(x2, width))
+            by2 = max(0, min(y2, height))
+
             seg = SEG(
                 cropped_image=cropped_image_tensor,
                 cropped_mask=cropped_mask_np,
                 # Impact Pack 约定 confidence 为标量
                 confidence=confidence,
                 crop_region=crop_region,
-                # bbox 保留原始检测框(Impact Pack 约定 dilation 不改变 seg.bbox)
-                bbox=np.array([x1, y1, x2, y2], dtype=np.float32),
+                bbox=np.array([bx1, by1, bx2, by2], dtype=np.float32),
                 label=label,
             )
 

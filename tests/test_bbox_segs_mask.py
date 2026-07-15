@@ -1,7 +1,8 @@
 """src/nodes/bbox/ bboxes_to_segs / bboxes_to_mask 的节点级单元测试.
 
 覆盖: 坐标裁剪, dilation/crop_factor 几何, SEG 字段组装 (Impact Pack 兼容),
-无效框逐个跳过, 多帧取首帧, mask 的羽化衰减与多框 maximum 合成, 恒 CPU 输出.
+无效框逐个跳过, 零面积框 + dilation 两节点行为一致, 多帧取首帧,
+mask 的羽化衰减与多框 maximum 合成, 恒 CPU 输出.
 """
 
 import unittest
@@ -69,6 +70,24 @@ class TestBBoxesToSegs(unittest.TestCase):
         shape, seg_list = self._process([(1, 2, 3), "junk", (5, 5, 5, 5), (40, 40, 50, 50)])
         self.assertEqual(shape, (32, 32))
         self.assertEqual(seg_list, [])
+
+    def test_zero_area_bbox_dilated_consistent_with_mask(self):
+        # 回归: 零面积框 + dilation 时先外扩后判空, 与 bboxes_to_mask 行为一致,
+        # 外扩出的区域不被提前丢弃
+        _, seg_list = self._process([(5, 5, 5, 5)], dilation=10)
+        self.assertEqual(len(seg_list), 1)
+        seg = seg_list[0]
+        # 扩张框 (-5,-5,15,15) 裁剪到图像内 -> 掩码矩形 (0,0,15,15)
+        self.assertEqual(seg.crop_region, [0, 0, 15, 15])
+        self.assertEqual(seg.cropped_mask.shape, (15, 15))
+        self.assertTrue((seg.cropped_mask == 1.0).all())
+        # seg.bbox 仍保留原始检测框, 不含 dilation
+        np.testing.assert_array_equal(seg.bbox, np.array([5, 5, 5, 5], dtype=np.float32))
+
+        # 同一输入在 MASK 节点画出同一块区域
+        mask = bboxes_to_mask().process([(5, 5, 5, 5)], torch.zeros(1, 32, 32, 3), 10, 0)[0]
+        self.assertEqual(mask[0, :15, :15].min().item(), 1.0)
+        self.assertEqual(mask.sum().item(), 15 * 15)
 
     def test_batch_crops_from_first_frame(self):
         image = torch.cat([torch.zeros(1, 32, 32, 3), torch.ones(1, 32, 32, 3)])
