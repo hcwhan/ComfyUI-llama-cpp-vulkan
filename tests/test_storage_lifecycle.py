@@ -140,6 +140,18 @@ class TestLoadModelStateMachine(unittest.TestCase):
         self.free_memory.assert_not_called()
         self.assertEqual(LLAMA_CPP_STORAGE.llm.kwargs["n_gpu_layers"], 0)
 
+    def test_interrupt_before_load_raises_with_clean_state(self):
+        # 排队期间点 Cancel: 加载真正开始前响应中断,
+        # 此时旧模型已卸载而新模型未构造, 状态干净
+        with (
+            mock.patch.object(storage.mm, "processing_interrupted", lambda: True),
+            self.assertRaises(storage.mm.InterruptProcessingException),
+        ):
+            LLAMA_CPP_STORAGE.load_model(self._config())
+        self.assertIsNone(LLAMA_CPP_STORAGE.llm)
+        self.assertIsNone(LLAMA_CPP_STORAGE.chat_handler)
+        self.assertIsNone(LLAMA_CPP_STORAGE.current_config)
+
     def test_clean_closes_and_is_idempotent(self):
         LLAMA_CPP_STORAGE.load_model(self._config())
         loaded = LLAMA_CPP_STORAGE.llm

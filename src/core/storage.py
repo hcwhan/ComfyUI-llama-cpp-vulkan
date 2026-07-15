@@ -222,6 +222,12 @@ class LLAMA_CPP_STORAGE:
             except Exception as e:
                 logger.warning(LOG_PREFIX + _LOGS["free_vram_failed"].format(e=e))
 
+        # 加载可达分钟级且中途不可终止, 在真正开始前响应排队期间的取消
+        # (点 Cancel 后才轮到本节点执行的场景); 此时旧模型已卸载而新模型
+        # 未加载, chat_handler 也未构造, 状态干净
+        if mm.processing_interrupted():
+            raise mm.InterruptProcessingException()
+
         if mmproj_path:
             # handler 构造只校验路径, mmproj 真正加载进显存由 mtmd 在首次推理时
             # 惰性初始化(_init_mtmd_context), 与上面 free_memory 的腾挪同在
