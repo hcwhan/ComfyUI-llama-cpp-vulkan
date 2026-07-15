@@ -9,12 +9,12 @@ _LLM_FOLDER_KEYS = ("llm", "LLM")
 for _key in _LLM_FOLDER_KEYS:
     folder_paths.add_model_folder_path(_key, os.path.join(folder_paths.models_dir, _key))
     _paths, _exts = folder_paths.folder_names_and_paths[_key]
-    if isinstance(_exts, set):
-        _exts.update(llm_extensions)
-    else:
-        # 键可能已被其他插件以 (paths, list/tuple) 形态直接赋值注册,
-        # 重建为 set 合并, 避免 import 期 AttributeError 导致整个插件加载失败
-        folder_paths.folder_names_and_paths[_key] = (_paths, set(_exts) | llm_extensions)
+    # 恒重建扩展名集合 (复制合并后整体替换本键元组), 不原位 update: 键可能
+    # 已被其他插件注册, 其集合可能与 checkpoints/loras 等约 20 个内置键共享
+    # 同一 set 实例 (supported_pt_extensions), 原位写入会把 .gguf 泄漏进全部
+    # 内置下拉框. set(_exts) 同时兼容第三方以 list/tuple 形态注册的键;
+    # _paths 沿用原列表引用, extra_model_paths.yaml 的后续注册不受影响
+    folder_paths.folder_names_and_paths[_key] = (_paths, set(_exts) | llm_extensions)
 
 
 def get_llm_filename_list():

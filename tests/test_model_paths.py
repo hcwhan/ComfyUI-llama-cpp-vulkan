@@ -1,4 +1,4 @@
-"""src/core/model_paths.py 的单元测试: 双键去重, gguf 过滤, 路径查找, 扩展名集合重建."""
+"""src/core/model_paths.py 的单元测试: 双键去重, gguf 过滤, 路径查找, 扩展名集合重建与共享集合防污染."""
 
 import importlib
 import unittest
@@ -57,6 +57,26 @@ class TestExtensionSetRebuild(unittest.TestCase):
         _paths, exts = folder_paths.folder_names_and_paths["llm"]
         self.assertIsInstance(exts, set)
         self.assertEqual(exts, {".bin", ".gguf"})
+
+    def test_shared_extension_set_not_polluted(self):
+        # 回归: 第三方插件注册 llm/LLM 键时可能直接引用与内置键共享的扩展名
+        # 集合 (最典型是 supported_pt_extensions, ComfyUI 约 20 个内置键共用
+        # 同一 set 实例). 本插件须复制重建而非原位 update, 否则 .gguf 会
+        # 泄漏进 checkpoints/loras 等全部内置下拉框
+        original = dict(folder_paths.folder_names_and_paths)
+        self.addCleanup(folder_paths.folder_names_and_paths.update, original)
+        shared = {".safetensors"}
+        folder_paths.folder_names_and_paths["checkpoints"] = (["/ckpt"], shared)
+        folder_paths.folder_names_and_paths["llm"] = (["/x"], shared)
+        folder_paths.folder_names_and_paths["LLM"] = (["/x"], shared)
+
+        importlib.reload(model_paths)
+
+        # 共享集合原封不动, 只有 llm/LLM 两键的新集合多出 .gguf
+        self.assertEqual(shared, {".safetensors"})
+        self.assertEqual(folder_paths.folder_names_and_paths["checkpoints"][1], {".safetensors"})
+        for key in ("llm", "LLM"):
+            self.assertEqual(folder_paths.folder_names_and_paths[key][1], {".safetensors", ".gguf"})
 
 
 if __name__ == "__main__":
