@@ -36,7 +36,7 @@ BBOX_MODE_SIMPLE = "Simple"
 BBOX_MODE_QWEN3 = "Qwen3-VL"
 BBOX_MODE_QWEN25_VL = "Qwen2.5-VL"
 
-# image Instruct 逐张模式多图输出的分隔行模板, {n} 为图片序号 (从 1 起);
+# image Instruct 逐张模式多图输出的前缀行模板, {n} 为图片序号 (从 1 起);
 # 生成端 (image Instruct) 与识别端 (shared/text_utils.py 的拆分正则,
 # 由本模板派生) 必须同源, 修改模板即同时更新两端
 IMAGE_RESULT_SEPARATOR_TEMPLATE = "======== Image {n} ========"

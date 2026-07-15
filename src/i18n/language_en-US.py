@@ -26,7 +26,7 @@ Placeholder conventions:
 
 Not in this file (not switched with language, centralized in common_static.py):
 - Dropdown option values: Per-Image/Batch, Auto (GPU First), the chat handler list etc. (widget values serialized into workflows).
-- The node category (llama-cpp-vulkan), the "======== Image N ========" separator line (protocol strings matched by regex).
+- The node category (llama-cpp-vulkan), the "======== Image N ========" prefix line (protocol strings matched by regex).
 - Task presets and system prompt presets (names and contents).
 """
 
@@ -329,7 +329,7 @@ LANG = {
                 },
                 "errors": {
                     "image_required": "Qwen modes require the Image input",
-                    # {i} is the index of the JSON segment (1-based, matching the Image N separator), {error} is the original parse error
+                    # {i} is the index of the JSON segment (1-based, matching the Image N prefix line), {error} is the original parse error
                     "json_parse_failed": "Failed to parse JSON #{i}: {error}",
                     "not_a_list": 'Expected a JSON list of {{"bbox_2d": [...], "label": "..."}} objects, got: {type_name}',
                     # The next three live in the structure validation of bbox_utils.py

@@ -62,8 +62,8 @@ class json_to_bboxes:
         mode = mode[0]
         wanted_label = _normalized_label(label[0])
 
-        # image Instruct 逐张模式的 output 是分隔行拼接的整段文本,
-        # 自动拆回逐张 JSON; 合法 JSON 文本中不存在真实分隔行, 不会被误拆
+        # image Instruct 逐张模式的 output 是前缀行拼接的整段文本,
+        # 自动拆回逐张 JSON; 合法 JSON 文本中不存在真实前缀行, 不会被误拆
         json = [part for text in json for part in split_image_results(text)]
 
         # 拆平为 [1,H,W,C] 单帧列表, 记录每个输入元素的批次大小以便还原结构
@@ -90,7 +90,7 @@ class json_to_bboxes:
                 items = parse_json(json_str)
             except ValueError as e:
                 # 逐张模式拆出几十段结果时定位坏段; 序号从 1 起,
-                # 与分隔行 "Image N" 及画框失败分支的 JSON #{i} 对齐
+                # 与前缀行 "Image N" 及画框失败分支的 JSON #{i} 对齐
                 raise ValueError(_ERRORS["json_parse_failed"].format(i=i + 1, error=e)) from None
             # 模型只检出单个目标时可能直接输出对象而非单元素列表
             if isinstance(items, dict):

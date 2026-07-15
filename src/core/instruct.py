@@ -259,7 +259,7 @@ class llama_cpp_instruct_base:
         """通用执行骨架: 组消息 -> 中断监视下执行 runner -> 收尾清理.
 
         runner(messages, user_content, seed, params, extract_text, watcher)
-        由子类提供, 返回输出文本(image 逐张模式为按分隔行拼接的整段文本,
+        由子类提供, 返回输出文本(image 逐张模式为按前缀行拼接的整段文本,
         下游可用 Split Instruct Output 节点或 JSON to BBoxes 的内建拆分还原).
         """
         # 先做零成本的 prompt 校验(占位符预设缺 custom_prompt 时直接 ValueError),

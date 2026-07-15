@@ -66,7 +66,7 @@ class TestSplitImageResults(unittest.TestCase):
         self.assertEqual(split_image_results("普通文本"), ["普通文本"])
 
     def test_json_with_escaped_newline_not_split(self):
-        # JSON 文本中的换行是 \n 转义, 不存在真实分隔行, 不应被拆分
+        # JSON 文本中的换行是 \n 转义, 不存在真实前缀行, 不应被拆分
         text = '[{"label": "======== Image 1 ========\\n"}]'
         self.assertEqual(split_image_results(text), [text])
 
@@ -84,7 +84,7 @@ class TestSplitImageResults(unittest.TestCase):
         self.assertEqual(split_image_results(text), ['```json\n[{"a": 1}]\n```', '```json\n[{"b": 2}]\n```'])
 
     def test_leading_text_before_first_separator_kept(self):
-        # 首个分隔行之前存在非空正文时保留为首段(防御行为: 实际逐张输出首段恒为空,
+        # 首个前缀行之前存在非空正文时保留为首段(防御行为: 实际逐张输出首段恒为空,
         # 但保留语义保证任何输入都不丢内容)
         text = "前导说明\n\n======== Image 1 ========\n\nA"
         self.assertEqual(split_image_results(text), ["前导说明", "A"])

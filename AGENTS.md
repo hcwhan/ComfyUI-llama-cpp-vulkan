@@ -94,7 +94,7 @@ llama_cpp_parameters ----> LLAMACPPARAMS ----+---> llama_cpp_audio_instruct
 system_prompt_preset ----> STRING -----------+   (接全部 Instruct 的 system_prompt)
 
 全部 Instruct 输出单端口 STRING (output);
-image 逐张模式的多图结果以 "======== Image N ========" 分隔行拼接
+image 逐张模式的多图结果以 "======== Image N ========" 前缀行拼接
     |
     +--> parse_json_node / remove_code_block
     +--> split_instruct_output    (拆回 STRING 列表, 接第三方列表语义节点)
@@ -153,7 +153,7 @@ image 逐张模式的多图结果以 "======== Image N ========" 分隔行拼接
 
 ### 多模态输入
 
-- image Instruct: `mode` 下拉框切换逐张模式 `Per-Image`(逐张推理, 多图结果以 `======== Image N ========` 分隔行拼接, `split_instruct_output` 节点与 `json_to_bboxes` 的内建拆分均可还原为逐张列表)与批量模式 `Batch`(全部图片并入单次请求); 批量多图时缩放到 `max_size`, 单图保持原分辨率. `max_size` 仅在 Batch 档显示(`web/image_instruct.js` 按 mode widget options 透传的 `batch_mode_value` 联动, 隐藏值仍序列化; JS 失效只损失显隐效果)
+- image Instruct: `mode` 下拉框切换逐张模式 `Per-Image`(逐张推理, 多图结果以 `======== Image N ========` 前缀行拼接, `split_instruct_output` 节点与 `json_to_bboxes` 的内建拆分均可还原为逐张列表)与批量模式 `Batch`(全部图片并入单次请求); 批量多图时缩放到 `max_size`, 单图保持原分辨率. `max_size` 仅在 Batch 档显示(`web/image_instruct.js` 按 mode widget options 透传的 `batch_mode_value` 联动, 隐藏值仍序列化; JS 失效只损失显隐效果)
 - video Instruct: `frames` 输入为 IMAGE 帧批次(ComfyUI 生态的视频通行形态), 按 `max_frames` linspace 均匀抽帧后缩放, 并在 system prompt 前注入"连续视频"语义提示
 - audio Instruct: ComfyUI `AUDIO` dict 由 `shared/encoding.py` 的 `audio2base64()` 均值混为单声道 16-bit WAV, 以 `input_audio` 内容项注入(重采样由 llama.cpp 的 mtmd 解码端完成), 服务 Qwen3-ASR 等音频 handler; 音频是否被 mmproj 支持由 llama-cpp-python 侧校验
 
@@ -169,7 +169,7 @@ image 逐张模式的多图结果以 "======== Image N ========" 分隔行拼接
 
 ### 文案与 i18n
 
-- 全部用户可见文案(节点显示名, tooltip, placeholder, 报错)与控制台日志文本统一放 `src/i18n/` 语言文件, 代码经 `from ..i18n.lang import LANG` 取用; 不随语言切换的字符串(下拉框选项值, 分类名, `======== Image N ========` 分隔行模板, 日志前缀)放 `common_static.py`. 新增/修改文案必须同步更新 zh-CN 与 en-US 两份语言文件并保持逐行一一对应
+- 全部用户可见文案(节点显示名, tooltip, placeholder, 报错)与控制台日志文本统一放 `src/i18n/` 语言文件, 代码经 `from ..i18n.lang import LANG` 取用; 不随语言切换的字符串(下拉框选项值, 分类名, `======== Image N ========` 前缀行模板, 日志前缀)放 `common_static.py`. 新增/修改文案必须同步更新 zh-CN 与 en-US 两份语言文件并保持逐行一一对应
 - 带运行时值的文案写成 `str.format` 具名占位符模板; 报错文案须单行; 语言文件排版规则(多字面量换行约定)由 `tests/test_i18n_format.py` 锁定, `pyproject.toml` 已对 `language_*.py` 豁免 ruff format(lint 仍生效)
 - 测试断言报错文案时引用 `LANG` 而非硬编码字符串, 使断言随语言文件自动跟随
 - 例外(不进 i18n): 任务预设与系统提示词预设(领域内容), chat handler 显示名(`handlers.py` 注册表 key, 功能性标识), video Instruct 注入的"连续视频"语义提示与 `MEDIA_WORD`(prompt 内容), `prompts.py` 的 import 期模态校验报错(开发期防御)

@@ -1,6 +1,6 @@
 """llama.cpp image Instruct 节点, 图片推理.
 
-- 逐张模式 (Per-Image): 逐张推理, 多图结果用 "======== Image N ========" 分隔行拼接输出
+- 逐张模式 (Per-Image): 逐张推理, 多图结果用 "======== Image N ========" 前缀行拼接输出
   (下游用 Split Instruct Output 拆回列表, JSON to BBoxes 会自动拆分)
 - 批量模式 (Batch): 全部图片并入同一条 user 消息, 一次推理; 多图时缩放到 max_size
 """
@@ -67,7 +67,7 @@ class llama_cpp_image_instruct(llama_cpp_media_instruct_base):
                 raise mm.InterruptProcessingException()
             image_content["image_url"] = image_content_item(tensor_to_uint8(image))["image_url"]
             output = LLAMA_CPP_STORAGE.llm.create_chat_completion(messages=messages, seed=seed, **params)
-            # 分隔行模板与 shared/text_utils 的拆分正则同源 (common_static)
+            # 前缀行模板与 shared/text_utils 的拆分正则同源 (common_static)
             if len(images) > 1:
                 tmp_list.append(IMAGE_RESULT_SEPARATOR_TEMPLATE.format(n=i + 1))
             tmp_list.append(extract_text(output))

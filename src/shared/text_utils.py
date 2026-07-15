@@ -34,18 +34,18 @@ def strip_code_fence(text):
     return _FENCE_CLOSE_RE.sub("", text)
 
 
-# image Instruct 逐张模式在多图结果间插入的分隔行(独占一行, 行首行尾锚定,
-# 降低正文文本误匹配的概率; JSON 文本中换行均为 \n 转义, 不会产生真实分隔行).
-# 正则由 common_static 的分隔行模板派生({n} 换成 \d+), 生成端与识别端同源
+# image Instruct 逐张模式在每段结果前插入的前缀行(独占一行, 行首行尾锚定,
+# 降低正文文本误匹配的概率; JSON 文本中换行均为 \n 转义, 不会产生真实前缀行).
+# 正则由 common_static 的前缀行模板派生({n} 换成 \d+), 生成端与识别端同源
 _SEP_PREFIX, _SEP_SUFFIX = IMAGE_RESULT_SEPARATOR_TEMPLATE.split("{n}")
 _IMAGE_SEP_RE = re.compile(rf"^{re.escape(_SEP_PREFIX)}\d+{re.escape(_SEP_SUFFIX)}[ \t]*\r?$", re.MULTILINE)
 
 
 def split_image_results(text):
-    """把 image Instruct 逐张模式的拼接输出按分隔行拆回逐张结果列表.
+    """把 image Instruct 逐张模式的拼接输出按前缀行拆回逐张结果列表.
 
-    无分隔行时返回单元素列表(整段原文), 普通文本 / 单图结果可安全通过.
-    只丢弃首个分隔行之前的空首段; 中间/末尾的空结果保留为空字符串占位,
+    无前缀行时返回单元素列表(整段原文), 普通文本 / 单图结果可安全通过.
+    只丢弃首个前缀行之前的空首段; 中间/末尾的空结果保留为空字符串占位,
     维持 "第 i 段对应第 i 张图" 的索引对齐(下游按索引配对画框/拆列表).
     """
     if not _IMAGE_SEP_RE.search(text):
