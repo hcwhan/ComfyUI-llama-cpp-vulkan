@@ -11,7 +11,7 @@ from llama_cpp import Llama
 from ..i18n.common_static import LOG_PREFIX, NONE_OPTION
 from ..i18n.lang import LANG
 from ..shared.logger import logger
-from .devices import AUTO_LABEL, log_backend_summary, resolve_device_selection
+from .devices import log_backend_summary, resolve_device_selection
 from .gguf_layers import get_model_meta
 from .handlers import handler_constructor, is_registered
 from .model_paths import get_llm_full_path
@@ -200,7 +200,7 @@ class LLAMA_CPP_STORAGE:
         model_path, mmproj_path, handler_cls = resolve_config(config)
 
         cls.clean()
-        gpu_device = config.get("gpu_device", AUTO_LABEL)
+        gpu_device = config["gpu_device"]
         model = config["model"]
         mmproj = config["mmproj"]
         main_gpu, split_mode = resolve_device_selection(gpu_device)

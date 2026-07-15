@@ -16,6 +16,7 @@ comfy_stubs.install()
 
 from src.core import storage  # noqa: E402
 from src.core.storage import LLAMA_CPP_STORAGE  # noqa: E402
+from src.i18n.common_static import AUTO_LABEL  # noqa: E402
 
 
 def _minimal_gguf_bytes(block_count=4):
@@ -81,9 +82,11 @@ class TestLoadModelStateMachine(unittest.TestCase):
     @staticmethod
     def _config(vram_limit=-1):
         return {
+            "gpu_device": AUTO_LABEL,
             "model": "model.gguf",
             "mmproj": "None",
             "chat_handler": "None",
+            "thinking": False,
             "n_ctx": 2048,
             "vram_limit": vram_limit,
             "image_min_tokens": 0,
