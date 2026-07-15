@@ -56,6 +56,10 @@ class llama_cpp_image_instruct(llama_cpp_media_instruct_base):
         }
 
     def _infer_each(self, messages, user_content, images, seed, params, extract_text, watcher):
+        # 同一 messages 列表跨多次请求复用, 每轮仅原位改写 image_content 的
+        # url: 依赖 handler 渲染消息时不改写 messages 入参 (当前 wheel 的
+        # MTMD handler 满足; 行为性假设无法静态锁定, 已记入 AGENTS.md
+        # 对接面清单, 升级 wheel 时人工复核)
         image_content = {"type": "image_url", "image_url": {"url": ""}}
         user_content.append(image_content)
         messages.append({"role": "user", "content": user_content})
