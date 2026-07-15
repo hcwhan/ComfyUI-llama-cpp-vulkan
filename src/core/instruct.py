@@ -224,7 +224,8 @@ class llama_cpp_instruct_base:
         template = preset_content(preset_prompt)
         if "###" not in template:
             if custom_prompt.strip():
-                return {"type": "text", "text": custom_prompt}
+                # strip 与填充分支的注入形态一致, 首尾空白不随请求发送
+                return {"type": "text", "text": custom_prompt.strip()}
         elif not custom_prompt.strip():
             raise ValueError(_ERRORS["preset_requires_custom_prompt"].format(preset_prompt=preset_prompt))
         # 先替换 @@@ 再注入用户文本, 避免 custom_prompt 中的 @@@ 被误替换
