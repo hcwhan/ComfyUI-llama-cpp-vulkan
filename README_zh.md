@@ -82,7 +82,7 @@ pip install -r ComfyUI-llama-cpp-vulkan/requirements.txt
   > 在使用 VLM 模型进行图像推理之前, 请确保已经下载并选择了主模型对应的 `mmproj` 权重文件.
   > 加载器按文件名区分 mmproj 与主模型: 只有文件名含 `mmproj` (不区分大小写) 的文件才会出现在 mmproj 下拉框中, 重命名时请保留 `mmproj` 字样.
 
-## 节点说明 (v2.1.0)
+## 节点说明
 
 - **加载器**: `LLM Model Loader` 加载纯文本 GGUF 模型, `VLM Model Loader` 加载视觉/音频模型 (mmproj 与 chat handler 必选). 两者输出类型完全独立: LLM 只能连 `text Instruct`, VLM 只能连 `image / video / audio Instruct`.
 - **推理节点**: 每个模态一个节点 - `text` (prompt 改写等), `image` (逐张或批量), `video` (输入为 IMAGE 帧批次, 均匀抽帧), `audio` (语音识别 / omni).
