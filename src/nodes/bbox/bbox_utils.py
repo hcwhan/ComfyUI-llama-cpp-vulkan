@@ -121,8 +121,9 @@ def json_to_pixel_bboxes(json_items, mode, width=0, height=0):
 
 def _label_color(label):
     # 由 label 内容哈希出稳定颜色, 同一 label 每次运行颜色一致;
-    # 80-180 区间保证中等亮度, 白色标签文字可读
-    digest = hashlib.md5(label.encode("utf-8")).digest()
+    # 80-180 区间保证中等亮度, 白色标签文字可读;
+    # usedforsecurity=False: 非安全用途, FIPS 强制环境下 md5 才不被拒
+    digest = hashlib.md5(label.encode("utf-8"), usedforsecurity=False).digest()
     return tuple(80 + b % 101 for b in digest[:3])
 
 
