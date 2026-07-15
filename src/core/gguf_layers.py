@@ -48,11 +48,20 @@ def _read_scalar(f, vtype):
     raise ValueError(_ERRORS["unknown_value_type"].format(vtype=vtype))
 
 
+# 数组 count 的合理性上限: 真实模型最大的数组是 tokenizer 的几十万条 token
+# 元数据, 1e8 留足量级余量. KV 区损坏/错位把 count 读成天文数字时, 逐元素
+# 解析会以每次几字节的步长扫过文件剩余内容 (GB 级文件在 EOF 报错前可打转
+# 数分钟, 且发生在节点执行期), 超限直接报错走 get_model_meta 的回退路径
+_MAX_ARRAY_COUNT = 100_000_000
+
+
 def read_value(f):
     vtype = read_u32(f)
     if vtype == 9:  # array (元素只能是标量, GGUF 不支持嵌套数组)
         atype = read_u32(f)
         count = read_u64(f)
+        if count > _MAX_ARRAY_COUNT:
+            raise ValueError(_ERRORS["array_count_implausible"].format(count=count))
         return [_read_scalar(f, atype) for _ in range(count)]
     return _read_scalar(f, vtype)
 

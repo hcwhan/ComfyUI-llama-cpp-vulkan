@@ -94,6 +94,15 @@ class TestBlockCountParsing(unittest.TestCase):
         path = self._write_temp(b"GGUF" + struct.pack("<I", 3))
         self.assertIsNone(_block_count(path))
 
+    def test_implausible_array_count_falls_back(self):
+        # 回归: KV 区错位使数组 count 读成天文数字时, 须立即报错走回退
+        # (返回空 dict), 而不是以几字节步长扫过整个文件打转数分钟
+        huge_array = (
+            _string("tokenizer.ggml.tokens") + struct.pack("<I", _T_ARRAY) + struct.pack("<I", _T_UINT32) + struct.pack("<Q", 10**12)
+        )
+        path = self._write_temp(_gguf_bytes([huge_array, _kv_uint32("llama.block_count", 32)]))
+        self.assertIsNone(_block_count(path))
+
     def test_gguf_v1_rejected(self):
         # v1 的计数字段是 32 位, 按 v2+ 布局读会错乱, 应直接按不支持返回 None
         data = b"GGUF" + struct.pack("<I", 1) + struct.pack("<I", 0) + struct.pack("<I", 1)
