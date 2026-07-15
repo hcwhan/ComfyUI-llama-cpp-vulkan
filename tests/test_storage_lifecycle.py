@@ -2,7 +2,8 @@
 
 覆盖: 校验失败不动已加载模型, 加载失败清理半初始化状态, 重试一轮路径,
 加载前与重试前的中断响应, 成功后才写 current_config,
-free_memory 腾挪的触发条件, clean 的幂等性.
+free_memory 腾挪的触发条件, clean 的幂等性, 加载收尾的日志分支,
+mmproj/chat_handler 分支 (构造失败包装, 主模型失败级联回收, use_gpu 折算).
 """
 
 import os
@@ -39,6 +40,23 @@ class _FakeLlama:
         self.model_path = model_path
         self.kwargs = kwargs
         self.closed = False
+
+    def close(self):
+        self.closed = True
+
+
+class _FakeHandler:
+    """记录构造 kwargs 的 chat handler 替身, 可控构造失败, close 只做记录."""
+
+    fail_init = False
+    last_instance = None
+
+    def __init__(self, **kwargs):
+        if _FakeHandler.fail_init:
+            raise RuntimeError("simulated handler init failure")
+        self.kwargs = kwargs
+        self.closed = False
+        _FakeHandler.last_instance = self
 
     def close(self):
         self.closed = True
@@ -234,6 +252,109 @@ class TestLoadModelStateMachine(unittest.TestCase):
         storage.mm.unload_all_models()
         self.assertTrue(loaded.closed)
         self.assertIsNone(LLAMA_CPP_STORAGE.llm)
+        self.assertIsNone(LLAMA_CPP_STORAGE.current_config)
+
+
+class TestLoadModelMmprojBranches(unittest.TestCase):
+    """load_model 的 mmproj/chat_handler 分支 (resolve_config 打桩为 _FakeHandler)."""
+
+    def setUp(self):
+        fd, self.model_path = tempfile.mkstemp(suffix=".gguf")
+        with os.fdopen(fd, "wb") as f:
+            f.write(_minimal_gguf_bytes())
+        self.addCleanup(os.remove, self.model_path)
+
+        # mmproj 只被 os.path.getsize 消费, 1 KB 占位内容即可
+        fd, self.mmproj_path = tempfile.mkstemp(suffix=".gguf")
+        with os.fdopen(fd, "wb") as f:
+            f.write(b"\x00" * 1024)
+        self.addCleanup(os.remove, self.mmproj_path)
+
+        _FakeLlama.fail_remaining = 0
+        _FakeHandler.fail_init = False
+        _FakeHandler.last_instance = None
+        patches = [
+            mock.patch.object(storage, "Llama", _FakeLlama),
+            mock.patch.object(storage, "resolve_config", lambda config: (self.model_path, self.mmproj_path, _FakeHandler)),
+            mock.patch.object(storage.time, "sleep", lambda s: None),
+        ]
+        for p in patches:
+            p.start()
+            self.addCleanup(p.stop)
+
+        self.free_memory = mock.Mock(return_value=[])
+        p = mock.patch.object(storage.mm, "free_memory", self.free_memory)
+        p.start()
+        self.addCleanup(p.stop)
+
+        self._orig_state = (LLAMA_CPP_STORAGE.llm, LLAMA_CPP_STORAGE.chat_handler, LLAMA_CPP_STORAGE.current_config)
+        LLAMA_CPP_STORAGE.llm = None
+        LLAMA_CPP_STORAGE.chat_handler = None
+        LLAMA_CPP_STORAGE.current_config = None
+        self.addCleanup(self._restore_state)
+
+    def _restore_state(self):
+        (LLAMA_CPP_STORAGE.llm, LLAMA_CPP_STORAGE.chat_handler, LLAMA_CPP_STORAGE.current_config) = self._orig_state
+
+    @staticmethod
+    def _config(vram_limit=-1, image_min_tokens=0, image_max_tokens=0):
+        return {
+            "gpu_device": AUTO_LABEL,
+            "model": "model.gguf",
+            "mmproj": "mmproj.gguf",
+            "chat_handler": "FakeHandler",
+            "thinking": False,
+            "n_ctx": 2048,
+            "vram_limit": vram_limit,
+            "image_min_tokens": image_min_tokens,
+            "image_max_tokens": image_max_tokens,
+        }
+
+    def test_handler_kwargs_passed_through(self):
+        # use_gpu 折算与 image_min/max_tokens 透传须原样落到 handler 构造 kwargs
+        LLAMA_CPP_STORAGE.load_model(self._config(image_min_tokens=7, image_max_tokens=9))
+        handler = LLAMA_CPP_STORAGE.chat_handler
+        self.assertIsInstance(handler, _FakeHandler)
+        self.assertEqual(handler.kwargs["mmproj_path"], self.mmproj_path)
+        self.assertEqual(handler.kwargs["image_min_tokens"], 7)
+        self.assertEqual(handler.kwargs["image_max_tokens"], 9)
+        self.assertTrue(handler.kwargs["use_gpu"])
+        self.free_memory.assert_called_once()
+
+    def test_pure_cpu_keeps_mmproj_off_gpu(self):
+        # vram_limit=0 (纯 CPU): mmproj 一并留 CPU 且不触发 free_memory 腾挪
+        LLAMA_CPP_STORAGE.load_model(self._config(vram_limit=0))
+        self.assertFalse(LLAMA_CPP_STORAGE.chat_handler.kwargs["use_gpu"])
+        self.free_memory.assert_not_called()
+
+    def test_mmproj_over_budget_keeps_mmproj_off_gpu(self):
+        # 回归 (严格守预算): 预算装不下 mmproj 时 use_gpu=False, 主模型也全留 CPU
+        LLAMA_CPP_STORAGE.load_model(self._config(vram_limit=1e-9))
+        self.assertFalse(LLAMA_CPP_STORAGE.chat_handler.kwargs["use_gpu"])
+        self.assertEqual(LLAMA_CPP_STORAGE.llm.kwargs["n_gpu_layers"], 0)
+        self.free_memory.assert_not_called()
+
+    def test_handler_init_failure_wrapped(self):
+        # handler 构造抛错须包装为 handler_init_failed RuntimeError, 状态干净
+        _FakeHandler.fail_init = True
+        with self.assertRaises(RuntimeError) as ctx:
+            LLAMA_CPP_STORAGE.load_model(self._config())
+        expected = LANG["common"]["storage_errors"]["handler_init_failed"].format(e="simulated handler init failure")
+        self.assertEqual(str(ctx.exception), expected)
+        self.assertIsNone(LLAMA_CPP_STORAGE.llm)
+        self.assertIsNone(LLAMA_CPP_STORAGE.chat_handler)
+        self.assertIsNone(LLAMA_CPP_STORAGE.current_config)
+
+    def test_main_model_failure_closes_handler(self):
+        # 回归: handler 构造成功后主模型加载失败 (含重试), except BaseException
+        # 级联回收已创建的 chat_handler, 不残留半初始化状态
+        _FakeLlama.fail_remaining = 2
+        with self.assertRaises(RuntimeError):
+            LLAMA_CPP_STORAGE.load_model(self._config())
+        self.assertIsNotNone(_FakeHandler.last_instance)
+        self.assertTrue(_FakeHandler.last_instance.closed)
+        self.assertIsNone(LLAMA_CPP_STORAGE.llm)
+        self.assertIsNone(LLAMA_CPP_STORAGE.chat_handler)
         self.assertIsNone(LLAMA_CPP_STORAGE.current_config)
 
 
