@@ -205,7 +205,7 @@ class llama_cpp_instruct_base:
         多组 loader+instruct 交错执行时, 全局单例可能已被切换成其他模型,
         因此按 current_config 比对后按需(重新)加载.
         """
-        if not LLAMA_CPP_STORAGE.llm or LLAMA_CPP_STORAGE.current_config != llama_model:
+        if LLAMA_CPP_STORAGE.llm is None or LLAMA_CPP_STORAGE.current_config != llama_model:
             LLAMA_CPP_STORAGE.load_model(llama_model)
 
         messages = []
