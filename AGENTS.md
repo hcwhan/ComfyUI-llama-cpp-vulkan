@@ -26,6 +26,11 @@ ComfyUI-llama-cpp-vulkan/
   web/
     vlm_loader.js             # vlm loader widget 联动: thinking 三态置灰, image token 字段显隐(纯 UX 增强)
   src/
+    i18n/                     # 文案层: 全部用户可见文案与控制台日志的单一来源
+      lang.py                 #   语言加载器, LANGUAGE 常量切换语言, 导出 LANG 字典
+      language_zh-CN.py       #   中文文案(结构/排版/占位符约定见其 docstring)
+      language_en-US.py       #   英文文案(与 zh-CN 逐行一一对应)
+      common_static.py        #   不随语言切换的常量(下拉选项值, 分类名, 协议串, 日志前缀)
     core/                     # 核心逻辑(非节点)
       storage.py              #   模型生命周期: 全局单例, resolve_config 校验, 显存折算, unload 钩子
       instruct.py             #   Instruct 基类(text 骨架)+ media 基类(VLM 校验)+ 中断/thinking/hybrid 工具
@@ -84,7 +89,7 @@ llama_cpp_parameters ----> LLAMACPPARAMS ----+---> llama_cpp_audio_instruct
 system_prompt_preset ----> STRING -----------+   (接全部 Instruct 的 system_prompt)
 
 全部 Instruct 输出单端口 STRING (output);
-image 逐张模式的多图结果以 "====== Image N ======" 分隔行拼接
+image 逐张模式的多图结果以 "======== Image N ========" 分隔行拼接
     |
     +--> parse_json_node / remove_code_block
     +--> split_instruct_output    (拆回 STRING 列表, 接第三方列表语义节点)
@@ -109,7 +114,7 @@ image 逐张模式的多图结果以 "====== Image N ======" 分隔行拼接
 选择语义(与 llama.cpp 构建 `model->devices` 的规则对齐):
 
 - llama.cpp 只把独显按枚举顺序收入设备列表, 仅当无独显时才收第一个核显, 其余设备无法通过 `main_gpu` 到达, 因此下拉框只展示可达设备
-- `Auto (独显优先)`: 走 llama.cpp 默认行为(`LLAMA_SPLIT_MODE_LAYER`, 独显优先, 多独显按层切分)
+- `Auto (GPU First)`: 走 llama.cpp 默认行为(`LLAMA_SPLIT_MODE_LAYER`, 独显优先, 多独显按层切分)
 - 显式选择某设备: 传 `LLAMA_SPLIT_MODE_NONE` + 该设备在可选列表中的索引, 整个模型加载到单卡; `main_gpu` 在 LAYER 模式下会被 llama.cpp 忽略, 这是显式选择必须切 NONE 的原因
 
 ### 模型生命周期
@@ -143,7 +148,7 @@ image 逐张模式的多图结果以 "====== Image N ======" 分隔行拼接
 
 ### 多模态输入
 
-- image Instruct: `mode` 下拉框切换逐张模式(逐张推理, 多图结果以 `====== Image N ======` 分隔行拼接, `split_instruct_output` 节点与 `json_to_bboxes` 的内建拆分均可还原为逐张列表)与批量模式(全部图片并入单次请求); 批量多图时缩放到 `max_size`, 单图保持原分辨率
+- image Instruct: `mode` 下拉框切换逐张模式 `Per-Image`(逐张推理, 多图结果以 `======== Image N ========` 分隔行拼接, `split_instruct_output` 节点与 `json_to_bboxes` 的内建拆分均可还原为逐张列表)与批量模式 `Batch`(全部图片并入单次请求); 批量多图时缩放到 `max_size`, 单图保持原分辨率
 - video Instruct: `frames` 输入为 IMAGE 帧批次(ComfyUI 生态的视频通行形态), 按 `max_frames` linspace 均匀抽帧后缩放, 并在 system prompt 前注入"连续视频"语义提示
 - audio Instruct: ComfyUI `AUDIO` dict 由 `media/encoding.py` 的 `audio2base64()` 均值混为单声道 16-bit WAV, 以 `input_audio` 内容项注入(重采样由 llama.cpp 的 mtmd 解码端完成), 服务 Qwen3-ASR 等音频 handler; 音频是否被 mmproj 支持由 llama-cpp-python 侧校验
 
@@ -156,6 +161,13 @@ image 逐张模式的多图结果以 "====== Image N ======" 分隔行拼接
 - 每次节点执行结束后按 `is_hybrid_arch()`(`_model.is_hybrid()`/`is_recurrent()` C API)判断是否整体重置 KV cache(重置在 `_run()` 的 finally 中, image 逐张模式中间的多次请求之间不重置, 依赖 wheel 内置的 hybrid checkpoint 前缀匹配): hybrid/recurrent 架构(Qwen3.5, LFM2 系等)的线性注意力状态无法跨请求前缀复用; 纯 SWA 模型(Gemma3)不受影响
 
 ## 修改代码须知
+
+### 文案与 i18n
+
+- 全部用户可见文案(节点显示名, tooltip, placeholder, 报错)与控制台日志文本统一放 `src/i18n/` 语言文件, 代码经 `from ..i18n.lang import LANG` 取用; 不随语言切换的字符串(下拉框选项值, 分类名, `======== Image N ========` 分隔行模板, 日志前缀)放 `common_static.py`. 新增/修改文案必须同步更新 zh-CN 与 en-US 两份语言文件并保持逐行一一对应
+- 带运行时值的文案写成 `str.format` 具名占位符模板; 报错文案须单行; 语言文件排版规则(多字面量换行约定)由 `tests/test_i18n_format.py` 锁定, `pyproject.toml` 已对 `language_*.py` 豁免 ruff format(lint 仍生效)
+- 测试断言报错文案时引用 `LANG` 而非硬编码字符串, 使断言随语言文件自动跟随
+- 例外(不进 i18n): 任务预设与系统提示词预设(领域内容), chat handler 显示名(`handlers.py` 注册表 key, 功能性标识), video Instruct 注入的"连续视频"语义提示与 `MEDIA_WORD`(prompt 内容), `prompts.py` 的 import 期模态校验报错(开发期防御)
 
 ### 文档维护原则
 

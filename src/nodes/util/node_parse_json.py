@@ -2,21 +2,19 @@
 
 import json
 
+from ...i18n.common_static import CATEGORY as _CATEGORY
+from ...i18n.lang import LANG
 from ...shared.text_utils import get_nested_value, parse_json
 from ...shared.types import any_type
+
+_NODE = LANG["nodes"]["util"]["parse_json"]
 
 
 # from: https://github.com/crystian/ComfyUI-Crystools
 class parse_json_node:
-    CATEGORY = "llama-cpp-vulkan"
+    CATEGORY = _CATEGORY
     FUNCTION = "process"
-    DESCRIPTION = (
-        "解析 JSON 字符串并按点分 key 取值, 同一个值以五种类型输出.\n"
-        "转换规则: string 对 dict/list 输出合法 JSON 文本, 其余为 str() 结果;\n"
-        "int/float 转换失败时回退 0 / 0.0; boolean 对数字取非零判定,\n"
-        '对文本仅 "true" (忽略大小写) 为真.\n'
-        'key 未命中且未连 default 时输出 (None, "", 0, 0.0, False).'
-    )
+    DESCRIPTION = _NODE["description"]
 
     @classmethod
     def INPUT_TYPES(s):
@@ -25,7 +23,7 @@ class parse_json_node:
                 "input": ("STRING", {"forceInput": True}),
                 "key": (
                     "STRING",
-                    {"default": "", "tooltip": "点分路径下钻取值, 如 a.b.c\n数组用数字下标, 如 items.0.label (负数从尾部取)"},
+                    {"default": "", "tooltip": _NODE["tooltips"]["key"]},
                 ),
             },
             "optional": {
@@ -38,7 +36,7 @@ class parse_json_node:
 
     def process(self, input, key, default=None):
         if not key.strip():
-            raise ValueError("Key cannot be empty!")
+            raise ValueError(_NODE["errors"]["key_empty"])
 
         # parse_json 统一顶层报错(含代码围栏剥离), 嵌套字符串由 get_nested_value 容错
         val = get_nested_value(parse_json(input), key, default)

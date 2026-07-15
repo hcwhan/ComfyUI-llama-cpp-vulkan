@@ -2,7 +2,12 @@
 
 import struct
 
+from ..i18n.common_static import LOG_PREFIX
+from ..i18n.lang import LANG
 from ..shared.logger import logger
+
+_ERRORS = LANG["common"]["gguf_errors"]
+_LOGS = LANG["logs"]["gguf"]
 
 # GGUF 标量 value type -> struct 格式 (string=8 和 array=9 单独处理)
 _SCALAR_FORMATS = {
@@ -40,7 +45,7 @@ def _read_scalar(f, vtype):
         return struct.unpack(fmt, f.read(struct.calcsize(fmt)))[0]
     if vtype == 8:  # string
         return read_string(f)
-    raise ValueError(f"Unknown value type {vtype}")
+    raise ValueError(_ERRORS["unknown_value_type"].format(vtype=vtype))
 
 
 def read_value(f):
@@ -73,13 +78,13 @@ def _parse_metadata(path):
     found = {}
     with open(path, "rb") as f:
         if f.read(4) != b"GGUF":
-            raise ValueError("This is not a GGUF file!")
+            raise ValueError(_ERRORS["not_gguf"])
 
         version = read_u32(f)
         if version < 2:
             # v1 的 tensor/kv 计数与字符串长度是 32 位, 按下面的 64 位布局读会
             # 解析错乱; v1 在生态中已基本绝迹, 直接按不支持报错
-            raise ValueError(f"GGUF v{version} is too old (v2+ required)")
+            raise ValueError(_ERRORS["version_too_old"].format(version=version))
         _tensor_count = read_u64(f)
         kv_count = read_u64(f)
 
@@ -103,8 +108,8 @@ def get_model_meta(path):
     try:
         meta = _parse_metadata(path)
         if "block_count" not in meta:
-            logger.warning("[llama-cpp-vulkan] block_count not found in GGUF metadata")
+            logger.warning(LOG_PREFIX + _LOGS["block_count_missing"])
         return meta
     except Exception as e:
-        logger.warning(f"[llama-cpp-vulkan] GGUF parse failed: {e}")
+        logger.warning(LOG_PREFIX + _LOGS["parse_failed"].format(e=e))
         return {}

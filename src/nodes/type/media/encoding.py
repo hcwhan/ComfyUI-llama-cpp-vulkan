@@ -8,6 +8,8 @@ import numpy as np
 import torch
 from PIL import Image
 
+from ....i18n.common_static import LOG_PREFIX
+from ....i18n.lang import LANG
 from ....shared.logger import logger
 
 
@@ -51,7 +53,7 @@ def audio2base64(audio):
     waveform = audio["waveform"]
     if waveform.ndim == 3:
         if waveform.shape[0] > 1:
-            logger.warning(f"[llama-cpp-vulkan] AUDIO batch of {waveform.shape[0]} clips received; only the first clip is processed")
+            logger.warning(LOG_PREFIX + LANG["logs"]["encoding"]["audio_batch_first_only"].format(count=waveform.shape[0]))
         waveform = waveform[0]
     if waveform.ndim == 2:
         waveform = waveform.mean(dim=0)

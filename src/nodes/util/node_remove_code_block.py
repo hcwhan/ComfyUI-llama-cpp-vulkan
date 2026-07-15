@@ -1,10 +1,11 @@
 """Unpack Code Block 节点, 去除 LLM 输出首尾的代码围栏标记."""
 
+from ...i18n.common_static import CATEGORY as _CATEGORY
 from ...shared.text_utils import strip_code_fence
 
 
 class remove_code_block:
-    CATEGORY = "llama-cpp-vulkan"
+    CATEGORY = _CATEGORY
     FUNCTION = "process"
 
     @classmethod

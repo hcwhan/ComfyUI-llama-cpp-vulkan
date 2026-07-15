@@ -1,10 +1,19 @@
 """采样参数配置节点, 打包成 kwargs dict 供 Instruct 传给 create_chat_completion."""
 
 from ...core.instruct import DEFAULT_SAMPLING_PARAMS as _DEFAULTS
+from ...i18n.common_static import CATEGORY as _CATEGORY
+from ...i18n.lang import LANG
+
+_TIPS = LANG["nodes"]["model"]["parameters"]["tooltips"]
+
+
+def _tooltip(name):
+    # tooltip 模板的 {default} 按 widget 默认值填充, 与实际生效值同源
+    return _TIPS[name].format(default=_DEFAULTS[name])
 
 
 class llama_cpp_parameters:
-    CATEGORY = "llama-cpp-vulkan"
+    CATEGORY = _CATEGORY
     FUNCTION = "process"
 
     @classmethod
@@ -20,7 +29,7 @@ class llama_cpp_parameters:
                         "min": 0,
                         "max": 65536,
                         "step": 1,
-                        "tooltip": f'单次生成的 token 数上限, 0 = 不限制.\n实际上限 = min(本值, 上下文长度 - prompt token 数),\n达到上限时静默截断 (finish_reason="length", 不报错).\n默认 {_DEFAULTS["max_gen_tokens"]}.',
+                        "tooltip": _tooltip("max_gen_tokens"),
                     },
                 ),
                 "top_k": (
@@ -30,7 +39,7 @@ class llama_cpp_parameters:
                         "min": 0,
                         "max": 1000,
                         "step": 1,
-                        "tooltip": f"只保留概率最高的 K 个候选 token 再采样, 0 = 不裁剪.\n默认 {_DEFAULTS['top_k']}.",
+                        "tooltip": _tooltip("top_k"),
                     },
                 ),
                 "top_p": (
@@ -40,7 +49,7 @@ class llama_cpp_parameters:
                         "min": 0.0,
                         "max": 1.0,
                         "step": 0.01,
-                        "tooltip": f"核采样: 按概率从高到低累计到 p 截断候选集, 1.0 = 禁用.\n默认 {_DEFAULTS['top_p']}.",
+                        "tooltip": _tooltip("top_p"),
                     },
                 ),
                 "min_p": (
@@ -50,7 +59,7 @@ class llama_cpp_parameters:
                         "min": 0.0,
                         "max": 1.0,
                         "step": 0.01,
-                        "tooltip": f"相对概率下限: 剔除低于 最高候选概率 x min_p 的候选, 0 = 禁用.\n默认 {_DEFAULTS['min_p']}.",
+                        "tooltip": _tooltip("min_p"),
                     },
                 ),
                 "typical_p": (
@@ -60,7 +69,7 @@ class llama_cpp_parameters:
                         "min": 0.0,
                         "max": 1.0,
                         "step": 0.01,
-                        "tooltip": f"典型性采样: 按信息量偏离度筛选候选, 1.0 = 禁用.\n默认 {_DEFAULTS['typical_p']}.",
+                        "tooltip": _tooltip("typical_p"),
                     },
                 ),
                 "temperature": (
@@ -70,7 +79,7 @@ class llama_cpp_parameters:
                         "min": 0.0,
                         "max": 2.0,
                         "step": 0.01,
-                        "tooltip": f"采样温度: 越低越确定保守, 越高越发散随机, 0 = 贪心.\n默认 {_DEFAULTS['temperature']}.",
+                        "tooltip": _tooltip("temperature"),
                     },
                 ),
                 "repeat_penalty": (
@@ -80,7 +89,7 @@ class llama_cpp_parameters:
                         "min": 0.0,
                         "max": 10.0,
                         "step": 0.01,
-                        "tooltip": f"对最近窗口内出现过的 token 乘惩罚系数, 1.0 = 禁用.\n默认 {_DEFAULTS['repeat_penalty']}.",
+                        "tooltip": _tooltip("repeat_penalty"),
                     },
                 ),
                 # OpenAI/llama.cpp 语义均允许负值(奖励重复), 统一 -2.0 ~ 2.0
@@ -91,7 +100,7 @@ class llama_cpp_parameters:
                         "min": -2.0,
                         "max": 2.0,
                         "step": 0.01,
-                        "tooltip": f"按 token 已出现的次数线性累加惩罚, 负值奖励重复.\n默认 {_DEFAULTS['frequency_penalty']}.",
+                        "tooltip": _tooltip("frequency_penalty"),
                     },
                 ),
                 "present_penalty": (
@@ -101,7 +110,7 @@ class llama_cpp_parameters:
                         "min": -2.0,
                         "max": 2.0,
                         "step": 0.01,
-                        "tooltip": f"token 只要出现过就惩罚一次, 鼓励引入新内容, 负值奖励重复.\n(即 OpenAI 的 presence_penalty)\n默认 {_DEFAULTS['present_penalty']}.",
+                        "tooltip": _tooltip("present_penalty"),
                     },
                 ),
                 "mirostat_mode": (
@@ -111,7 +120,7 @@ class llama_cpp_parameters:
                         "min": 0,
                         "max": 2,
                         "step": 1,
-                        "tooltip": f"Mirostat 自适应采样: 0 = 关闭, 1 = Mirostat, 2 = Mirostat 2.0.\n开启后接管采样, top_k/top_p 等失效.\n默认 {_DEFAULTS['mirostat_mode']}.",
+                        "tooltip": _tooltip("mirostat_mode"),
                     },
                 ),
                 "mirostat_eta": (
@@ -121,7 +130,7 @@ class llama_cpp_parameters:
                         "min": 0.0,
                         "max": 1.0,
                         "step": 0.01,
-                        "tooltip": f"Mirostat 学习率: 控制向目标熵收敛的速度.\n默认 {_DEFAULTS['mirostat_eta']}.",
+                        "tooltip": _tooltip("mirostat_eta"),
                     },
                 ),
                 "mirostat_tau": (
@@ -131,7 +140,7 @@ class llama_cpp_parameters:
                         "min": 0.0,
                         "max": 10.0,
                         "step": 0.01,
-                        "tooltip": f"Mirostat 目标熵 (约为目标困惑度), 越大输出越多样.\n默认 {_DEFAULTS['mirostat_tau']}.",
+                        "tooltip": _tooltip("mirostat_tau"),
                     },
                 ),
             }

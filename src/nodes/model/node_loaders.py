@@ -14,12 +14,20 @@ from ...core.devices import AUTO_LABEL, gpu_device_choices
 from ...core.handlers import HANDLERS, clamp_thinking, image_token_handlers, thinking_modes
 from ...core.model_paths import get_llm_filename_list
 from ...core.storage import resolve_config
+from ...i18n.common_static import CATEGORY as _CATEGORY
+from ...i18n.common_static import NONE_OPTION
+from ...i18n.lang import LANG
+
+_COMMON_TIPS = LANG["nodes"]["model"]["common"]["tooltips"]
+_COMMON_ERRORS = LANG["nodes"]["model"]["common"]["errors"]
+_VLM_TIPS = LANG["nodes"]["model"]["vlm_loader"]["tooltips"]
+_VLM_ERRORS = LANG["nodes"]["model"]["vlm_loader"]["errors"]
 
 _GPU_DEVICE_FIELD = (
     gpu_device_choices,
     {
         "default": AUTO_LABEL,
-        "tooltip": "选择 LLM 推理使用的 GPU 设备.\nAuto = llama.cpp 默认行为: 独显优先, 多独显按层切分.\n显式选择某设备时, 整个模型加载到该单卡.\n(仅当系统没有独显时, 核显才可选)",
+        "tooltip": _COMMON_TIPS["gpu_device"],
     },
 )
 
@@ -37,7 +45,7 @@ def _ctx_size_field(default):
             "min": 1024,
             "max": 327680,
             "step": 128,
-            "tooltip": "上下文长度上限, 即 llama.cpp 的 n_ctx.\n请求的 prompt + 生成 token 总量受此约束.",
+            "tooltip": _COMMON_TIPS["ctx_size"],
         },
     )
 
@@ -49,7 +57,7 @@ _VRAM_LIMIT_FIELD = (
         "min": -1,
         "max": 1024,
         "step": 1,
-        "tooltip": "显存占用上限, 单位 GB.\n-1 = 自动 (llama.cpp 按空闲显存适配层数), 0 = 纯 CPU 推理.\n预算不足模型 1 层时全部留在 CPU (严格守上限);\n层体积为估算值, 实际占用可能略有偏差.",
+        "tooltip": _COMMON_TIPS["vram_limit"],
     },
 )
 
@@ -60,18 +68,18 @@ def _is_mmproj(path):
 
 
 def _model_list():
-    return ["None"] + [f for f in get_llm_filename_list() if not _is_mmproj(f)]
+    return [NONE_OPTION] + [f for f in get_llm_filename_list() if not _is_mmproj(f)]
 
 
 def _mmproj_list():
     # "None" 占位在首位作为默认值, 强制用户显式选择与主模型配对的 mmproj
     # (loadmodel 做非空校验), 与 model / chat_handler 的显式选择原则统一:
     # 静默选中首个文件时, 错配要到 mtmd 首次推理才报错, 距配置点太远
-    return ["None"] + [f for f in get_llm_filename_list() if _is_mmproj(f)]
+    return [NONE_OPTION] + [f for f in get_llm_filename_list() if _is_mmproj(f)]
 
 
 class llama_cpp_llm_model_loader:
-    CATEGORY = "llama-cpp-vulkan"
+    CATEGORY = _CATEGORY
     FUNCTION = "loadmodel"
 
     @classmethod
@@ -89,13 +97,13 @@ class llama_cpp_llm_model_loader:
     RETURN_NAMES = ("llm_model",)
 
     def loadmodel(self, gpu_device, model, ctx_size, vram_limit):
-        if model == "None":
-            raise ValueError("Please select a gguf model.")
+        if model == NONE_OPTION:
+            raise ValueError(_COMMON_ERRORS["model_not_selected"])
         config = {
             "gpu_device": gpu_device,
             "model": model,
-            "mmproj": "None",
-            "chat_handler": "None",
+            "mmproj": NONE_OPTION,
+            "chat_handler": NONE_OPTION,
             "thinking": False,
             "n_ctx": ctx_size,
             "vram_limit": vram_limit,
@@ -107,7 +115,7 @@ class llama_cpp_llm_model_loader:
 
 
 class llama_cpp_vlm_model_loader:
-    CATEGORY = "llama-cpp-vulkan"
+    CATEGORY = _CATEGORY
     FUNCTION = "loadmodel"
 
     @classmethod
@@ -123,14 +131,14 @@ class llama_cpp_vlm_model_loader:
                 # 原样透传给前端 JS: 前者做 thinking 开关的三态置灰, 后者控制
                 # image_min/max_tokens 的显隐(均与注册表单一真源)
                 "chat_handler": (
-                    ["None"] + list(HANDLERS),
+                    [NONE_OPTION] + list(HANDLERS),
                     {"thinking_modes": thinking_modes(), "image_token_handlers": image_token_handlers()},
                 ),
                 "thinking": (
                     "BOOLEAN",
                     {
                         "default": False,
-                        "tooltip": "开启模型的思考(reasoning)模式.\n构造期模板级开关: 切换后下次执行会整体重新加载模型.\n仅对支持切换的 handler 生效: 不支持思考的强制为关,\nGLM-4.1V 等纯思考模型强制为开.\nGemma4 E2B/E4B 关闭后仍会以纯文本形式思考,\n残留思考内容由 Instruct 的 strip_thinking 剥离.",
+                        "tooltip": _VLM_TIPS["thinking"],
                     },
                 ),
                 "ctx_size": _ctx_size_field(_CTX_SIZE_DEFAULT * 2),
@@ -142,7 +150,7 @@ class llama_cpp_vlm_model_loader:
                         "min": 0,
                         "max": 4096,
                         "step": 32,
-                        "tooltip": "mmproj 视觉编码的最小 token 数.\n0 = 使用模型默认 (<=0 视为未设置).\n仅对图像/视频输入生效, 音频不受影响.\n修改后 Qwen2.5-VL 的 bbox 坐标换算会有偏差.",
+                        "tooltip": _VLM_TIPS["image_min_tokens"],
                     },
                 ),
                 "image_max_tokens": (
@@ -152,7 +160,7 @@ class llama_cpp_vlm_model_loader:
                         "min": 0,
                         "max": 4096,
                         "step": 32,
-                        "tooltip": "mmproj 视觉编码的最大 token 数, 可限制高分辨率图片的显存与耗时.\n0 = 使用模型默认 (<=0 视为未设置).\n仅对图像/视频输入生效, 音频不受影响.\n修改后 Qwen2.5-VL 的 bbox 坐标换算会有偏差.",
+                        "tooltip": _VLM_TIPS["image_max_tokens"],
                     },
                 ),
             }
@@ -162,14 +170,12 @@ class llama_cpp_vlm_model_loader:
     RETURN_NAMES = ("vlm_model",)
 
     def loadmodel(self, gpu_device, model, mmproj, chat_handler, thinking, ctx_size, vram_limit, image_min_tokens, image_max_tokens):
-        if model == "None":
-            raise ValueError("Please select a gguf model.")
-        if mmproj == "None":
-            raise ValueError(
-                "vlm Model Loader requires a mmproj file. Put the matching mmproj gguf in the llm/LLM folder, or use llm Model Loader for text-only models."
-            )
-        if chat_handler == "None":
-            raise ValueError("vlm Model Loader requires a chat handler matching the model.")
+        if model == NONE_OPTION:
+            raise ValueError(_COMMON_ERRORS["model_not_selected"])
+        if mmproj == NONE_OPTION:
+            raise ValueError(_VLM_ERRORS["mmproj_not_selected"])
+        if chat_handler == NONE_OPTION:
+            raise ValueError(_VLM_ERRORS["handler_not_selected"])
         # 无视觉编码路径的 handler (音频专用) 把两个 image token 参数折算为 0
         # (0 = 未设置): 与前端隐藏字段的行为对应, widget 值本身保留不动,
         # 重新显示时不丢失; 也顺带豁免下方的区间校验 (隐藏字段无法在 UI 修正)
@@ -178,7 +184,7 @@ class llama_cpp_vlm_model_loader:
             image_max_tokens = 0
         # 与 handler 侧同一条件, 只是提前到 loader 报错(<=0 视为未设置)
         if 0 < image_max_tokens < image_min_tokens:
-            raise ValueError(f"image_max_tokens ({image_max_tokens}) cannot be less than image_min_tokens ({image_min_tokens}).")
+            raise ValueError(_VLM_ERRORS["image_token_range"].format(image_max_tokens=image_max_tokens, image_min_tokens=image_min_tokens))
         config = {
             "gpu_device": gpu_device,
             "model": model,

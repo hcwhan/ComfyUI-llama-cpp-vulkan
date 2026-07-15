@@ -1,5 +1,6 @@
 """src/nodes/model/node_loaders.py 的单元测试: loadmodel 快速失败校验分支."""
 
+import re
 import unittest
 from unittest import mock
 
@@ -9,17 +10,20 @@ comfy_stubs.install()
 
 from src.core import storage  # noqa: E402
 from src.core.handlers import HANDLERS  # noqa: E402
+from src.i18n.common_static import AUTO_LABEL as _AUTO  # noqa: E402
+from src.i18n.lang import LANG  # noqa: E402
 from src.nodes.model.node_loaders import (  # noqa: E402
     llama_cpp_llm_model_loader,
     llama_cpp_vlm_model_loader,
 )
 
-_AUTO = "Auto (独显优先)"
+# 报错文案以语言文件为单一真源, 断言随语言文件自动跟随
+_MODEL_NOT_SELECTED = re.escape(LANG["nodes"]["model"]["common"]["errors"]["model_not_selected"])
 
 
 class TestLlmLoaderValidation(unittest.TestCase):
     def test_model_none_rejected(self):
-        with self.assertRaisesRegex(ValueError, "select a gguf model"):
+        with self.assertRaisesRegex(ValueError, _MODEL_NOT_SELECTED):
             llama_cpp_llm_model_loader().loadmodel(_AUTO, "None", 8192, -1)
 
     def test_valid_config_returned(self):
@@ -37,7 +41,7 @@ class TestVlmLoaderValidation(unittest.TestCase):
         return llama_cpp_vlm_model_loader().loadmodel(_AUTO, model, mmproj, handler, thinking, 8192, -1, min_t, max_t)
 
     def test_model_none_rejected(self):
-        with self.assertRaisesRegex(ValueError, "select a gguf model"):
+        with self.assertRaisesRegex(ValueError, _MODEL_NOT_SELECTED):
             self._load(model="None")
 
     def test_mmproj_none_rejected(self):

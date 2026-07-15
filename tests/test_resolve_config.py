@@ -1,5 +1,6 @@
 """src/core/storage.py resolve_config 的单元测试: loader 快速失败校验的报错路径."""
 
+import re
 import unittest
 from unittest import mock
 
@@ -9,6 +10,10 @@ comfy_stubs.install()
 
 from src.core import storage  # noqa: E402
 from src.core.handlers import HANDLERS  # noqa: E402
+from src.i18n.lang import LANG  # noqa: E402
+
+# 报错文案以语言文件为单一真源, 断言随语言文件自动跟随
+_STORAGE_ERRORS = LANG["common"]["storage_errors"]
 
 
 def _config(model="model.gguf", mmproj="None", chat_handler="None"):
@@ -27,16 +32,18 @@ class TestResolveConfig(unittest.TestCase):
             storage.resolve_config(_config())
 
     def test_unknown_handler_name_raises(self):
-        with self.assertRaisesRegex(ValueError, "Unknown chat handler"):
+        expected = re.escape(_STORAGE_ERRORS["unknown_chat_handler"].format(chat_handler="No-Such-Handler"))
+        with self.assertRaisesRegex(ValueError, expected):
             storage.resolve_config(_config(mmproj="m.gguf", chat_handler="No-Such-Handler"))
 
     def test_registered_but_unavailable_handler_raises(self):
         # 注册表声明过但 wheel 缺类的 handler (HANDLERS 缺项抛 KeyError):
         # 报错应指向 "本构建不可用" 而非 "名字未知"
+        expected = re.escape(_STORAGE_ERRORS["handler_unavailable"].format(chat_handler="Qwen3-VL"))
         with (
             mock.patch.object(storage, "handler_constructor", side_effect=KeyError),
             mock.patch.object(storage, "is_registered", return_value=True),
-            self.assertRaisesRegex(ValueError, "unavailable in this llama-cpp-python build"),
+            self.assertRaisesRegex(ValueError, expected),
         ):
             storage.resolve_config(_config(mmproj="m.gguf", chat_handler="Qwen3-VL"))
 

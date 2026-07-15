@@ -1,5 +1,6 @@
 """src/core/instruct.py 的单元测试: thinking 块剥离, 预设/自定义提示词组装, 预设配置一致性, 以及 FakeLlm 打桩的 content 扁平化, allow_thinking 折算与 REQUIRE_USER_TEXT 守卫 (走 _run)."""
 
+import re
 import types
 import unittest
 
@@ -10,6 +11,7 @@ comfy_stubs.install()
 from src.core.instruct import llama_cpp_instruct_base, strip_thinking_blocks  # noqa: E402
 from src.core.prompts import instruct_presets, preset_content  # noqa: E402
 from src.core.storage import LLAMA_CPP_STORAGE  # noqa: E402
+from src.i18n.lang import LANG  # noqa: E402
 from src.nodes.type.media.audio.node_instruct import llama_cpp_audio_instruct  # noqa: E402
 from src.nodes.type.media.image.node_instruct import llama_cpp_image_instruct  # noqa: E402
 from src.nodes.type.media.video.node_instruct import llama_cpp_video_instruct  # noqa: E402
@@ -279,7 +281,9 @@ class TestPresetConfig(unittest.TestCase):
 
     def test_unknown_preset_raises_value_error(self):
         # 预设改名/删除后经连线传入的旧值: 带指引的 ValueError 而非裸 KeyError
-        with self.assertRaisesRegex(ValueError, "Unknown preset_prompt"):
+        # (报错文案以语言文件为单一真源, 断言随语言文件自动跟随)
+        expected = re.escape(LANG["nodes"]["instruct"]["common"]["errors"]["unknown_preset_prompt"].format(name="不存在的预设"))
+        with self.assertRaisesRegex(ValueError, expected):
             preset_content("不存在的预设")
 
 

@@ -9,7 +9,11 @@ import functools
 
 import llama_cpp.llama_multimodal as _handler_module
 
+from ..i18n.common_static import LOG_PREFIX
+from ..i18n.lang import LANG
 from ..shared.logger import logger
+
+_LOGS = LANG["logs"]["handlers"]
 
 # thinking 三态: 可切换档直接记 handler 构造参数名(enable_thinking /
 # Qwen3-VL 的 force_reasoning), 另两档用哨兵常量; 钳制规则见 clamp_thinking
@@ -87,7 +91,7 @@ def _resolve_handlers():
             handler_cls = functools.partial(handler_cls, **kwargs)
         available[label] = handler_cls
     if missing:
-        logger.warning(f"[llama-cpp-vulkan] chat handler(s) unavailable in this llama-cpp-python build: {', '.join(missing)}")
+        logger.warning(LOG_PREFIX + _LOGS["handlers_unavailable"].format(missing=", ".join(missing)))
     return available
 
 
@@ -102,10 +106,10 @@ def clamp_thinking(label, thinking):
     """
     think = _HANDLER_SPECS[label][2]
     if think is THINK_UNSUPPORTED and thinking:
-        logger.warning(f'[llama-cpp-vulkan] handler "{label}" does not support thinking, the switch is treated as off')
+        logger.warning(LOG_PREFIX + _LOGS["thinking_unsupported"].format(label=label))
         return False
     if think is THINK_FORCED and not thinking:
-        logger.warning(f'[llama-cpp-vulkan] handler "{label}" is a thinking-only model, the switch is treated as on')
+        logger.warning(LOG_PREFIX + _LOGS["thinking_forced"].format(label=label))
         return True
     return thinking
 

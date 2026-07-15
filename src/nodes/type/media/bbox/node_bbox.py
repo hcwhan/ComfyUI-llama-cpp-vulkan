@@ -5,6 +5,9 @@ from collections import namedtuple
 import numpy as np
 import torch
 
+from .....i18n.common_static import BBOX_MODE_QWEN3, BBOX_MODE_QWEN25_VL, BBOX_MODE_SIMPLE, LOG_PREFIX
+from .....i18n.common_static import CATEGORY as _CATEGORY
+from .....i18n.lang import LANG
 from .....shared.logger import logger
 from .....shared.text_utils import parse_json, split_image_results
 from .bbox_utils import (
@@ -15,6 +18,9 @@ from .bbox_utils import (
     json_to_pixel_bboxes,
     valid_int_bbox,
 )
+
+_BBOX = LANG["nodes"]["bbox"]
+_LOGS = LANG["logs"]["bbox"]
 
 
 def _normalized_label(value):
@@ -38,7 +44,7 @@ SEG = namedtuple(
 
 
 class json_to_bboxes:
-    CATEGORY = "llama-cpp-vulkan"
+    CATEGORY = _CATEGORY
     FUNCTION = "process"
 
     INPUT_IS_LIST = True
@@ -49,15 +55,15 @@ class json_to_bboxes:
             "required": {
                 "json": ("STRING", {"forceInput": True}),
                 "mode": (
-                    ["simple", "Qwen3-VL", "Qwen2.5-VL"],
+                    [BBOX_MODE_SIMPLE, BBOX_MODE_QWEN3, BBOX_MODE_QWEN25_VL],
                     {
-                        "default": "simple",
-                        "tooltip": "坐标系换算:\nsimple = 原样透传 (模型输出即原图像素坐标)\nQwen3-VL = 0-1000 归一化坐标\nQwen2.5-VL = 内部 resize 空间的绝对坐标 (自动还原到原图;\n  loader 修改过 image_min/max_tokens 时换算会有偏差;\n  需配合 image Instruct 逐张模式使用: 批量模式多图会被 max_size\n  缩放而破坏换算, 批量单图不缩放, 换算仍精确)",
+                        "default": BBOX_MODE_SIMPLE,
+                        "tooltip": _BBOX["json_to_bboxes"]["tooltips"]["mode"],
                     },
                 ),
                 "label": (
                     "STRING",
-                    {"default": "", "multiline": False, "tooltip": "只保留指定 label 的 BBox.\n(匹配忽略大小写与首尾空格)"},
+                    {"default": "", "multiline": False, "tooltip": _BBOX["json_to_bboxes"]["tooltips"]["label"]},
                 ),
             },
             "optional": {
@@ -87,14 +93,11 @@ class json_to_bboxes:
             flat_images.extend(img_batch[n : n + 1] for n in range(img_batch.shape[0]))
 
         if mode in QWEN_BBOX_MODES and not flat_images:
-            raise ValueError("Image required for Qwen mode")
+            raise ValueError(_BBOX["json_to_bboxes"]["errors"]["image_required"])
         if flat_images and len(json) != len(flat_images):
-            if len(json) > len(flat_images):
-                detail = "extra JSON entries reuse the last frame, appended to image_list as single-frame batches"
-            else:
-                detail = "unpaired trailing frames are passed through without boxes"
+            detail = _LOGS["detail_extra_json"] if len(json) > len(flat_images) else _LOGS["detail_extra_frames"]
             logger.warning(
-                f"[llama-cpp-vulkan] {len(json)} JSON result(s) but {len(flat_images)} image frame(s); pairing by index, {detail}"
+                LOG_PREFIX + _LOGS["json_frame_mismatch"].format(json_count=len(json), frame_count=len(flat_images), detail=detail)
             )
 
         output_bboxes = []
@@ -105,12 +108,12 @@ class json_to_bboxes:
                 items = parse_json(json_str)
             except ValueError as e:
                 # 逐张模式拆出几十段结果时定位坏段, 与画框失败分支的 JSON #{i} 对齐
-                raise ValueError(f"JSON #{i}: {e}") from None
+                raise ValueError(_BBOX["json_to_bboxes"]["errors"]["json_parse_failed"].format(i=i, error=e)) from None
             # 模型只检出单个目标时可能直接输出对象而非单元素列表
             if isinstance(items, dict):
                 items = [items]
             if not isinstance(items, list):
-                raise ValueError(f'Expected a JSON list of {{"bbox_2d": [...], "label": "..."}} objects, got: {type(items).__name__}')
+                raise ValueError(_BBOX["json_to_bboxes"]["errors"]["not_a_list"].format(type_name=type(items).__name__))
             if wanted_label:
                 # 兼容 label / text_content 混用的输出, 任一字段匹配即保留;
                 # 非 dict 项原样保留, 由 json_to_pixel_bboxes 的结构校验给出
@@ -130,7 +133,7 @@ class json_to_bboxes:
                     # draw_bbox 返回 [1,H,W,C]
                     drawn_images.append(draw_bbox(curr_img[0], pixel_bboxes, [bbox_label(b) for b in items]))
                 except Exception as e:
-                    logger.warning(f"[llama-cpp-vulkan] Error drawing bboxes for JSON #{i}: {e}")
+                    logger.warning(LOG_PREFIX + _LOGS["draw_failed_json"].format(i=i, e=e))
                     # draw_bbox 经 numpy 往返恒输出 CPU 张量, 回退帧统一 .cpu(),
                     # 避免 --gpu-only 下与画框帧 torch.cat 混拼报 device mismatch
                     drawn_images.append(curr_img.cpu())
@@ -158,24 +161,25 @@ class json_to_bboxes:
 
 
 class bboxes_to_segs:
-    CATEGORY = "llama-cpp-vulkan"
+    CATEGORY = _CATEGORY
     FUNCTION = "process"
 
     @classmethod
     def INPUT_TYPES(s):
         # label/confidence 是检测结果本身的元数据(紧跟 bboxes 输入),
         # dilation/feather 作用于掩码矩形, crop_factor 决定上下文窗口, 按此语义分组排序
+        tips = _BBOX["bboxes_to_segs"]["tooltips"]
         return {
             "required": {
                 "bboxes": ("BBOX",),
                 "image": ("IMAGE",),
                 "label": (
                     "STRING",
-                    {"default": "bbox", "tooltip": "写入每个 SEG 的 label, 供下游按 label 过滤/赋值 (如 Impact Pack 的 SEGS Filter)."},
+                    {"default": "bbox", "tooltip": tips["label"]},
                 ),
                 "confidence": (
                     "FLOAT",
-                    {"default": 0.9, "min": 0.0, "max": 1.0, "step": 0.01, "tooltip": "写入每个 SEG 的置信度, 供下游按阈值过滤."},
+                    {"default": 0.9, "min": 0.0, "max": 1.0, "step": 0.01, "tooltip": tips["confidence"]},
                 ),
                 "dilation": (
                     "INT",
@@ -184,10 +188,10 @@ class bboxes_to_segs:
                         "min": 0,
                         "max": 200,
                         "step": 1,
-                        "tooltip": "掩码矩形向外扩张的像素数, 直接扩大下游的重绘区域.\n(与 Impact Pack 检测器及 BBoxes to MASK 的 dilation 语义一致)",
+                        "tooltip": tips["dilation"],
                     },
                 ),
-                "feather": ("INT", {"default": 0, "min": 0, "max": 100, "step": 1, "tooltip": "掩码边缘高斯羽化的 sigma (像素)."}),
+                "feather": ("INT", {"default": 0, "min": 0, "max": 100, "step": 1, "tooltip": tips["feather"]}),
                 "crop_factor": (
                     "FLOAT",
                     {
@@ -195,7 +199,7 @@ class bboxes_to_segs:
                         "min": 1.0,
                         "max": 10.0,
                         "step": 0.1,
-                        "tooltip": "crop_region 相对掩码矩形的放大倍数, 为下游 Detailer 提供重绘上下文.\n(Impact Pack 惯例, 1.0 = 不外扩)",
+                        "tooltip": tips["crop_factor"],
                     },
                 ),
             }
@@ -210,9 +214,7 @@ class bboxes_to_segs:
 
         seg_list = []
         if batch_size > 1:
-            logger.warning(
-                f"[llama-cpp-vulkan] BBoxes to SEGS received a batch of {batch_size} images; cropped images are taken from the first frame only"
-            )
+            logger.warning(LOG_PREFIX + _LOGS["segs_batch_first_frame"].format(batch_size=batch_size))
         image_for_cropping = image[0]
 
         for bbox in bboxes:
@@ -226,7 +228,7 @@ class bboxes_to_segs:
             y1 = max(0, min(y1, height))
             y2 = max(0, min(y2, height))
             if x2 <= x1 or y2 <= y1:
-                logger.warning(f"[llama-cpp-vulkan] Skipping bbox outside image bounds: {bbox}")
+                logger.warning(LOG_PREFIX + _LOGS["bbox_out_of_bounds"].format(bbox=bbox))
                 continue
 
             # dilation 直接外扩掩码矩形(重绘区域), 与 bboxes_to_mask 及
@@ -273,11 +275,12 @@ class bboxes_to_segs:
 
 
 class bboxes_to_mask:
-    CATEGORY = "llama-cpp-vulkan"
+    CATEGORY = _CATEGORY
     FUNCTION = "process"
 
     @classmethod
     def INPUT_TYPES(s):
+        tips = _BBOX["bboxes_to_mask"]["tooltips"]
         return {
             "required": {
                 "bboxes": ("BBOX",),
@@ -289,10 +292,10 @@ class bboxes_to_mask:
                         "min": 0,
                         "max": 200,
                         "step": 1,
-                        "tooltip": "掩码矩形向外扩张的像素数.\n(与 BBoxes to SEGS 的 dilation 语义一致)",
+                        "tooltip": tips["dilation"],
                     },
                 ),
-                "feather": ("INT", {"default": 0, "min": 0, "max": 100, "step": 1, "tooltip": "掩码边缘高斯羽化的 sigma (像素)."}),
+                "feather": ("INT", {"default": 0, "min": 0, "max": 100, "step": 1, "tooltip": tips["feather"]}),
             }
         }
 
@@ -320,14 +323,14 @@ class bboxes_to_mask:
             y2_exp = y2 + dilation
 
             if x2_exp - x1_exp <= 0 or y2_exp - y1_exp <= 0:
-                logger.warning(f"[llama-cpp-vulkan] Skipping bbox with empty area: {bbox}")
+                logger.warning(LOG_PREFIX + _LOGS["bbox_empty_area"].format(bbox=bbox))
                 continue
 
             # 局部窗口(含羽化边界), 裁剪到图像范围
             wx1, wy1 = max(0, x1_exp - margin), max(0, y1_exp - margin)
             wx2, wy2 = min(width, x2_exp + margin), min(height, y2_exp + margin)
             if wx2 <= wx1 or wy2 <= wy1:
-                logger.warning(f"[llama-cpp-vulkan] Skipping bbox outside image bounds: {bbox}")
+                logger.warning(LOG_PREFIX + _LOGS["bbox_out_of_bounds"].format(bbox=bbox))
                 continue
 
             # 扩张框(裁剪到图像内)在窗口坐标系中的位置
@@ -346,7 +349,7 @@ class bboxes_to_mask:
 
 
 class bboxes_to_bbox:
-    CATEGORY = "llama-cpp-vulkan"
+    CATEGORY = _CATEGORY
     FUNCTION = "process"
 
     # 上游 json_to_bboxes 的 BBOX 输出是 OUTPUT_IS_LIST(每元素一组).
@@ -362,7 +365,7 @@ class bboxes_to_bbox:
                 "image_index": ("INT", {"default": 0, "min": 0, "max": 1000000, "step": 1}),
                 "bbox_index": (
                     "INT",
-                    {"default": 0, "min": -998, "max": 999, "step": 1, "tooltip": "图内 BBox 索引. 设为 999 时返回该图全部 BBox."},
+                    {"default": 0, "min": -998, "max": 999, "step": 1, "tooltip": _BBOX["bboxes_to_bbox"]["tooltips"]["bbox_index"]},
                 ),
             }
         }
@@ -375,10 +378,16 @@ class bboxes_to_bbox:
         image_index = image_index[0]
         bbox_index = bbox_index[0]
         if not 0 <= image_index < len(bboxes):
-            raise IndexError(f"image_index {image_index} out of range: only {len(bboxes)} bbox group(s) available")
+            raise IndexError(
+                _BBOX["bboxes_to_bbox"]["errors"]["image_index_out_of_range"].format(image_index=image_index, count=len(bboxes))
+            )
         group = bboxes[image_index]
         if bbox_index == 999:
             return (group,)
         if not -len(group) <= bbox_index < len(group):
-            raise IndexError(f"bbox_index {bbox_index} out of range: image {image_index} has {len(group)} bbox(es)")
+            raise IndexError(
+                _BBOX["bboxes_to_bbox"]["errors"]["bbox_index_out_of_range"].format(
+                    bbox_index=bbox_index, image_index=image_index, count=len(group)
+                )
+            )
         return ([group[bbox_index]],)

@@ -13,9 +13,16 @@ import threading
 
 import comfy.model_management as mm
 
+from ..i18n.common_static import CATEGORY as _CATEGORY
+from ..i18n.lang import LANG
 from ..shared.types import any_type
 from .prompts import instruct_presets, preset_content
 from .storage import LLAMA_CPP_STORAGE
+
+_COMMON = LANG["nodes"]["instruct"]["common"]
+_TIPS = _COMMON["tooltips"]
+_PLACEHOLDERS = _COMMON["placeholders"]
+_ERRORS = _COMMON["errors"]
 
 # 采样参数的统一默认值: Parameters 节点的 widget 默认值与 Instruct 未连接
 # parameters 端口时的生效值均取自此表, 保证连不连默认参数节点行为一致
@@ -124,7 +131,7 @@ class InterruptWatcher:
 
 
 class llama_cpp_instruct_base:
-    CATEGORY = "llama-cpp-vulkan"
+    CATEGORY = _CATEGORY
     FUNCTION = "process"
 
     RETURN_TYPES = ("STRING",)
@@ -154,7 +161,7 @@ class llama_cpp_instruct_base:
                     "min": 0,
                     "max": 0xFFFFFFFE,
                     "step": 1,
-                    "tooltip": "32 位种子; 上限 0xFFFFFFFE, 避开 llama.cpp 的随机种子哨兵值 0xFFFFFFFF.",
+                    "tooltip": _TIPS["seed"],
                 },
             ),
         }
@@ -169,25 +176,25 @@ class llama_cpp_instruct_base:
                 {
                     "default": "",
                     "multiline": True,
-                    "placeholder": "用户提示词\n\n预设含占位符时(如 BBox 检测的目标类别, 待改写的提示词), 此内容用于填充占位符\n否则, 此内容会整体覆盖预设提示词.",
+                    "placeholder": _PLACEHOLDERS["custom_prompt"],
                 },
             ),
-            "system_prompt": ("STRING", {"default": "", "multiline": True, "placeholder": "系统提示词\n\n用于设置模型的人设."}),
+            "system_prompt": ("STRING", {"default": "", "multiline": True, "placeholder": _PLACEHOLDERS["system_prompt"]}),
         }
 
     @classmethod
     def runtime_inputs(cls):
         # force_offload 是执行结束后的收尾动作, 垫底; 输出后处理 (strip_thinking) 靠前
         return {
-            "strip_thinking": ("BOOLEAN", {"default": True, "tooltip": "移除输出中的思考/推理块\n(适用于 Thinking 模型)"}),
-            "force_offload": ("BOOLEAN", {"default": True, "tooltip": "推理结束后立即卸载模型, 释放显存."}),
+            "strip_thinking": ("BOOLEAN", {"default": True, "tooltip": _TIPS["strip_thinking"]}),
+            "force_offload": ("BOOLEAN", {"default": True, "tooltip": _TIPS["force_offload"]}),
         }
 
     @classmethod
     def optional_inputs(cls):
         return {
-            "parameters": ("LLAMACPPARAMS", {"tooltip": "采样参数配置.\n不连接时使用与 llama.cpp Parameters 节点默认值相同的一套参数."}),
-            "queue_handler": (any_type, {"tooltip": "用于控制多个 Instruct 节点的执行顺序."}),
+            "parameters": ("LLAMACPPARAMS", {"tooltip": _TIPS["parameters"]}),
+            "queue_handler": (any_type, {"tooltip": _TIPS["queue_handler"]}),
         }
 
     # ---- 执行核心 ----
@@ -219,9 +226,7 @@ class llama_cpp_instruct_base:
             if custom_prompt.strip():
                 return {"type": "text", "text": custom_prompt}
         elif not custom_prompt.strip():
-            raise ValueError(
-                f'Preset "{preset_prompt}" requires custom_prompt to fill its placeholder (e.g. object categories for BBox detection, or the prompt to rewrite).'
-            )
+            raise ValueError(_ERRORS["preset_requires_custom_prompt"].format(preset_prompt=preset_prompt))
         # 先替换 @@@ 再注入用户文本, 避免 custom_prompt 中的 @@@ 被误替换
         p = template.replace("@@@", self.MEDIA_WORD).replace("###", custom_prompt.strip())
         return {"type": "text", "text": p}
@@ -261,7 +266,7 @@ class llama_cpp_instruct_base:
         # 再触发可能长达数 GB 的模型加载, 避免漏填时白白完成一次全量加载才报错
         user_content = [self._build_user_prompt(preset_prompt, custom_prompt)]
         if self.REQUIRE_USER_TEXT and not user_content[0]["text"].strip():
-            raise ValueError("User prompt is empty: select a non-blank preset_prompt or fill custom_prompt.")
+            raise ValueError(_ERRORS["user_prompt_empty"])
         messages = self._prepare_messages(llama_model, system_prompt)
         # 合并生成新 dict 兼作防御性复制(parameters 是 ComfyUI 缓存的共享 dict,
         # 防止 runner 修改时污染); 未连接 parameters 端口时整体落到统一默认值
@@ -300,4 +305,4 @@ class llama_cpp_media_instruct_base(llama_cpp_instruct_base):
     @staticmethod
     def require_mmproj(kind):
         if not getattr(LLAMA_CPP_STORAGE.chat_handler, "mmproj_path", None):
-            raise ValueError(f"{kind} input detected, but the loaded model is not configured with a mmproj module.")
+            raise ValueError(_ERRORS["mmproj_not_configured"].format(kind=kind))

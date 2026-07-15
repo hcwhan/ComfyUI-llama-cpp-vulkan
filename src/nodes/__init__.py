@@ -1,5 +1,6 @@
 """节点注册表, 聚合全部节点的 ID -> 类 / 显示名映射."""
 
+from ..i18n.lang import LANG
 from .model.node_loaders import llama_cpp_llm_model_loader, llama_cpp_vlm_model_loader
 from .model.node_parameters import llama_cpp_parameters
 from .model.node_unload import llama_cpp_unload_model
@@ -37,21 +38,5 @@ NODE_CLASS_MAPPINGS = {
     "system_prompt_preset": system_prompt_preset,
 }
 
-NODE_DISPLAY_NAME_MAPPINGS = {
-    "llama_cpp_llm_model_loader": "llama.cpp llm Model Loader",
-    "llama_cpp_vlm_model_loader": "llama.cpp vlm Model Loader",
-    "llama_cpp_parameters": "llama.cpp Parameters",
-    "llama_cpp_unload_model": "llama.cpp Unload Model",
-    "llama_cpp_text_instruct": "llama.cpp text Instruct",
-    "llama_cpp_image_instruct": "llama.cpp image Instruct",
-    "llama_cpp_video_instruct": "llama.cpp video Instruct",
-    "llama_cpp_audio_instruct": "llama.cpp audio Instruct",
-    "json_to_bboxes": "JSON to BBoxes",
-    "bboxes_to_segs": "BBoxes to SEGS",
-    "bboxes_to_mask": "BBoxes to MASK",
-    "bboxes_to_bbox": "BBoxes to BBox",
-    "parse_json_node": "Parse JSON",
-    "remove_code_block": "Unpack Code Block",
-    "split_instruct_output": "Split Instruct Output",
-    "system_prompt_preset": "System Prompt Preset",
-}
+# 显示名以语言文件为单一来源; dict() 复制防外部经此引用改写语言字典
+NODE_DISPLAY_NAME_MAPPINGS = dict(LANG["display_names"])

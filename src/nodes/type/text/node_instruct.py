@@ -5,6 +5,7 @@
 """
 
 from ....core.instruct import llama_cpp_instruct_base
+from ....i18n.lang import LANG
 
 
 class llama_cpp_text_instruct(llama_cpp_instruct_base):
@@ -23,7 +24,7 @@ class llama_cpp_text_instruct(llama_cpp_instruct_base):
                     "BOOLEAN",
                     {
                         "default": False,
-                        "tooltip": "允许 Thinking 模型输出思考过程.\n关: 思考块开启即被强制闭合, 直接生成正文\n(对非思考模型无副作用; 残留的空思考块由 strip_thinking 剥离).",
+                        "tooltip": LANG["nodes"]["instruct"]["text"]["tooltips"]["allow_thinking"],
                     },
                 ),
                 **cls.runtime_inputs(),

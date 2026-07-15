@@ -8,11 +8,16 @@ import time
 import comfy.model_management as mm
 from llama_cpp import Llama
 
+from ..i18n.common_static import LOG_PREFIX, NONE_OPTION
+from ..i18n.lang import LANG
 from ..shared.logger import logger
 from .devices import AUTO_LABEL, log_backend_summary, resolve_device_selection
 from .gguf_layers import get_model_meta
 from .handlers import handler_constructor, is_registered
 from .model_paths import get_llm_full_path
+
+_ERRORS = LANG["common"]["storage_errors"]
+_LOGS = LANG["logs"]["storage"]
 
 # GGUF 文件体积 -> 运行时显存占用的经验放大系数, 按 n_ctx=8192 校准拆成两项:
 # 与上下文无关的计算缓冲等固定开销 + 随 n_ctx 线性增长的 KV/激活开销
@@ -95,16 +100,12 @@ def _estimate_n_gpu_layers(model_path, mmproj_path, vram_limit, n_ctx):
     if mmproj_path:
         mmproj_gb = os.path.getsize(mmproj_path) * _MMPROJ_FACTOR / (1024**3)
         if mmproj_gb >= vram_limit:
-            logger.warning(
-                f"[llama-cpp-vulkan] vram_limit ({vram_limit} GB) cannot fit the mmproj file (~{mmproj_gb:.1f} GB), keeping the main model and mmproj on CPU to honor the budget"
-            )
+            logger.warning(LOG_PREFIX + _LOGS["vram_cannot_fit_mmproj"].format(vram_limit=vram_limit, mmproj_gb=mmproj_gb))
             return 0, False
         usable -= mmproj_gb
     n_layers = int(usable / layer_size)
     if n_layers < 1:
-        logger.warning(
-            f"[llama-cpp-vulkan] vram_limit ({vram_limit} GB) leaves no room for even one model layer (~{layer_size:.1f} GB/layer), keeping the main model on CPU to honor the budget"
-        )
+        logger.warning(LOG_PREFIX + _LOGS["vram_no_room_for_layer"].format(vram_limit=vram_limit, layer_size=layer_size))
         return 0, mmproj_path is not None
     return n_layers, mmproj_path is not None
 
@@ -133,9 +134,9 @@ def resolve_config(config):
 
     model_path = get_llm_full_path(model)
     if model_path is None:
-        raise FileNotFoundError(f"Model '{model}' not found in any llm/LLM folder")
+        raise FileNotFoundError(_ERRORS["model_not_found"].format(model=model))
 
-    if chat_handler == "None":
+    if chat_handler == NONE_OPTION:
         handler_cls = None
     else:
         thinking = config["thinking"]
@@ -145,25 +146,20 @@ def resolve_config(config):
             # 注册过但本构建缺类的 handler 已在启动日志给出 warning,
             # 此处区分两种失配, 避免把 wheel 缺类误报为名字未知
             if is_registered(chat_handler):
-                raise ValueError(
-                    f'Chat handler "{chat_handler}" is unavailable in this llama-cpp-python build (see startup warnings).'
-                ) from None
-            raise ValueError(f'Unknown chat handler: "{chat_handler}"') from None
+                raise ValueError(_ERRORS["handler_unavailable"].format(chat_handler=chat_handler)) from None
+            raise ValueError(_ERRORS["unknown_chat_handler"].format(chat_handler=chat_handler)) from None
 
     mmproj_path = None
-    if mmproj and mmproj != "None":
+    if mmproj and mmproj != NONE_OPTION:
         mmproj_path = get_llm_full_path(mmproj)
         if mmproj_path is None:
-            raise FileNotFoundError(f"mmproj '{mmproj}' not found in any llm/LLM folder")
+            raise FileNotFoundError(_ERRORS["mmproj_not_found"].format(mmproj=mmproj))
         if handler_cls is None:
-            raise ValueError("Please select a chat handler for vision model.")
+            raise ValueError(_ERRORS["handler_required_for_mmproj"])
     elif handler_cls is not None:
         # 当前所有 chat handler 均为 VLM handler, 实例化时强制要求 mmproj;
         # 提前拦截, 避免抛出含糊的 "mmproj_path is required"
-        raise ValueError(
-            f'Chat handler "{chat_handler}" requires a mmproj model. '
-            'Select the matching mmproj file, or set chat_handler to "None" for text-only models.'
-        )
+        raise ValueError(_ERRORS["mmproj_required_for_handler"].format(chat_handler=chat_handler))
 
     return model_path, mmproj_path, handler_cls
 
@@ -181,7 +177,7 @@ class LLAMA_CPP_STORAGE:
             try:
                 cls.llm.close()
             except Exception as e:
-                logger.debug(f"[llama-cpp-vulkan] llm close failed: {e}")
+                logger.debug(LOG_PREFIX + _LOGS["llm_close_failed"].format(e=e))
 
         if cls.chat_handler is not None:
             try:
@@ -190,7 +186,7 @@ class LLAMA_CPP_STORAGE:
                 # 用公开的 close()(幂等且完整, mtmd_free + exit_stack)
                 cls.chat_handler.close()
             except Exception as e:
-                logger.debug(f"[llama-cpp-vulkan] chat_handler close failed: {e}")
+                logger.debug(LOG_PREFIX + _LOGS["handler_close_failed"].format(e=e))
 
         cls.llm = None
         cls.chat_handler = None
@@ -224,13 +220,13 @@ class LLAMA_CPP_STORAGE:
                     mm.get_torch_device(),
                 )
             except Exception as e:
-                logger.warning(f"[llama-cpp-vulkan] failed to free torch VRAM before load: {e}")
+                logger.warning(LOG_PREFIX + _LOGS["free_vram_failed"].format(e=e))
 
         if mmproj_path:
             # handler 构造只校验路径, mmproj 真正加载进显存由 mtmd 在首次推理时
             # 惰性初始化(_init_mtmd_context), 与上面 free_memory 的腾挪同在
             # 一次节点执行内完成, 时序仍有效
-            logger.info(f"[llama-cpp-vulkan] Preparing mmproj: {mmproj}")
+            logger.info(LOG_PREFIX + _LOGS["preparing_mmproj"].format(mmproj=mmproj))
 
             # 注册表固定 kwargs 与 thinking 开关已由 resolve_config 预绑定
             kwargs = {
@@ -248,16 +244,12 @@ class LLAMA_CPP_STORAGE:
             try:
                 cls.chat_handler = handler_cls(**kwargs)
             except Exception as e:
-                raise RuntimeError(
-                    f"{e}\nChatHandler initialization failed. "
-                    "Check that the mmproj file matches the selected chat_handler, "
-                    "and that dependencies were installed from requirements.txt (pinned Vulkan wheel)."
-                ) from e
+                raise RuntimeError(_ERRORS["handler_init_failed"].format(e=e)) from e
         else:
             cls.chat_handler = None
 
-        logger.info(f"[llama-cpp-vulkan] Loading model: {model}")
-        logger.info(f"[llama-cpp-vulkan] n_gpu_layers = {n_gpu_layers}, main_gpu = {main_gpu}, split_mode = {split_mode}")
+        logger.info(LOG_PREFIX + _LOGS["loading_model"].format(model=model))
+        logger.info(LOG_PREFIX + _LOGS["load_params"].format(n_gpu_layers=n_gpu_layers, main_gpu=main_gpu, split_mode=split_mode))
 
         def _create_llama():
             return Llama(
@@ -279,14 +271,14 @@ class LLAMA_CPP_STORAGE:
                 # Windows WDDM 归还显存有延迟, 估算偏低时 Vulkan 分配仍可能失败;
                 # 再腾挪一次并稍作等待后重试一轮. 失败原因无法可靠区分是否为
                 # 显存不足, 统一重试一次: 非显存错误(文件损坏等)会再次快速失败
-                logger.warning(f"[llama-cpp-vulkan] model load failed ({e}), freeing torch VRAM and retrying once")
+                logger.warning(LOG_PREFIX + _LOGS["load_failed_retry"].format(e=e))
                 try:
                     mm.free_memory(
                         _estimate_vram_bytes(model_path, mmproj_path if mmproj_on_gpu else None, n_gpu_layers, config["n_ctx"]),
                         mm.get_torch_device(),
                     )
                 except Exception as free_err:
-                    logger.warning(f"[llama-cpp-vulkan] failed to free torch VRAM before retry: {free_err}")
+                    logger.warning(LOG_PREFIX + _LOGS["free_vram_retry_failed"].format(free_err=free_err))
                 time.sleep(1.0)
                 cls.llm = _create_llama()
         except Exception:
@@ -299,7 +291,7 @@ class LLAMA_CPP_STORAGE:
         cls.current_config = config.copy()
         if n_gpu_layers == 0 and not mmproj_on_gpu:
             # 纯 CPU 推理时打印 Active GPU 会误导排查
-            logger.info("[llama-cpp-vulkan] CPU-only inference: no layers or mmproj offloaded to GPU")
+            logger.info(LOG_PREFIX + _LOGS["cpu_only"])
         else:
             log_backend_summary(main_gpu, split_mode)
 
@@ -318,4 +310,4 @@ if not hasattr(mm, "unload_all_models_backup"):
         return mm.unload_all_models_backup(*args, **kwargs)
 
     mm.unload_all_models = patched_unload_all_models
-    logger.info("[llama-cpp-vulkan] Model cleanup hook applied!")
+    logger.info(LOG_PREFIX + _LOGS["cleanup_hook_applied"])

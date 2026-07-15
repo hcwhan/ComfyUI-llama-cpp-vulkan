@@ -5,6 +5,7 @@ mtmd 解码端完成. 音频是否被 mmproj 支持由 llama-cpp-python 侧校�
 """
 
 from .....core.instruct import llama_cpp_media_instruct_base
+from .....i18n.lang import LANG
 from ..encoding import audio2base64
 
 
@@ -17,7 +18,7 @@ class llama_cpp_audio_instruct(llama_cpp_media_instruct_base):
         return {
             "required": {
                 "vlm_model": (cls.MODEL_TYPE,),
-                "audio": ("AUDIO", {"tooltip": "供 ASR/omni 模型使用的音频片段.\n需要支持音频的 mmproj(如 Qwen3-ASR)."}),
+                "audio": ("AUDIO", {"tooltip": LANG["nodes"]["instruct"]["audio"]["tooltips"]["audio"]}),
                 **cls.seed_input(),
                 **cls.prompt_inputs(),
                 **cls.runtime_inputs(),

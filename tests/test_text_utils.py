@@ -59,7 +59,7 @@ class TestStripCodeFence(unittest.TestCase):
 
 class TestSplitImageResults(unittest.TestCase):
     def test_multi_image_output_split(self):
-        text = "====== Image 1 ======\n\n结果1\n\n====== Image 2 ======\n\n结果2\n\n====== Image 3 ======\n\n结果3"
+        text = "======== Image 1 ========\n\n结果1\n\n======== Image 2 ========\n\n结果2\n\n======== Image 3 ========\n\n结果3"
         self.assertEqual(split_image_results(text), ["结果1", "结果2", "结果3"])
 
     def test_plain_text_returns_single_element(self):
@@ -67,36 +67,36 @@ class TestSplitImageResults(unittest.TestCase):
 
     def test_json_with_escaped_newline_not_split(self):
         # JSON 文本中的换行是 \n 转义, 不存在真实分隔行, 不应被拆分
-        text = '[{"label": "====== Image 1 ======\\n"}]'
+        text = '[{"label": "======== Image 1 ========\\n"}]'
         self.assertEqual(split_image_results(text), [text])
 
     def test_separator_inside_line_not_matched(self):
         # 分隔样式出现在行中间(非独占一行)时不拆分
-        text = "前缀 ====== Image 1 ====== 后缀"
+        text = "前缀 ======== Image 1 ======== 后缀"
         self.assertEqual(split_image_results(text), [text])
 
     def test_crlf_separator(self):
-        text = "====== Image 1 ======\r\n\r\nA\r\n\r\n====== Image 2 ======\r\n\r\nB"
+        text = "======== Image 1 ========\r\n\r\nA\r\n\r\n======== Image 2 ========\r\n\r\nB"
         self.assertEqual(split_image_results(text), ["A", "B"])
 
     def test_fenced_json_segments(self):
-        text = '====== Image 1 ======\n\n```json\n[{"a": 1}]\n```\n\n====== Image 2 ======\n\n```json\n[{"b": 2}]\n```'
+        text = '======== Image 1 ========\n\n```json\n[{"a": 1}]\n```\n\n======== Image 2 ========\n\n```json\n[{"b": 2}]\n```'
         self.assertEqual(split_image_results(text), ['```json\n[{"a": 1}]\n```', '```json\n[{"b": 2}]\n```'])
 
     def test_leading_text_before_first_separator_kept(self):
         # 首个分隔行之前存在非空正文时保留为首段(防御行为: 实际逐张输出首段恒为空,
         # 但保留语义保证任何输入都不丢内容)
-        text = "前导说明\n\n====== Image 1 ======\n\nA"
+        text = "前导说明\n\n======== Image 1 ========\n\nA"
         self.assertEqual(split_image_results(text), ["前导说明", "A"])
 
     def test_empty_middle_result_keeps_placeholder(self):
         # 中间某图输出为空时保留空字符串占位, 后续结果不得前移错位
         # (下游 json_to_bboxes / Split Instruct Output 按 "第 i 段对应第 i 张图" 配对)
-        text = "====== Image 1 ======\n\nA\n\n====== Image 2 ======\n\n\n\n====== Image 3 ======\n\nC"
+        text = "======== Image 1 ========\n\nA\n\n======== Image 2 ========\n\n\n\n======== Image 3 ========\n\nC"
         self.assertEqual(split_image_results(text), ["A", "", "C"])
 
     def test_empty_last_result_keeps_placeholder(self):
-        text = "====== Image 1 ======\n\nA\n\n====== Image 2 ======\n\n"
+        text = "======== Image 1 ========\n\nA\n\n======== Image 2 ========\n\n"
         self.assertEqual(split_image_results(text), ["A", ""])
 
 

@@ -9,10 +9,15 @@ import torch
 from PIL import Image, ImageDraw, ImageFont
 from scipy.ndimage import gaussian_filter
 
+from .....i18n.common_static import BBOX_MODE_QWEN3, BBOX_MODE_QWEN25_VL, LOG_PREFIX
+from .....i18n.lang import LANG
 from .....shared.logger import logger
 from ..encoding import tensor_to_uint8
 
-QWEN_BBOX_MODES = ("Qwen3-VL", "Qwen2.5-VL")
+_ERRORS = LANG["nodes"]["bbox"]["json_to_bboxes"]["errors"]
+_LOGS = LANG["logs"]["bbox"]
+
+QWEN_BBOX_MODES = (BBOX_MODE_QWEN3, BBOX_MODE_QWEN25_VL)
 
 # Qwen2.5-VL 输出的是 mtmd smart_resize 后图像空间的绝对像素坐标(官方语义,
 # 实测 Qwen2.5-VL-3B GGUF 逐值吻合), 换算回原图需要复现 resize 尺寸.
@@ -69,7 +74,7 @@ def _label_font(size):
             return ImageFont.truetype(name, size)
         except OSError:
             continue
-    logger.warning("[llama-cpp-vulkan] No CJK font found, bbox labels may render as boxes")
+    logger.warning(LOG_PREFIX + _LOGS["no_cjk_font"])
     return ImageFont.load_default(size)
 
 
@@ -89,10 +94,10 @@ def json_to_pixel_bboxes(json_items, mode, width=0, height=0):
     - Qwen2.5-VL: 输出 smart_resize 后图像空间的绝对坐标, 按 原图/resize 比例还原
     - simple:     视为已是原图像素坐标, 原样透传
     """
-    if mode == "Qwen2.5-VL":
+    if mode == BBOX_MODE_QWEN25_VL:
         rw, rh = qwen25_smart_resize(width, height)
         sx, sy = width / rw, height / rh
-    elif mode == "Qwen3-VL":
+    elif mode == BBOX_MODE_QWEN3:
         sx, sy = width / 1000, height / 1000
     else:
         sx = sy = 1.0
@@ -101,15 +106,15 @@ def json_to_pixel_bboxes(json_items, mode, width=0, height=0):
     for item in json_items:
         # LLM 输出结构不可信, 显式校验并给出期望格式, 避免裸 KeyError/TypeError
         if not isinstance(item, dict):
-            raise ValueError(f'Expected a JSON list of objects like {{"bbox_2d": [x1, y1, x2, y2], "label": "..."}}, got item: {item!r}')
+            raise ValueError(_ERRORS["item_not_object"].format(item=item))
         coords = item.get("bbox_2d")
         if not isinstance(coords, (list, tuple)) or len(coords) != 4:
-            raise ValueError(f'BBox item is missing a valid "bbox_2d": [x1, y1, x2, y2] field: {item!r}')
+            raise ValueError(_ERRORS["missing_bbox_2d"].format(item=item))
         try:
             # 坐标经 float 强转: 弱模型常见输出数字字符串, 与 valid_int_bbox 行为一致
             x0, y0, x1, y1 = (float(v) for v in coords)
         except (TypeError, ValueError):
-            raise ValueError(f'BBox "bbox_2d" coordinates must be numeric: {item!r}') from None
+            raise ValueError(_ERRORS["coords_not_numeric"].format(item=item)) from None
         bboxes.append((x0 * sx, y0 * sy, x1 * sx, y1 * sy))
     return bboxes
 
@@ -144,7 +149,7 @@ def draw_bbox(image, pixel_bboxes, labels):
             # 反向坐标(x1 < x0, LLM 常见错误)或非有限值会让 PIL 抛错;
             # 逐框跳过, 与 SEGS/MASK 路径的逐框容错粒度一致,
             # 单个坏框不放弃整张图的其余框
-            logger.warning(f"[llama-cpp-vulkan] Skipping bbox that failed to draw ({label!r}: ({x0}, {y0}, {x1}, {y1})): {e}")
+            logger.warning(LOG_PREFIX + _LOGS["bbox_draw_failed"].format(label=label, x0=x0, y0=y0, x1=x1, y1=y1, e=e))
     return torch.from_numpy(np.array(img).astype(np.float32) / 255.0).unsqueeze(0)
 
 
@@ -155,12 +160,12 @@ def valid_int_bbox(bbox):
     坐标值来自 LLM 输出, 非数字时按无效项跳过.
     """
     if not isinstance(bbox, (list, tuple)) or len(bbox) < 4:
-        logger.warning(f"[llama-cpp-vulkan] Skipping invalid bbox item: {bbox}")
+        logger.warning(LOG_PREFIX + _LOGS["bbox_invalid_item"].format(bbox=bbox))
         return None
     try:
         return tuple(int(round(float(v))) for v in bbox[:4])
     except (TypeError, ValueError):
-        logger.warning(f"[llama-cpp-vulkan] Skipping bbox with non-numeric coordinates: {bbox}")
+        logger.warning(LOG_PREFIX + _LOGS["bbox_non_numeric"].format(bbox=bbox))
         return None
 
 

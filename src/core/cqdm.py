@@ -3,9 +3,11 @@
 import comfy.utils
 from tqdm import tqdm
 
+from ..i18n.lang import LANG
+
 
 class cqdm:
-    def __init__(self, iterable, desc="Processing"):
+    def __init__(self, iterable, desc=LANG["logs"]["cqdm"]["progress_desc"]):
         self.total = len(iterable)
         self.pbar = comfy.utils.ProgressBar(self.total)
         # 立即推送 0/N: 前端马上显示进度起点, 同时清掉上一次执行被中断时

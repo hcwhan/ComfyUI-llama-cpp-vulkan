@@ -25,8 +25,8 @@
 - parameters 节点 tooltip 中的 {default} 由代码按 widget 默认值自动填充.
 
 不在本文件 (不随语言切换, 后续统一放 common_static.py):
-- 下拉框选项值: 逐张模式/批量模式, Auto (独显优先), chat handler 名单等 (会序列化进工作流的 widget 值).
-- 节点分类名 category (llama-cpp-vulkan), "====== Image N ======" 分隔行 (被正则匹配的协议串).
+- 下拉框选项值: Per-Image/Batch, Auto (GPU First), chat handler 名单等 (会序列化进工作流的 widget 值).
+- 节点分类名 category (llama-cpp-vulkan), "======== Image N ========" 分隔行 (被正则匹配的协议串).
 - 任务预设与系统提示词预设 (名称与内容).
 """
 
@@ -57,6 +57,7 @@ LANG = {
         "storage_errors": {
             "model_not_found": "在 llm 目录中找不到模型 '{model}'.",
             "unknown_chat_handler": '未知的 chat handler: "{chat_handler}"',
+            "handler_unavailable": 'chat handler "{chat_handler}" 在当前 llama-cpp-python 构建中不可用 (见启动日志 warning).',
             "mmproj_not_found": "在 llm 目录中找不到 mmproj '{mmproj}'.",
             "handler_required_for_mmproj": "请为视觉模型选择配套的 chat handler.",
             "mmproj_required_for_handler": 'chat handler "{chat_handler}" 需要配套的 mmproj 文件.',
@@ -272,11 +273,11 @@ LANG = {
             "image": {
                 "tooltips": {
                     "mode": (
-                        '逐张模式: 逐张图片单独推理, 各得一条结果, 单图时直接输出, 多图时以 "====== Image N ======" (N 从 1 起) 作为前缀行然后拼接为单条输出.\n'
-                        "批量模式: 全部图片并入单次请求 (多图时缩放到 max_size, 单图保持原分辨率)."
+                        'Per-Image = 逐张图片单独推理, 各得一条结果, 单图时直接输出, 多图时以 "======== Image N ========" (N 从 1 起) 作为前缀行然后拼接为单条输出.\n'
+                        "Batch = 全部图片并入单次请求 (多图时缩放到 max_size, 单图保持原分辨率)."
                     ),
                     "max_size": (
-                        "批量模式下输入图片分辨率的最大边长, 超出时等比缩小.\n"
+                        "Batch 模式下输入图片分辨率的最大边长, 超出时等比缩小.\n"
                         "仅在发送多张图片时生效, 单张图片保持原分辨率."
                     ),
                 },
@@ -317,9 +318,9 @@ LANG = {
                         "Qwen3-VL = 0-1000 归一化坐标, 按原图尺寸还原\n"
                         "Qwen2.5-VL = 模型内部 resize 空间的绝对坐标, 自动还原到原图\n"
                         "  loader 修改过 image_min/max_tokens 时换算会有偏差;\n"
-                        "  需配合 image Instruct 逐张模式使用:\n"
-                        "    批量模式多图时会被 max_size 缩放导致换算失真,\n"
-                        "    批量模式单图时不缩放, 换算仍精确"
+                        "  需配合 image Instruct 的 Per-Image 模式使用:\n"
+                        "    Batch 模式多图时会被 max_size 缩放导致换算失真,\n"
+                        "    Batch 模式单图时不缩放, 换算仍精确"
                     ),
                     "label": (
                         "只保留 label 匹配的 BBox, 留空保留全部.\n"

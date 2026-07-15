@@ -27,6 +27,8 @@
 (场景 1/2 是 4/3 在空模板下的特例, 代码中走同一分支)
 """
 
+from ..i18n.lang import LANG
+
 user_prompt_presets = {
     "空白 - 空": {
         "use": ["text", "image", "video", "audio"],
@@ -105,6 +107,4 @@ def preset_content(name):
     try:
         return user_prompt_presets[name]["content"]
     except KeyError:
-        raise ValueError(
-            f'Unknown preset_prompt: "{name}". Re-select a preset from the dropdown (the workflow may reference a renamed or removed preset).'
-        ) from None
+        raise ValueError(LANG["nodes"]["instruct"]["common"]["errors"]["unknown_preset_prompt"].format(name=name)) from None

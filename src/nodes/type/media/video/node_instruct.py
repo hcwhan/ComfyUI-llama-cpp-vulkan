@@ -8,7 +8,10 @@ frames 输入为 IMAGE 帧批次(ComfyUI 生态的视频通行形态, VHS/视频
 import numpy as np
 
 from .....core.instruct import llama_cpp_media_instruct_base
+from .....i18n.lang import LANG
 from ..encoding import image_content_item, scale_image, tensor_to_uint8
+
+_TIPS = LANG["nodes"]["instruct"]["video"]["tooltips"]
 
 
 def sample_frame_indices(total_frames, max_frames):
@@ -26,10 +29,10 @@ class llama_cpp_video_instruct(llama_cpp_media_instruct_base):
         return {
             "required": {
                 "vlm_model": (cls.MODEL_TYPE,),
-                "frames": ("IMAGE", {"tooltip": "IMAGE 帧批次形式的视频帧(如 VHS Load Video 或视频模型 VAE Decode 的输出)."}),
+                "frames": ("IMAGE", {"tooltip": _TIPS["frames"]}),
                 **cls.seed_input(),
                 **cls.prompt_inputs(),
-                "max_frames": ("INT", {"default": 30, "min": 2, "max": 1024, "step": 1, "tooltip": "从输入帧中均匀采样的帧数上限."}),
+                "max_frames": ("INT", {"default": 30, "min": 2, "max": 1024, "step": 1, "tooltip": _TIPS["max_frames"]}),
                 "max_size": (
                     "INT",
                     {
@@ -37,7 +40,7 @@ class llama_cpp_video_instruct(llama_cpp_media_instruct_base):
                         "min": 128,
                         "max": 16384,
                         "step": 64,
-                        "tooltip": "采样帧的最大边长.\n仅在发送多帧时生效, 单帧保持原分辨率.",
+                        "tooltip": _TIPS["max_size"],
                     },
                 ),
                 **cls.runtime_inputs(),

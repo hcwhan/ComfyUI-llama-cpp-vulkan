@@ -19,7 +19,11 @@ from llama_cpp._ggml import (
     libggml_base,
 )
 
+from ..i18n.common_static import AUTO_LABEL, DEVICE_LABEL_TEMPLATE, LOG_PREFIX
+from ..i18n.lang import LANG
 from ..shared.logger import logger
+
+_LOGS = LANG["logs"]["devices"]
 
 libggml_base.ggml_backend_dev_name.argtypes = [ctypes.c_void_p]
 libggml_base.ggml_backend_dev_name.restype = ctypes.c_char_p
@@ -35,8 +39,6 @@ _DEV_TYPE_NAMES = {
     _GGML_BACKEND_DEVICE_TYPE_GPU: "GPU",
     _GGML_BACKEND_DEVICE_TYPE_IGPU: "IGPU",
 }
-
-AUTO_LABEL = "Auto (独显优先)"
 
 SPLIT_MODE_NONE = _llama_cpp_lib.llama_split_mode.LLAMA_SPLIT_MODE_NONE
 SPLIT_MODE_LAYER = _llama_cpp_lib.llama_split_mode.LLAMA_SPLIT_MODE_LAYER
@@ -60,7 +62,7 @@ def _detect_gpu_devices():
                 devices.append({"name": name, "desc": desc, "type": type_name})
         return devices
     except Exception as e:
-        logger.warning(f"[llama-cpp-vulkan] GPU detection failed: {e}")
+        logger.warning(LOG_PREFIX + _LOGS["detection_failed"].format(e=e))
         return []
 
 
@@ -68,9 +70,9 @@ _gpu_devices = _detect_gpu_devices()
 
 if _gpu_devices:
     _summary = ", ".join(f"{d['name']} ({d['desc']}) [{d['type']}]" for d in _gpu_devices)
-    logger.info(f"[llama-cpp-vulkan] Detected {len(_gpu_devices)} GPU device(s): {_summary}")
+    logger.info(LOG_PREFIX + _LOGS["detected_devices"].format(count=len(_gpu_devices), summary=_summary))
 else:
-    logger.warning("[llama-cpp-vulkan] No GPU devices detected, running on CPU only")
+    logger.warning(LOG_PREFIX + _LOGS["no_devices"])
 
 
 def _selectable_devices():
@@ -87,7 +89,7 @@ def _selectable_devices():
 
 
 def _device_label(dev):
-    return f"{dev['name']} - {dev['desc']} [{dev['type']}]"
+    return DEVICE_LABEL_TEMPLATE.format(name=dev["name"], desc=dev["desc"], type=dev["type"])
 
 
 gpu_device_choices = [AUTO_LABEL] + [_device_label(d) for d in _selectable_devices()]
@@ -107,18 +109,18 @@ def resolve_device_selection(gpu_device):
         # 防御分支: 选项列表与 _selectable_devices 同源且进程内静态, 跨进程的
         # 过期 label(硬件/驱动变更后的旧工作流)会先被 ComfyUI 对 combo 输入的
         # 前置校验(value_not_in_list)拒绝, 正常执行走不到这里
-        logger.warning(f"[llama-cpp-vulkan] device '{gpu_device}' is not selectable, falling back to Auto")
+        logger.warning(LOG_PREFIX + _LOGS["device_not_selectable"].format(gpu_device=gpu_device))
     return 0, SPLIT_MODE_LAYER
 
 
 def log_backend_summary(main_gpu, split_mode):
     selectable = _selectable_devices()
     if not selectable:
-        logger.warning("[llama-cpp-vulkan] No GPU backend detected, running on CPU only")
+        logger.warning(LOG_PREFIX + _LOGS["no_backend"])
         return
     if split_mode == SPLIT_MODE_LAYER and len(selectable) > 1:
         names = ", ".join(d["name"] for d in selectable)
-        logger.info(f"[llama-cpp-vulkan] Active GPUs (layer split): {names}")
+        logger.info(LOG_PREFIX + _LOGS["active_gpus_layer_split"].format(names=names))
     else:
         active = selectable[main_gpu] if main_gpu < len(selectable) else selectable[0]
-        logger.info(f"[llama-cpp-vulkan] Active GPU: {active['name']} ({active['desc']}) [{active['type']}]")
+        logger.info(LOG_PREFIX + _LOGS["active_gpu"].format(name=active["name"], desc=active["desc"], type=active["type"]))

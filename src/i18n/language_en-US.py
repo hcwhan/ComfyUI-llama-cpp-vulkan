@@ -25,8 +25,8 @@ Placeholder conventions:
 - {default} in parameters node tooltips is auto-filled by code from the widget default value.
 
 Not in this file (not switched with language, centralized in common_static.py):
-- Dropdown option values: the per-image/batch modes, Auto (dGPU first), the chat handler list etc. (widget values serialized into workflows).
-- The node category (llama-cpp-vulkan), the "====== Image N ======" separator line (protocol strings matched by regex).
+- Dropdown option values: Per-Image/Batch, Auto (GPU First), the chat handler list etc. (widget values serialized into workflows).
+- The node category (llama-cpp-vulkan), the "======== Image N ========" separator line (protocol strings matched by regex).
 - Task presets and system prompt presets (names and contents).
 """
 
@@ -57,6 +57,7 @@ LANG = {
         "storage_errors": {
             "model_not_found": "Model '{model}' not found in the llm folder.",
             "unknown_chat_handler": 'Unknown chat handler: "{chat_handler}"',
+            "handler_unavailable": 'Chat handler "{chat_handler}" is unavailable in this llama-cpp-python build (see startup warnings).',
             "mmproj_not_found": "mmproj '{mmproj}' not found in the llm folder.",
             "handler_required_for_mmproj": "Please select a matching chat handler for the vision model.",
             "mmproj_required_for_handler": 'Chat handler "{chat_handler}" requires a matching mmproj file.',
@@ -272,11 +273,11 @@ LANG = {
             "image": {
                 "tooltips": {
                     "mode": (
-                        'Per-image mode: each image is inferred separately for its own result; a single image is output directly, multiple images are joined into one output with "====== Image N ======" prefix lines (N starts at 1).\n'
-                        "Batch mode: all images go into a single request (multiple images are scaled to max_size, a single image keeps its original resolution)."
+                        'Per-Image = each image is inferred separately for its own result; a single image is output directly, multiple images are joined into one output with "======== Image N ========" prefix lines (N starts at 1).\n'
+                        "Batch = all images go into a single request (multiple images are scaled to max_size, a single image keeps its original resolution)."
                     ),
                     "max_size": (
-                        "Maximum edge length of input image resolution in batch mode, downscaled proportionally when exceeded.\n"
+                        "Maximum edge length of input image resolution in Batch mode, downscaled proportionally when exceeded.\n"
                         "Only applies when sending multiple images, a single image keeps its original resolution."
                     ),
                 },
@@ -317,9 +318,9 @@ LANG = {
                         "Qwen3-VL = 0-1000 normalized coordinates, restored by the original image size\n"
                         "Qwen2.5-VL = absolute coordinates in the model's internal resize space, restored to the original image automatically\n"
                         "  the mapping skews if the loader changed image_min/max_tokens;\n"
-                        "  use together with the per-image mode of image Instruct:\n"
-                        "    batch mode with multiple images gets scaled by max_size and breaks the mapping,\n"
-                        "    batch mode with a single image is not scaled, the mapping stays exact"
+                        "  use together with the Per-Image mode of image Instruct:\n"
+                        "    Batch mode with multiple images gets scaled by max_size and breaks the mapping,\n"
+                        "    Batch mode with a single image is not scaled, the mapping stays exact"
                     ),
                     "label": (
                         "Keep only BBoxes with a matching label, empty keeps all.\n"

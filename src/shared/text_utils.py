@@ -3,6 +3,9 @@
 import json
 import re
 
+from ..i18n.common_static import IMAGE_RESULT_SEPARATOR_TEMPLATE
+from ..i18n.lang import LANG
+
 # 开头的 ```label(标签限单词类字符, 可无, 如 json/python/c++; CommonMark
 # 允许标签前有空格, 少数模型会输出 "``` json" 形态); 结尾的 ```.
 # 两端独立匹配, 生成被截断导致围栏未闭合时, 开头的标记仍能剥离.
@@ -32,8 +35,10 @@ def strip_code_fence(text):
 
 
 # image Instruct 逐张模式在多图结果间插入的分隔行(独占一行, 行首行尾锚定,
-# 降低正文文本误匹配的概率; JSON 文本中换行均为 \n 转义, 不会产生真实分隔行)
-_IMAGE_SEP_RE = re.compile(r"^====== Image \d+ ======[ \t]*\r?$", re.MULTILINE)
+# 降低正文文本误匹配的概率; JSON 文本中换行均为 \n 转义, 不会产生真实分隔行).
+# 正则由 common_static 的分隔行模板派生({n} 换成 \d+), 生成端与识别端同源
+_SEP_PREFIX, _SEP_SUFFIX = IMAGE_RESULT_SEPARATOR_TEMPLATE.split("{n}")
+_IMAGE_SEP_RE = re.compile(rf"^{re.escape(_SEP_PREFIX)}\d+{re.escape(_SEP_SUFFIX)}[ \t]*\r?$", re.MULTILINE)
 
 
 def split_image_results(text):
@@ -55,7 +60,7 @@ def parse_json(json_str):
     try:
         parsed = json.loads(strip_code_fence(json_str))
     except Exception as e:
-        raise ValueError(f"Unable to load JSON data!\n{e}") from e
+        raise ValueError(LANG["common"]["errors"]["unable_to_load_json"].format(e=e)) from e
     return parsed
 
 

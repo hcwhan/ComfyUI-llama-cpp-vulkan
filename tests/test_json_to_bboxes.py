@@ -1,5 +1,6 @@
 """src/nodes/type/media/bbox/node_bbox.py json_to_bboxes 的单元测试: JSON 条数与帧数不匹配时的重组对齐."""
 
+import re
 import unittest
 
 import torch
@@ -8,6 +9,7 @@ from tests import comfy_stubs
 
 comfy_stubs.install()
 
+from src.i18n.lang import LANG  # noqa: E402
 from src.nodes.type.media.bbox.node_bbox import json_to_bboxes  # noqa: E402
 
 _JSON_ONE_BOX = '[{"bbox_2d": [1, 1, 4, 4], "label": "a"}]'
@@ -103,7 +105,8 @@ class TestJsonToBBoxesQwenMode(unittest.TestCase):
 
     def test_qwen_mode_requires_image(self):
         # Qwen 坐标系换算依赖原图尺寸, 未连 image 时须明确报错
-        with self.assertRaisesRegex(ValueError, "Image required"):
+        expected = re.escape(LANG["nodes"]["bbox"]["json_to_bboxes"]["errors"]["image_required"])
+        with self.assertRaisesRegex(ValueError, expected):
             self.node.process(['[{"bbox_2d": [0, 0, 500, 1000]}]'], ["Qwen3-VL"], [""], None)
 
     def test_qwen3_normalized_coords_scaled_to_frame(self):
