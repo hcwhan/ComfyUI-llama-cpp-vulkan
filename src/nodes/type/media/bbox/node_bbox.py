@@ -107,8 +107,9 @@ class json_to_bboxes:
             try:
                 items = parse_json(json_str)
             except ValueError as e:
-                # 逐张模式拆出几十段结果时定位坏段, 与画框失败分支的 JSON #{i} 对齐
-                raise ValueError(_BBOX["json_to_bboxes"]["errors"]["json_parse_failed"].format(i=i, error=e)) from None
+                # 逐张模式拆出几十段结果时定位坏段; 序号从 1 起,
+                # 与分隔行 "Image N" 及画框失败分支的 JSON #{i} 对齐
+                raise ValueError(_BBOX["json_to_bboxes"]["errors"]["json_parse_failed"].format(i=i + 1, error=e)) from None
             # 模型只检出单个目标时可能直接输出对象而非单元素列表
             if isinstance(items, dict):
                 items = [items]
@@ -133,7 +134,7 @@ class json_to_bboxes:
                     # draw_bbox 返回 [1,H,W,C]
                     drawn_images.append(draw_bbox(curr_img[0], pixel_bboxes, [bbox_label(b) for b in items]))
                 except Exception as e:
-                    logger.warning(LOG_PREFIX + _LOGS["draw_failed_json"].format(i=i, e=e))
+                    logger.warning(LOG_PREFIX + _LOGS["draw_failed_json"].format(i=i + 1, e=e))
                     # draw_bbox 经 numpy 往返恒输出 CPU 张量, 回退帧统一 .cpu(),
                     # 避免 --gpu-only 下与画框帧 torch.cat 混拼报 device mismatch
                     drawn_images.append(curr_img.cpu())

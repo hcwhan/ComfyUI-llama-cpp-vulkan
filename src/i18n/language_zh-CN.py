@@ -329,7 +329,7 @@ LANG = {
                 },
                 "errors": {
                     "image_required": "Qwen 模式需要连接 Image 输入",
-                    # {i} 为该段 JSON 的序号 (从 0 起), {error} 为原始解析错误
+                    # {i} 为该段 JSON 的序号 (从 1 起, 与分隔行 Image N 对齐), {error} 为原始解析错误
                     "json_parse_failed": "JSON #{i} 解析失败: {error}",
                     "not_a_list": '期望 JSON 为由 {{"bbox_2d": [...], "label": "..."}} 对象组成的列表, 实际为: {type_name}',
                     # 以下三条位于 bbox_utils.py 的结构校验

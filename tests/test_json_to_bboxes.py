@@ -54,10 +54,11 @@ class TestJsonToBBoxesRestructure(unittest.TestCase):
         self.assertEqual(image_list, [])
 
     def test_parse_error_reports_segment_index(self):
-        # 回归: 逐段解析失败的报错须带分段索引, 便于定位坏在哪张图的输出
+        # 回归: 逐段解析失败的报错须带分段索引 (从 1 起, 与分隔行 Image N 对齐),
+        # 便于定位坏在哪张图的输出; 坏段是第 2 段, 报错应为 JSON #2
         with self.assertRaises(ValueError) as ctx:
             self.node.process([_JSON_ONE_BOX, "not json"], ["simple"], [""], None)
-        self.assertIn("JSON #1", str(ctx.exception))
+        self.assertIn("JSON #2", str(ctx.exception))
 
 
 _JSON_LABELED = (

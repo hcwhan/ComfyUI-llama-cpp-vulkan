@@ -329,7 +329,7 @@ LANG = {
                 },
                 "errors": {
                     "image_required": "Qwen modes require the Image input",
-                    # {i} is the index of the JSON segment (0-based), {error} is the original parse error
+                    # {i} is the index of the JSON segment (1-based, matching the Image N separator), {error} is the original parse error
                     "json_parse_failed": "Failed to parse JSON #{i}: {error}",
                     "not_a_list": 'Expected a JSON list of {{"bbox_2d": [...], "label": "..."}} objects, got: {type_name}',
                     # The next three live in the structure validation of bbox_utils.py
