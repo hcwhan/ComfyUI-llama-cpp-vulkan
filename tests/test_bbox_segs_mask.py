@@ -2,7 +2,7 @@
 
 覆盖: 坐标裁剪, dilation/crop_factor 几何, SEG 字段组装 (Impact Pack 兼容),
 无效框逐个跳过, 零面积框 + dilation 两节点行为一致, 多帧取首帧,
-mask 的羽化衰减与多框 maximum 合成, 恒 CPU 输出.
+mask 的羽化衰减与多框 maximum 合成, segs 羽化与 mask 节点衰减一致, 恒 CPU 输出.
 """
 
 import unittest
@@ -88,6 +88,24 @@ class TestBBoxesToSegs(unittest.TestCase):
         mask = bboxes_to_mask().process([(5, 5, 5, 5)], torch.zeros(1, 32, 32, 3), 10, 0)[0]
         self.assertEqual(mask[0, :15, :15].min().item(), 1.0)
         self.assertEqual(mask.sum().item(), 15 * 15)
+
+    def test_feather_decay_matches_mask_node(self):
+        # 回归: 羽化在扩了 margin 的窗口上滤波后裁回 crop_region 尺寸,
+        # 贴近 crop 窗口边缘的衰减不再被 reflect 边界抬高;
+        # 同参数下衰减形状与 bboxes_to_mask 一致
+        bboxes = [(8, 8, 24, 24)]
+        _, seg_list = self._process(bboxes, dilation=0, feather=2, crop_factor=1.0)
+        seg = seg_list[0]
+        self.assertEqual(seg.crop_region, [8, 8, 24, 24])
+        # cropped_mask 形状仍与 crop_region 一致 (Impact Pack 约定)
+        self.assertEqual(seg.cropped_mask.shape, (16, 16))
+        # 旧实现: 掩码矩形填满 crop 窗口, reflect 反射使整窗恒为 1.0
+        self.assertGreater(seg.cropped_mask[8, 8], 0.9)
+        self.assertLess(seg.cropped_mask[0, 8], 1.0)
+
+        mask = bboxes_to_mask().process(bboxes, torch.zeros(1, 32, 32, 3), 0, 2)[0]
+        cx1, cy1, cx2, cy2 = seg.crop_region
+        np.testing.assert_allclose(seg.cropped_mask, mask[0, cy1:cy2, cx1:cx2].numpy(), atol=1e-6)
 
     def test_batch_crops_from_first_frame(self):
         image = torch.cat([torch.zeros(1, 32, 32, 3), torch.ones(1, 32, 32, 3)])

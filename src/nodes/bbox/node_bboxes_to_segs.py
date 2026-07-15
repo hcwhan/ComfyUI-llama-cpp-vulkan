@@ -78,6 +78,10 @@ class bboxes_to_segs:
             logger.warning(LOG_PREFIX + _LOGS["segs_batch_first_frame"].format(batch_size=batch_size))
         image_for_cropping = image[0]
 
+        # gaussian_filter 默认 truncate=4.0, 窗口向外留 4 sigma 即可覆盖全部有效衰减
+        # (与 bboxes_to_mask 的 margin 同源)
+        margin = int(4 * feather) + 1 if feather > 0 else 0
+
         for bbox in bboxes:
             coords = valid_int_bbox(bbox)
             if coords is None:
@@ -116,9 +120,18 @@ class bboxes_to_segs:
 
             crop_region = [cx1, cy1, cx2, cy2]
 
-            # 掩码矩形在 crop 窗口坐标系中的位置
-            inner_rect = (mx1 - cx1, my1 - cy1, mx2 - cx1, my2 - cy1)
-            cropped_mask_np = feathered_rect_mask(cy2 - cy1, cx2 - cx1, inner_rect, feather)
+            # 羽化窗口在 crop_region 基础上向外扩 margin (裁剪到图像内),
+            # 滤波后裁回 crop_region 尺寸: 直接在 crop 窗口上滤波时 reflect
+            # 边界会把贴近窗口边缘的衰减抬高, 与 bboxes_to_mask 形状不一致;
+            # cropped_mask 形状必须保持与 crop_region 一致 (Impact Pack 约定)
+            fx1, fy1 = max(0, cx1 - margin), max(0, cy1 - margin)
+            fx2, fy2 = min(width, cx2 + margin), min(height, cy2 + margin)
+            # 掩码矩形在羽化窗口坐标系中的位置
+            inner_rect = (mx1 - fx1, my1 - fy1, mx2 - fx1, my2 - fy1)
+            feathered_np = feathered_rect_mask(fy2 - fy1, fx2 - fx1, inner_rect, feather)
+            # ascontiguousarray: 不让切片视图钳住整个羽化窗口的内存,
+            # 下游 (Impact Pack) 拿到的是标准连续数组
+            cropped_mask_np = np.ascontiguousarray(feathered_np[cy1 - fy1 : cy2 - fy1, cx1 - fx1 : cx2 - fx1])
             # Impact Pack 的 SEG 约定 cropped_image 为 [1, H, W, C];
             # 恒在 CPU 上构建与输出, 与 bboxes_to_mask / json_to_bboxes 策略一致:
             # --gpu-only 下跟随 image.device 会让直接 .numpy() 的下游第三方节点报错
