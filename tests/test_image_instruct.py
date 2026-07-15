@@ -1,25 +1,32 @@
-"""image Instruct 逐张模式 (_infer_each) 的节点级单元测试.
+"""image Instruct 逐张 (_infer_each) 与批量 (_infer_batch) 模式的节点级单元测试.
 
 用 FakeVlm 替身走通 process() 全链路 (不加载真实模型), 锁定:
-- 多图输出含 "======== Image N ========" 前缀行, 且经 split_image_results
-  可还原为逐张结果列表; 前缀行以字面量断言而非引用模板常量, 拆分正则与
-  生成模板同源 (common_static), 同改共错时唯有字面量断言能报出
-- 单图输出不加前缀行
-- 中断置位时循环立即抛 InterruptProcessingException, 不再发起请求
+- 逐张模式: 多图输出含 "======== Image N ========" 前缀行, 且经
+  split_image_results 可还原为逐张结果列表; 前缀行以字面量断言而非引用
+  模板常量, 拆分正则与生成模板同源 (common_static), 同改共错时唯有
+  字面量断言能报出
+- 逐张模式: 单图输出不加前缀行
+- 逐张模式: 中断置位时循环立即抛 InterruptProcessingException, 不再发起请求
+- 批量模式: 全部图片并入单条 user 消息 (文本项 + N 个 image_url 项),
+  多图逐张缩放到 max_size, 单图保持原分辨率 (tooltip 承诺 "仅在发送
+  多张图片时生效")
 """
 
+import base64
+import io
 import types
 import unittest
 from unittest import mock
 
 import torch
+from PIL import Image
 
 from tests import comfy_stubs
 
 comfy_stubs.install()
 
 from src.core.storage import LLAMA_CPP_STORAGE  # noqa: E402
-from src.i18n.common_static import IMAGE_MODE_EACH  # noqa: E402
+from src.i18n.common_static import IMAGE_MODE_BATCH, IMAGE_MODE_EACH  # noqa: E402
 from src.nodes.instruct.media.image import node_instruct  # noqa: E402
 from src.nodes.instruct.media.image.node_instruct import llama_cpp_image_instruct  # noqa: E402
 from src.shared.text_utils import split_image_results  # noqa: E402
@@ -31,6 +38,7 @@ class _FakeVlm:
     def __init__(self, outputs):
         self._outputs = list(outputs)
         self.calls = 0
+        self.last_messages = None
         self.n_tokens = 0
         self._model = types.SimpleNamespace(is_hybrid=lambda: False, is_recurrent=lambda: False)
         self._ctx = mock.Mock()
@@ -40,12 +48,21 @@ class _FakeVlm:
         pass
 
     def create_chat_completion(self, messages, seed, **params):
+        self.last_messages = messages
         text = self._outputs[self.calls]
         self.calls += 1
         return {"choices": [{"message": {"content": text}}]}
 
 
-class TestImageInstructInferEach(unittest.TestCase):
+def _png_size(content_item):
+    """image_url 内容项的 data URL -> PNG 实际 (宽, 高), 用于断言缩放行为."""
+    b64 = content_item["image_url"]["url"].split(",", 1)[1]
+    return Image.open(io.BytesIO(base64.b64decode(b64))).size
+
+
+class _ImageInstructTestBase(unittest.TestCase):
+    MODE = IMAGE_MODE_EACH
+
     def setUp(self):
         self.node = llama_cpp_image_instruct()
         self.config = {"model": "m.gguf"}
@@ -62,7 +79,7 @@ class TestImageInstructInferEach(unittest.TestCase):
         LLAMA_CPP_STORAGE.chat_handler = types.SimpleNamespace(mmproj_path="fake.mmproj")
         LLAMA_CPP_STORAGE.current_config = self.config
 
-    def _process(self, images):
+    def _process(self, images, max_size=256):
         (out,) = self.node.process(
             vlm_model=self.config,
             images=images,
@@ -70,13 +87,15 @@ class TestImageInstructInferEach(unittest.TestCase):
             preset_prompt="空白 - 空",
             custom_prompt="一只猫",
             system_prompt="",
-            mode=IMAGE_MODE_EACH,
-            max_size=256,
+            mode=self.MODE,
+            max_size=max_size,
             strip_thinking=True,
             force_offload=False,
         )
         return out
 
+
+class TestImageInstructInferEach(_ImageInstructTestBase):
     def test_multi_image_prefixed_and_splittable(self):
         llm = _FakeVlm(["第一张结果", "第二张结果"])
         self._install(llm)
@@ -104,6 +123,48 @@ class TestImageInstructInferEach(unittest.TestCase):
         ):
             self._process(torch.zeros(2, 4, 4, 3))
         self.assertEqual(llm.calls, 0)
+
+
+class TestImageInstructInferBatch(_ImageInstructTestBase):
+    MODE = IMAGE_MODE_BATCH
+
+    def _user_content(self, llm):
+        (user_msg,) = [m for m in llm.last_messages if m["role"] == "user"]
+        return user_msg["content"]
+
+    def test_multi_image_merged_into_single_message_and_scaled(self):
+        # 多图并入单条 user 消息 (文本项 + N 个 image_url 项), 一次推理;
+        # 两张 8x16 图按 max_size=8 逐张缩放为 8x4
+        llm = _FakeVlm(["批量结果"])
+        self._install(llm)
+        out = self._process(torch.zeros(2, 8, 16, 3), max_size=8)
+        self.assertEqual(out, "批量结果")
+        self.assertEqual(llm.calls, 1)
+        content = self._user_content(llm)
+        self.assertEqual([item["type"] for item in content], ["text", "image_url", "image_url"])
+        self.assertEqual(content[0]["text"], "一只猫")
+        for item in content[1:]:
+            self.assertEqual(_png_size(item), (8, 4))
+
+    def test_single_image_keeps_original_resolution(self):
+        # 单图保持原分辨率: 16 宽超出 max_size=8 也不缩放
+        # (max_size tooltip 承诺 "仅在发送多张图片时生效")
+        llm = _FakeVlm(["单图结果"])
+        self._install(llm)
+        self._process(torch.zeros(1, 8, 16, 3), max_size=8)
+        self.assertEqual(llm.calls, 1)
+        content = self._user_content(llm)
+        self.assertEqual([item["type"] for item in content], ["text", "image_url"])
+        self.assertEqual(_png_size(content[1]), (16, 8))
+
+    def test_small_images_not_upscaled(self):
+        # 不超 max_size 的多图不做等尺寸重采样, 原分辨率进消息
+        llm = _FakeVlm(["批量结果"])
+        self._install(llm)
+        self._process(torch.zeros(2, 4, 4, 3), max_size=8)
+        content = self._user_content(llm)
+        for item in content[1:]:
+            self.assertEqual(_png_size(item), (4, 4))
 
 
 if __name__ == "__main__":
