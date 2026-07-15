@@ -80,7 +80,7 @@ LANG = {
     "nodes": {
         # ================ model (模型) ================
         # llm_loader / vlm_loader / parameters / unload;
-        # llm Loader 无专属文案, 全部见本组 common
+        # LLM Loader 无专属文案, 全部见本组 common
         "model": {
             "common": {
                 # 两个 Model Loader 共用字段 (node_loaders.py)
@@ -136,7 +136,7 @@ LANG = {
                     ),
                 },
                 "errors": {
-                    "mmproj_not_selected": "请选择与模型配对的 mmproj 文件 (需放在 llm 目录); 纯文本模型请改用 llm Model Loader.",
+                    "mmproj_not_selected": "请选择与模型配对的 mmproj 文件 (需放在 llm 目录); 纯文本模型请改用 LLM Model Loader.",
                     "handler_not_selected": "请选择与模型匹配的 chat handler.",
                     "image_token_range": "image_max_tokens ({image_max_tokens}) 不能小于 image_min_tokens ({image_min_tokens}).",
                 },

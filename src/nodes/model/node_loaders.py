@@ -1,11 +1,11 @@
-"""模型加载节点: llm(纯文本)与 vlm(多模态)两个 Loader.
+"""模型加载节点: LLM(纯文本)与 VLM(多模态)两个 Loader.
 
 两者只做快速失败校验并输出配置 dict, 实际加载由 Instruct 节点按需触发
 (懒加载: 多组 loader+instruct 交错时避免全局单例被 loader 反复挤占).
 
 输出类型完全隔离:
-- llm Loader -> LLAMACPPLLM, 只能连 text Instruct
-- vlm Loader -> LLAMACPPVLM, 只能连 image/video/audio Instruct
+- LLM Loader -> LLAMACPPLLM, 只能连 text Instruct
+- VLM Loader -> LLAMACPPVLM, 只能连 image/video/audio Instruct
 """
 
 import os

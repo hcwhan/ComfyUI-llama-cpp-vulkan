@@ -1,6 +1,6 @@
 """llama.cpp text Instruct 节点, 纯文本推理.
 
-只接受 llm Model Loader 的 LLAMACPPLLM 配置,
+只接受 LLM Model Loader 的 LLAMACPPLLM 配置,
 预设模板的 @@@ 占位符按文生图语境替换为 "图像"(如 prompt 改写预设).
 """
 

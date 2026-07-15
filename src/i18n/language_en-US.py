@@ -80,7 +80,7 @@ LANG = {
     "nodes": {
         # ================ model ================
         # llm_loader / vlm_loader / parameters / unload;
-        # llm Loader has no exclusive copy, see the group common
+        # LLM Loader has no exclusive copy, see the group common
         "model": {
             "common": {
                 # Fields shared by both Model Loaders (node_loaders.py)
@@ -136,7 +136,7 @@ LANG = {
                     ),
                 },
                 "errors": {
-                    "mmproj_not_selected": "Please select the mmproj file paired with the model (placed in the llm folder); for text-only models use llm Model Loader instead.",
+                    "mmproj_not_selected": "Please select the mmproj file paired with the model (placed in the llm folder); for text-only models use LLM Model Loader instead.",
                     "handler_not_selected": "Please select a chat handler matching the model.",
                     "image_token_range": "image_max_tokens ({image_max_tokens}) cannot be less than image_min_tokens ({image_min_tokens}).",
                 },

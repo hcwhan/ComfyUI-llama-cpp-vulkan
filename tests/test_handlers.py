@@ -102,7 +102,7 @@ class TestHandlerSpecs(unittest.TestCase):
 
     def test_thinking_suffix_only_on_forced(self):
         # "-Thinking" 后缀只允许出现在强制思考档 (后缀描述模型本身,
-        # 如 GLM-4.1V-Thinking); 可切换档由 vlm loader 的 thinking 开关承载
+        # 如 GLM-4.1V-Thinking); 可切换档由 VLM Loader 的 thinking 开关承载
         for label, (_cls_name, _kwargs, think) in _HANDLER_SPECS.items():
             if label.endswith("-Thinking"):
                 self.assertIs(think, THINK_FORCED, f'"{label}": 带 -Thinking 后缀但非强制思考档')

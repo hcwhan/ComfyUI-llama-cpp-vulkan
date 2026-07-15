@@ -32,7 +32,7 @@ Vulkan provides near-native GPU performance without requiring CUDA or ROCm toolk
 | Step3-VL | Yes |
 | LFM2.5-VL / LFM2-VL | - |
 
-> Thinking is controlled by the `thinking` toggle on the vlm Model Loader (a construction-time parameter; changing it reloads the model). Handlers marked "Yes" honor the toggle; GLM-4.1V is a thinking-only model where the toggle is forced on; handlers marked "-" do not support thinking and the toggle is forced off (greyed out in the UI, clamped on the backend). Gemma4 E2B/E4B think even when disabled (only 31B/26BA4B honor the toggle); the reasoning is stripped from the output either way. The dropdown groups handlers by family (newest first) and is the authoritative list.
+> Thinking is controlled by the `thinking` toggle on the VLM Model Loader (a construction-time parameter; changing it reloads the model). Handlers marked "Yes" honor the toggle; GLM-4.1V is a thinking-only model where the toggle is forced on; handlers marked "-" do not support thinking and the toggle is forced off (greyed out in the UI, clamped on the backend). Gemma4 E2B/E4B think even when disabled (only 31B/26BA4B honor the toggle); the reasoning is stripped from the output either way. The dropdown groups handlers by family (newest first) and is the authoritative list.
 
 Legacy handlers (LLaVA-1.6 / 1.5, llama3-Vision-Alpha, nanoLLaVA, Moondream2, Obsidian, MiniCPM-v2.6) are also available.
 
@@ -47,7 +47,7 @@ Legacy handlers (LLaVA-1.6 / 1.5, llama3-Vision-Alpha, nanoLLaVA, Moondream2, Ob
 | (OCR) Granite-Docling | Document |
 | -Generic- | Fallback (renders the model's built-in chat template) |
 
-> VLMs without a dedicated handler can use the `-Generic-` fallback handler. Text-only GGUF models need no handler at all and run in generic text mode via `llm Model Loader`.
+> VLMs without a dedicated handler can use the `-Generic-` fallback handler. Text-only GGUF models need no handler at all and run in generic text mode via `LLM Model Loader`.
 
 ## Installation
 
@@ -84,14 +84,14 @@ One wheel per platform covers all Python versions. Download from [Releases](http
 
 ## Nodes (v2.1.0)
 
-- **Loaders**: `llm Model Loader` for text-only GGUF models, `vlm Model Loader` for vision/audio models (mmproj + chat handler required). Their outputs are separate types: llm connects only to `text Instruct`, vlm connects only to `image / video / audio Instruct`.
+- **Loaders**: `LLM Model Loader` for text-only GGUF models, `VLM Model Loader` for vision/audio models (mmproj + chat handler required). Their outputs are separate types: LLM connects only to `text Instruct`, VLM connects only to `image / video / audio Instruct`.
 - **Instruct**: one node per modality - `text` (prompt refining etc.), `image` (per-image or batch), `video` (IMAGE frame batch input, evenly sampled), `audio` (ASR / Omni).
 - **BBox toolchain**: `JSON to BBoxes` (parse detection JSON, draw boxes), `BBoxes to SEGS` (Impact Pack compatible), `BBoxes to MASK`, `BBoxes to BBox`.
 - **Utilities**: `Parameters` (sampling config), `Unload Model`, `Parse JSON`, `Unpack Code Block`, `Split Instruct Output`, `System Prompt Preset` (Chinese prompt-enhancement presets for Qwen-Image / Z-Image / Flux.2 / Wan).
 
 ## Notes
 
-- **Audio input (ASR)**: connect a ComfyUI `AUDIO` output to the `audio Instruct` node and load the model with `vlm Model Loader` using an audio-capable handler (e.g. `(ASR) Qwen3-ASR`) with its matching mmproj. Audio is sent as 16-bit mono WAV; resampling is handled by llama.cpp.
+- **Audio input (ASR)**: connect a ComfyUI `AUDIO` output to the `audio Instruct` node and load the model with `VLM Model Loader` using an audio-capable handler (e.g. `(ASR) Qwen3-ASR`) with its matching mmproj. Audio is sent as 16-bit mono WAV; resampling is handled by llama.cpp.
 - **Stateless inference**: every run is an independent one-shot request (system prompt + current prompt). No conversation history is kept between runs.
 - **GPU not detected?** Run `python tools/check_devices.py` (with ComfyUI's Python) to list every device the GGML backend enumerates (CPU/GPU/IGPU/ACCEL) without starting ComfyUI - useful for diagnosing Vulkan driver issues.
 

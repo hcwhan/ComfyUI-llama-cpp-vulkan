@@ -25,7 +25,7 @@ ComfyUI-llama-cpp-vulkan/
     项目分析.html             # 历史快照(页头已注明生成 commit, 仅供历史参考)
   web/
     widget_utils.js           # 前端共用工具: widget 显隐切换(hidden 标志 + type/computeSize 双轨)
-    vlm_loader.js             # vlm loader widget 联动: thinking 三态置灰, image token 字段显隐(纯 UX 增强)
+    vlm_loader.js             # VLM Loader widget 联动: thinking 三态置灰, image token 字段显隐(纯 UX 增强)
     image_instruct.js         # image Instruct widget 联动: max_size 仅在 Batch 档显示(纯 UX 增强)
   src/
     i18n/                     # 文案层: 全部用户可见文案与控制台日志的单一来源
@@ -106,7 +106,7 @@ image 逐张模式的多图结果以 "======== Image N ========" 前缀行拼接
 
 `llama_cpp_unload_model` 为 any 透传节点, 可串接在任意连线上, 不参与上图数据流.
 
-`LLAMACPPLLM`(llm Loader 输出)与 `LLAMACPPVLM`(vlm Loader 输出)完全独立: llm 配置只能连 text Instruct, vlm 配置只能连 image/video/audio Instruct, 连错在连线阶段即被 ComfyUI 类型系统拦截. 两种配置 dict 结构相同(llm 侧 mmproj/chat_handler 固定为 "None", thinking 固定 False), 底层共用 `core/storage.py` 的加载路径.
+`LLAMACPPLLM`(LLM Loader 输出)与 `LLAMACPPVLM`(VLM Loader 输出)完全独立: llm 配置只能连 text Instruct, vlm 配置只能连 image/video/audio Instruct, 连错在连线阶段即被 ComfyUI 类型系统拦截. 两种配置 dict 结构相同(llm 侧 mmproj/chat_handler 固定为 "None", thinking 固定 False), 底层共用 `core/storage.py` 的加载路径.
 
 ## 架构要点
 
@@ -149,7 +149,7 @@ image 逐张模式的多图结果以 "======== Image N ========" 前缀行拼接
 
 ### Chat Handler 注册表
 
-`src/core/handlers.py` 的 `_HANDLER_SPECS` 表集中定义全部 handler, 数据形态, 排序约定与新增须知见该表头注释. 要点: 每个条目附 thinking 三态元数据(可切换档记构造参数名 / 不支持 / 强制思考), vlm loader 的 `thinking` 开关值经 `handler_constructor` 按三态绑定, 不可切换档由 `clamp_thinking` 钳制并打 warning(覆盖绕过前端的 API 提交路径), `storage.py` 因此不感知 thinking 逻辑; 构造期固定参数(-Generic- 兜底的 `chat_format` 等)经 `functools.partial` 预绑定进 `HANDLERS` 的构造器; 启动时解析失败的类只从下拉框剔除并打 warning(防御 wheel 升级时的类变动, 不静默, 不阻断 import); 三态元数据与类签名的一致性由 `tests/test_handlers.py` 契约测试锁定. 前端 `web/vlm_loader.js` 按 `chat_handler` widget options 的自定义 key(经 `/object_info` 原样透传, 与注册表单一真源)做联动: `thinking_modes` 对 thinking 开关三态置灰, `image_token_handlers` 控制 image_min/max_tokens 仅在视觉类 handler 下显示(音频专用与 "None" 隐藏; widget 值本身不动, 重新显示时保留原值, loadmodel 对无视觉路径的 handler 把两值折算为 0 落盘); 另对 image_min/max_tokens 做区间互钳(修改任一侧越界时钳制另一侧, max=0 视为未设置; 只在用户编辑时触发, 载入工作流不改存量值, loader 侧报错保留兜底); JS 失效只损失置灰/显隐/互钳效果, 行为正确性由 Python 侧保证.
+`src/core/handlers.py` 的 `_HANDLER_SPECS` 表集中定义全部 handler, 数据形态, 排序约定与新增须知见该表头注释. 要点: 每个条目附 thinking 三态元数据(可切换档记构造参数名 / 不支持 / 强制思考), VLM Loader 的 `thinking` 开关值经 `handler_constructor` 按三态绑定, 不可切换档由 `clamp_thinking` 钳制并打 warning(覆盖绕过前端的 API 提交路径), `storage.py` 因此不感知 thinking 逻辑; 构造期固定参数(-Generic- 兜底的 `chat_format` 等)经 `functools.partial` 预绑定进 `HANDLERS` 的构造器; 启动时解析失败的类只从下拉框剔除并打 warning(防御 wheel 升级时的类变动, 不静默, 不阻断 import); 三态元数据与类签名的一致性由 `tests/test_handlers.py` 契约测试锁定. 前端 `web/vlm_loader.js` 按 `chat_handler` widget options 的自定义 key(经 `/object_info` 原样透传, 与注册表单一真源)做联动: `thinking_modes` 对 thinking 开关三态置灰, `image_token_handlers` 控制 image_min/max_tokens 仅在视觉类 handler 下显示(音频专用与 "None" 隐藏; widget 值本身不动, 重新显示时保留原值, loadmodel 对无视觉路径的 handler 把两值折算为 0 落盘); 另对 image_min/max_tokens 做区间互钳(修改任一侧越界时钳制另一侧, max=0 视为未设置; 只在用户编辑时触发, 载入工作流不改存量值, loader 侧报错保留兜底); JS 失效只损失置灰/显隐/互钳效果, 行为正确性由 Python 侧保证.
 
 ### 多模态输入
 
@@ -160,7 +160,7 @@ image 逐张模式的多图结果以 "======== Image N ========" 前缀行拼接
 ### 推理输出与中断
 
 - 无会话状态: 每次执行都是全新的一次性请求(system prompt + 本次提问), 不保留任何跨执行的对话历史
-- text Instruct 的 `allow_thinking` 开关(默认关): 关闭时以 `reasoning_budget=0` 让思考块开启即强制闭合(请求期参数, 切换零成本; 非思考模型由 wheel 采样器的 reasoning_start 安全窗自动失效). 放 Instruct 而非 llm loader 是因为 text 侧 wheel 无模板级开关, reasoning_budget 采样器是唯一通用机制; 与 vlm 侧构造期 thinking 开关(切换需重载)的位置不对称是机制差异的忠实反映. 采样器按生成的 `<think>` 标签计数, 模板预注入 `<think>` 的形态无法被抑制, 残留思考块由 strip_thinking 剥离
+- text Instruct 的 `allow_thinking` 开关(默认关): 关闭时以 `reasoning_budget=0` 让思考块开启即强制闭合(请求期参数, 切换零成本; 非思考模型由 wheel 采样器的 reasoning_start 安全窗自动失效). 放 Instruct 而非 LLM Loader 是因为 text 侧 wheel 无模板级开关, reasoning_budget 采样器是唯一通用机制; 与 vlm 侧构造期 thinking 开关(切换需重载)的位置不对称是机制差异的忠实反映. 采样器按生成的 `<think>` 标签计数, 模板预注入 `<think>` 的形态无法被抑制, 残留思考块由 strip_thinking 剥离
 - `strip_thinking` 开关(默认开): 剥离三种思考形态 - `<think>...</think>` 推理块(兼容 generation prompt 已注入 `<think>` 导致输出只含闭合标签的情况), Gemma4 的 channel 格式(取最后一个 `<channel|>` 之后, 覆盖 E 系列无开标签的纯文本思考形态), GLM-4.1V 的 `<answer>` 包裹(handler 以 `</answer>` 为 stop token 导致开标签残留); 未闭合(生成截断)时均保持原样
 - `InterruptWatcher`: 推理期间守护线程每 200ms 轮询 `mm.processing_interrupted()`, 命中后调用 `Llama.abort()` 使生成立即停止; llama-cpp-python 在每次请求开始会 clear abort 事件, 因此监视线程命中后持续重复 set 以抗竞态
 - 每次节点执行结束后按 `is_hybrid_arch()`(`_model.is_hybrid()`/`is_recurrent()` C API)判断是否整体重置 KV cache(重置在 `_run()` 的 finally 中, image 逐张模式中间的多次请求之间不重置, 依赖 wheel 内置的 hybrid checkpoint 前缀匹配): hybrid/recurrent 架构(Qwen3.5, LFM2 系等)的线性注意力状态无法跨请求前缀复用; 纯 SWA 模型(Gemma3)不受影响

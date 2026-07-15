@@ -1,4 +1,4 @@
-// vlm Model Loader 的 widget 联动 (纯 UX 增强, 行为正确性由 Python 侧保证):
+// VLM Model Loader 的 widget 联动 (纯 UX 增强, 行为正确性由 Python 侧保证):
 // - thinking 开关按 chat_handler 选值三态置灰 (可切换 / 强制开 / 强制关),
 //   强制档覆写前缓存用户在可切换档的设定, 切回可切换档时恢复;
 //   失效时由 clamp_thinking 钳制兜底
