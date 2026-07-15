@@ -24,7 +24,7 @@
 - {{ 与 }} 是转义后的字面花括号, 渲染为 { 与 }.
 - parameters 节点 tooltip 中的 {default} 由代码按 widget 默认值自动填充.
 
-不在本文件 (不随语言切换, 后续统一放 common_static.py):
+不在本文件 (不随语言切换, 统一放 common_static.py):
 - 下拉框选项值: Per-Image/Batch, Auto (GPU First), chat handler 名单等 (会序列化进工作流的 widget 值).
 - 节点分类名 category (llama-cpp-vulkan), "======== Image N ========" 前缀行 (被正则匹配的协议串).
 - 任务预设与系统提示词预设 (名称与内容).
@@ -460,16 +460,6 @@ LANG = {
             "parse_failed": "GGUF parse failed: {e}",
         },
 
-        # nodes/model/node_unload.py
-        "unload": {
-            "unloading": "Unloading llama model...",
-        },
-
-        # nodes/instruct/media/image/node_instruct.py
-        "image_instruct": {
-            "start_processing": "Start processing {count} images",
-        },
-
         # core/cqdm.py (tqdm 终端进度条的描述文字, 非 logger 输出)
         "cqdm": {
             "progress_desc": "Processing",
@@ -478,6 +468,16 @@ LANG = {
         # shared/encoding.py
         "encoding": {
             "audio_batch_first_only": "AUDIO batch of {count} clips received; only the first clip is processed",
+        },
+
+        # nodes/model/node_unload.py
+        "unload": {
+            "unloading": "Unloading llama model...",
+        },
+
+        # nodes/instruct/media/image/node_instruct.py
+        "image_instruct": {
+            "start_processing": "Start processing {count} images",
         },
 
         # nodes/bbox/ 各节点文件 + bbox_utils.py

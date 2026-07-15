@@ -460,16 +460,6 @@ LANG = {
             "parse_failed": "GGUF parse failed: {e}",
         },
 
-        # nodes/model/node_unload.py
-        "unload": {
-            "unloading": "Unloading llama model...",
-        },
-
-        # nodes/instruct/media/image/node_instruct.py
-        "image_instruct": {
-            "start_processing": "Start processing {count} images",
-        },
-
         # core/cqdm.py (description text of the tqdm terminal progress bar, not logger output)
         "cqdm": {
             "progress_desc": "Processing",
@@ -478,6 +468,16 @@ LANG = {
         # shared/encoding.py
         "encoding": {
             "audio_batch_first_only": "AUDIO batch of {count} clips received; only the first clip is processed",
+        },
+
+        # nodes/model/node_unload.py
+        "unload": {
+            "unloading": "Unloading llama model...",
+        },
+
+        # nodes/instruct/media/image/node_instruct.py
+        "image_instruct": {
+            "start_processing": "Start processing {count} images",
         },
 
         # the node files under nodes/bbox/ + bbox_utils.py
