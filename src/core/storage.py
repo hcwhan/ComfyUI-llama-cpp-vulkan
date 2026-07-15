@@ -279,11 +279,9 @@ class LLAMA_CPP_STORAGE:
                 # 显存不足, 统一重试一次: 非显存错误(文件损坏等)会再次快速失败
                 logger.warning(LOG_PREFIX + _LOGS["load_failed_retry"].format(e=e))
                 # 首次加载可达分钟级, 期间用户可能已点 Cancel, 重试前响应中断,
-                # 避免白费一次全量加载. InterruptProcessingException 是
-                # BaseException 子类, 外层 except Exception 接不住, 须先 clean
-                # 回收可能已构造的 chat_handler 再 raise
+                # 避免白费一次全量加载; chat_handler 清理由外层
+                # except BaseException 统一收口
                 if mm.processing_interrupted():
-                    cls.clean()
                     raise mm.InterruptProcessingException() from None
                 try:
                     mm.free_memory(
@@ -294,10 +292,12 @@ class LLAMA_CPP_STORAGE:
                     logger.warning(LOG_PREFIX + _LOGS["free_vram_retry_failed"].format(free_err=free_err))
                 time.sleep(1.0)
                 cls.llm = _create_llama()
-        except Exception:
+        except BaseException:
             # 主模型加载失败时立即回收已创建的 chat_handler, 避免半初始化状态
             # 残留到下一次 load/unload; 此时 mmproj 尚未进显存(mtmd 首次推理时
-            # 才惰性加载), close 释放的只是 handler 自身资源
+            # 才惰性加载), close 释放的只是 handler 自身资源.
+            # 捕 BaseException 以覆盖 InterruptProcessingException 与
+            # KeyboardInterrupt 等非 Exception 路径, 清理后原样 raise
             cls.clean()
             raise
         # 加载成功后才记录配置, 避免加载失败时残留新配置导致后续误判"无需重载"
