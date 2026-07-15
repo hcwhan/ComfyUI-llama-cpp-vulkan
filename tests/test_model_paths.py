@@ -15,11 +15,20 @@ from src.core import model_paths  # noqa: E402
 
 class TestGetLlmFilenameList(unittest.TestCase):
     def test_dedup_across_keys_and_gguf_filter(self):
-        # llm/LLM 双键结果去重保序, 其他插件追加的非 gguf 扩展名被过滤
+        # llm/LLM 双键结果去重, 其他插件追加的非 gguf 扩展名被过滤
         listing = {"llm": ["a.gguf", "b.txt", "c.GGUF"], "LLM": ["a.gguf", "d.gguf"]}
         with mock.patch.object(folder_paths, "get_filename_list", lambda key: listing[key]):
             result = model_paths.get_llm_filename_list()
         self.assertEqual(result, ["a.gguf", "c.GGUF", "d.gguf"])
+
+    def test_merged_result_globally_sorted(self):
+        # 两键为独立目录时 (Linux 下 llm/LLM 大小写不同名), 合并结果须全局
+        # 排序而非按键拼接, 排序规则与 folder_paths.get_filename_list 的
+        # 单键结果一致 (朴素 sorted, 无大小写折叠)
+        listing = {"llm": ["z.gguf", "m.gguf"], "LLM": ["a.gguf"]}
+        with mock.patch.object(folder_paths, "get_filename_list", lambda key: listing[key]):
+            result = model_paths.get_llm_filename_list()
+        self.assertEqual(result, ["a.gguf", "m.gguf", "z.gguf"])
 
     def test_full_path_falls_through_keys(self):
         # 首键未命中时继续查后续目录键

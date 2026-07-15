@@ -18,17 +18,18 @@ for _key in _LLM_FOLDER_KEYS:
 
 
 def get_llm_filename_list():
-    seen = set()
-    result = []
+    merged = set()
     for key in _LLM_FOLDER_KEYS:
         if key in folder_paths.folder_names_and_paths:
             for f in folder_paths.get_filename_list(key):
                 # llm/LLM 键的扩展名集合是全局共享的, 其他插件可能追加非 gguf
                 # 格式, 这里只保留本插件能加载的 .gguf
-                if f.lower().endswith(".gguf") and f not in seen:
-                    seen.add(f)
-                    result.append(f)
-    return result
+                if f.lower().endswith(".gguf"):
+                    merged.add(f)
+    # 跨键合并后统一排序, 与 folder_paths.get_filename_list 的单键排序规则
+    # 一致; 两键为独立目录时 (Linux 下 llm/LLM 大小写不同名), 按键拼接会使
+    # 下拉框顺序割裂
+    return sorted(merged)
 
 
 def get_llm_full_path(filename):
