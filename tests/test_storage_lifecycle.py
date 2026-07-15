@@ -1,7 +1,8 @@
 """src/core/storage.py load_model/clean 状态机的单元测试 (mock Llama, 不加载真实模型).
 
 覆盖: 校验失败不动已加载模型, 加载失败清理半初始化状态, 重试一轮路径,
-成功后才写 current_config, free_memory 腾挪的触发条件, clean 的幂等性.
+加载前与重试前的中断响应, 成功后才写 current_config,
+free_memory 腾挪的触发条件, clean 的幂等性.
 """
 
 import os
@@ -154,6 +155,21 @@ class TestLoadModelStateMachine(unittest.TestCase):
         self.assertIsNone(LLAMA_CPP_STORAGE.llm)
         self.assertIsNone(LLAMA_CPP_STORAGE.chat_handler)
         self.assertIsNone(LLAMA_CPP_STORAGE.current_config)
+
+    def test_interrupt_before_retry_raises_with_clean_state(self):
+        # 首次加载期间点 Cancel: 重试前响应中断, 不再白费一次全量加载;
+        # 加载前检查(第一次调用)须放行, 故 side_effect 先 False 后 True
+        _FakeLlama.fail_remaining = 1
+        with (
+            mock.patch.object(storage.mm, "processing_interrupted", mock.Mock(side_effect=[False, True])),
+            self.assertRaises(storage.mm.InterruptProcessingException),
+        ):
+            LLAMA_CPP_STORAGE.load_model(self._config())
+        self.assertIsNone(LLAMA_CPP_STORAGE.llm)
+        self.assertIsNone(LLAMA_CPP_STORAGE.chat_handler)
+        self.assertIsNone(LLAMA_CPP_STORAGE.current_config)
+        # 重试未发生: 首次加载前腾挪一次后即中止, 无重试前的第二次腾挪
+        self.assertEqual(self.free_memory.call_count, 1)
 
     def test_clean_closes_and_is_idempotent(self):
         LLAMA_CPP_STORAGE.load_model(self._config())

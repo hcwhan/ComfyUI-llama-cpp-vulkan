@@ -278,6 +278,13 @@ class LLAMA_CPP_STORAGE:
                 # 再腾挪一次并稍作等待后重试一轮. 失败原因无法可靠区分是否为
                 # 显存不足, 统一重试一次: 非显存错误(文件损坏等)会再次快速失败
                 logger.warning(LOG_PREFIX + _LOGS["load_failed_retry"].format(e=e))
+                # 首次加载可达分钟级, 期间用户可能已点 Cancel, 重试前响应中断,
+                # 避免白费一次全量加载. InterruptProcessingException 是
+                # BaseException 子类, 外层 except Exception 接不住, 须先 clean
+                # 回收可能已构造的 chat_handler 再 raise
+                if mm.processing_interrupted():
+                    cls.clean()
+                    raise mm.InterruptProcessingException() from None
                 try:
                     mm.free_memory(
                         _estimate_vram_bytes(model_path, mmproj_path if mmproj_on_gpu else None, n_gpu_layers, config["n_ctx"]),
