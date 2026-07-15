@@ -26,11 +26,11 @@ AUTO_LABEL = "Auto (GPU First)"
 # resolve_device_selection 按同一模板反查选中设备, 生成端与匹配端同源
 DEVICE_LABEL_TEMPLATE = "{name} - {desc} [{type}]"
 
-# image Instruct 的 mode 下拉框 (nodes/type/media/image/node_instruct.py)
+# image Instruct 的 mode 下拉框 (nodes/instruct/media/image/node_instruct.py)
 IMAGE_MODE_EACH = "Per-Image"
 IMAGE_MODE_BATCH = "Batch"
 
-# JSON to BBoxes 的 mode 下拉框 (nodes/type/media/bbox/node_bbox.py);
+# JSON to BBoxes 的 mode 下拉框 (nodes/bbox/node_json_to_bboxes.py);
 # 两个 Qwen 值同时是 bbox_utils.json_to_pixel_bboxes 坐标换算的分支匹配值
 BBOX_MODE_SIMPLE = "Simple"
 BBOX_MODE_QWEN3 = "Qwen3-VL"

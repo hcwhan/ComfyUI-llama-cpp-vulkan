@@ -1,4 +1,4 @@
-"""src/nodes/type/media/encoding.py 的单元测试: 张量转 uint8, 音频打包, 图片缩放."""
+"""src/shared/encoding.py 的单元测试: 张量转 uint8, 音频打包, 图片缩放."""
 
 import base64
 import io
@@ -12,7 +12,7 @@ from tests import comfy_stubs
 
 comfy_stubs.install()
 
-from src.nodes.type.media.encoding import audio2base64, scale_image, tensor_to_uint8  # noqa: E402
+from src.shared.encoding import audio2base64, scale_image, tensor_to_uint8  # noqa: E402
 
 
 def _decode_wav(b64):

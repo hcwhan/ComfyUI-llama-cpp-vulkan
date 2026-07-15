@@ -1,4 +1,4 @@
-"""src/nodes/type/media/bbox/bbox_utils.py 的单元测试: 坐标换算, 结构校验, 羽化 mask."""
+"""src/nodes/bbox/bbox_utils.py 的单元测试: 坐标换算, 结构校验, 羽化 mask."""
 
 import unittest
 
@@ -8,7 +8,7 @@ from tests import comfy_stubs
 
 comfy_stubs.install()
 
-from src.nodes.type.media.bbox.bbox_utils import (  # noqa: E402
+from src.nodes.bbox.bbox_utils import (  # noqa: E402
     _label_color,
     _label_font,
     bbox_label,
@@ -18,7 +18,7 @@ from src.nodes.type.media.bbox.bbox_utils import (  # noqa: E402
     qwen25_smart_resize,
     valid_int_bbox,
 )
-from src.nodes.type.media.bbox.node_bbox import SEG  # noqa: E402
+from src.nodes.bbox.node_bboxes_to_segs import SEG  # noqa: E402
 
 
 class TestJsonToPixelBboxes(unittest.TestCase):

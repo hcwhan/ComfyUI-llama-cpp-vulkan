@@ -12,8 +12,8 @@ from .....core.instruct import llama_cpp_media_instruct_base
 from .....core.storage import LLAMA_CPP_STORAGE
 from .....i18n.common_static import IMAGE_MODE_BATCH, IMAGE_MODE_EACH, IMAGE_RESULT_SEPARATOR_TEMPLATE, LOG_PREFIX
 from .....i18n.lang import LANG
+from .....shared.encoding import image_content_item, scale_image, tensor_to_uint8
 from .....shared.logger import logger
-from ..encoding import image_content_item, scale_image, tensor_to_uint8
 
 _TIPS = LANG["nodes"]["instruct"]["image"]["tooltips"]
 

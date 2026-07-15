@@ -9,10 +9,10 @@ import torch
 from PIL import Image, ImageDraw, ImageFont
 from scipy.ndimage import gaussian_filter
 
-from .....i18n.common_static import BBOX_MODE_QWEN3, BBOX_MODE_QWEN25_VL, LOG_PREFIX
-from .....i18n.lang import LANG
-from .....shared.logger import logger
-from ..encoding import tensor_to_uint8
+from ...i18n.common_static import BBOX_MODE_QWEN3, BBOX_MODE_QWEN25_VL, LOG_PREFIX
+from ...i18n.lang import LANG
+from ...shared.encoding import tensor_to_uint8
+from ...shared.logger import logger
 
 _ERRORS = LANG["nodes"]["bbox"]["json_to_bboxes"]["errors"]
 _LOGS = LANG["logs"]["bbox"]

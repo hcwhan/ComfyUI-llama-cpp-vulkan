@@ -1,4 +1,4 @@
-"""媒体编码工具, ComfyUI 张量/音频 dict 转 base64, 供 image/video/audio Instruct 注入消息."""
+"""媒体编码工具: ComfyUI 张量/音频 dict 转 uint8/base64 与缩放, 供 media Instruct 注入消息与 bbox 画框共用."""
 
 import base64
 import io
@@ -8,9 +8,9 @@ import numpy as np
 import torch
 from PIL import Image
 
-from ....i18n.common_static import LOG_PREFIX
-from ....i18n.lang import LANG
-from ....shared.logger import logger
+from ..i18n.common_static import LOG_PREFIX
+from ..i18n.lang import LANG
+from .logger import logger
 
 
 def tensor_to_uint8(image: torch.Tensor):

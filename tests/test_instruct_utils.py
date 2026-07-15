@@ -12,10 +12,10 @@ from src.core.instruct import llama_cpp_instruct_base, strip_thinking_blocks  # 
 from src.core.prompts import instruct_presets, preset_content  # noqa: E402
 from src.core.storage import LLAMA_CPP_STORAGE  # noqa: E402
 from src.i18n.lang import LANG  # noqa: E402
-from src.nodes.type.media.audio.node_instruct import llama_cpp_audio_instruct  # noqa: E402
-from src.nodes.type.media.image.node_instruct import llama_cpp_image_instruct  # noqa: E402
-from src.nodes.type.media.video.node_instruct import llama_cpp_video_instruct  # noqa: E402
-from src.nodes.type.text.node_instruct import llama_cpp_text_instruct  # noqa: E402
+from src.nodes.instruct.media.audio.node_instruct import llama_cpp_audio_instruct  # noqa: E402
+from src.nodes.instruct.media.image.node_instruct import llama_cpp_image_instruct  # noqa: E402
+from src.nodes.instruct.media.video.node_instruct import llama_cpp_video_instruct  # noqa: E402
+from src.nodes.instruct.text.node_instruct import llama_cpp_text_instruct  # noqa: E402
 
 _INSTRUCT_NODES = (
     llama_cpp_text_instruct,

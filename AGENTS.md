@@ -11,7 +11,7 @@
 
 ## 目录结构
 
-组织原则: `src/nodes/` 只放节点声明(文件名一律 `node_` 前缀), 与某个节点强相关的工具放在该节点文件旁边(如 `bbox_utils.py`, `system_prompt_presets.py`, media 共用的 `encoding.py`); 跨领域复用的逻辑放 `src/core/`(模型生命周期, 推理骨架, 基础设施)与 `src/shared/`(纯工具).
+组织原则: `src/nodes/` 只放节点声明(文件名一律 `node_` 前缀), 与某个节点强相关的工具放在该节点文件旁边(如 `bbox_utils.py`, `system_prompt_presets.py`); 跨领域复用的逻辑放 `src/core/`(模型生命周期, 推理骨架, 基础设施)与 `src/shared/`(纯工具, 如 media Instruct 与 bbox 画框共用的 `encoding.py`).
 
 ```
 ComfyUI-llama-cpp-vulkan/
@@ -45,6 +45,7 @@ ComfyUI-llama-cpp-vulkan/
     shared/                   # 跨领域纯工具(非节点)
       logger.py               #   插件统一 logging logger(沿用 ComfyUI 的日志配置)
       text_utils.py           #   代码围栏剥离, 逐张结果拆分, JSON 解析, 嵌套取值
+      encoding.py             #   媒体编码: 张量/音频转 uint8/base64, 缩放
       types.py                #   AnyType 万能透传类型
     nodes/                    # 只放节点声明
       __init__.py             #   节点注册表(16 个节点的映射)
@@ -52,20 +53,22 @@ ComfyUI-llama-cpp-vulkan/
         node_loaders.py       #   llm / vlm 两个 Model Loader
         node_parameters.py    #   llama.cpp Parameters
         node_unload.py        #   llama.cpp Unload Model
-      type/
+      instruct/
         text/
           node_instruct.py    #   llama.cpp text Instruct
         media/
-          encoding.py         #   media 共用: 张量/音频转 base64, 缩放
           image/
             node_instruct.py  #   llama.cpp image Instruct
           video/
             node_instruct.py  #   llama.cpp video Instruct
           audio/
             node_instruct.py  #   llama.cpp audio Instruct
-          bbox/
-            node_bbox.py      #   BBox 工具链 4 节点
-            bbox_utils.py     #   BBox 强相关工具: 坐标换算, 画框, 羽化 mask
+      bbox/
+        node_json_to_bboxes.py     # JSON to BBoxes
+        node_bboxes_to_segs.py     # BBoxes to SEGS(含 Impact Pack 兼容的 SEG 定义)
+        node_bboxes_to_mask.py     # BBoxes to MASK
+        node_bboxes_to_bbox.py     # BBoxes to BBox
+        bbox_utils.py              # BBox 强相关工具: 坐标换算, 画框, 羽化 mask
       util/
         node_parse_json.py    #   Parse JSON
         node_remove_code_block.py  # Unpack Code Block
@@ -152,7 +155,7 @@ image 逐张模式的多图结果以 "======== Image N ========" 分隔行拼接
 
 - image Instruct: `mode` 下拉框切换逐张模式 `Per-Image`(逐张推理, 多图结果以 `======== Image N ========` 分隔行拼接, `split_instruct_output` 节点与 `json_to_bboxes` 的内建拆分均可还原为逐张列表)与批量模式 `Batch`(全部图片并入单次请求); 批量多图时缩放到 `max_size`, 单图保持原分辨率. `max_size` 仅在 Batch 档显示(`web/image_instruct.js` 按 mode widget options 透传的 `batch_mode_value` 联动, 隐藏值仍序列化; JS 失效只损失显隐效果)
 - video Instruct: `frames` 输入为 IMAGE 帧批次(ComfyUI 生态的视频通行形态), 按 `max_frames` linspace 均匀抽帧后缩放, 并在 system prompt 前注入"连续视频"语义提示
-- audio Instruct: ComfyUI `AUDIO` dict 由 `media/encoding.py` 的 `audio2base64()` 均值混为单声道 16-bit WAV, 以 `input_audio` 内容项注入(重采样由 llama.cpp 的 mtmd 解码端完成), 服务 Qwen3-ASR 等音频 handler; 音频是否被 mmproj 支持由 llama-cpp-python 侧校验
+- audio Instruct: ComfyUI `AUDIO` dict 由 `shared/encoding.py` 的 `audio2base64()` 均值混为单声道 16-bit WAV, 以 `input_audio` 内容项注入(重采样由 llama.cpp 的 mtmd 解码端完成), 服务 Qwen3-ASR 等音频 handler; 音频是否被 mmproj 支持由 llama-cpp-python 侧校验
 
 ### 推理输出与中断
 

@@ -465,7 +465,7 @@ LANG = {
             "unloading": "Unloading llama model...",
         },
 
-        # nodes/type/media/image/node_instruct.py
+        # nodes/instruct/media/image/node_instruct.py
         "image_instruct": {
             "start_processing": "Start processing {count} images",
         },
@@ -475,12 +475,12 @@ LANG = {
             "progress_desc": "Processing",
         },
 
-        # nodes/type/media/encoding.py
+        # shared/encoding.py
         "encoding": {
             "audio_batch_first_only": "AUDIO batch of {count} clips received; only the first clip is processed",
         },
 
-        # nodes/type/media/bbox/node_bbox.py + bbox_utils.py
+        # the node files under nodes/bbox/ + bbox_utils.py
         "bbox": {
             # {detail} takes one of the two detail_* variants below
             "json_frame_mismatch": "{json_count} JSON result(s) but {frame_count} image frame(s); pairing by index, {detail}",

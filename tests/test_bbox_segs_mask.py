@@ -1,4 +1,4 @@
-"""node_bbox.py bboxes_to_segs / bboxes_to_mask 的节点级单元测试.
+"""src/nodes/bbox/ bboxes_to_segs / bboxes_to_mask 的节点级单元测试.
 
 覆盖: 坐标裁剪, dilation/crop_factor 几何, SEG 字段组装 (Impact Pack 兼容),
 无效框逐个跳过, 多帧取首帧, mask 的羽化衰减与多框 maximum 合成, 恒 CPU 输出.
@@ -13,7 +13,8 @@ from tests import comfy_stubs
 
 comfy_stubs.install()
 
-from src.nodes.type.media.bbox.node_bbox import bboxes_to_mask, bboxes_to_segs  # noqa: E402
+from src.nodes.bbox.node_bboxes_to_mask import bboxes_to_mask  # noqa: E402
+from src.nodes.bbox.node_bboxes_to_segs import bboxes_to_segs  # noqa: E402
 
 
 class TestBBoxesToSegs(unittest.TestCase):

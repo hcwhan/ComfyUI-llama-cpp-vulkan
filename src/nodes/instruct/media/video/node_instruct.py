@@ -9,7 +9,7 @@ import numpy as np
 
 from .....core.instruct import llama_cpp_media_instruct_base
 from .....i18n.lang import LANG
-from ..encoding import image_content_item, scale_image, tensor_to_uint8
+from .....shared.encoding import image_content_item, scale_image, tensor_to_uint8
 
 _TIPS = LANG["nodes"]["instruct"]["video"]["tooltips"]
 
