@@ -175,7 +175,7 @@ image 逐张模式的多图结果以 "======== Image N ========" 前缀行拼接
 - 全部用户可见文案(节点显示名, tooltip, placeholder, 报错)与控制台日志文本统一放 `src/i18n/` 语言文件, 代码经 `from ..i18n.lang import LANG` 取用; 不随语言切换的字符串(下拉框选项值, 分类名, `======== Image N ========` 前缀行模板, 日志前缀)放 `common_static.py`. 新增/修改文案必须同步更新 zh-CN 与 en-US 两份语言文件并保持逐行一一对应
 - 带运行时值的文案写成 `str.format` 具名占位符模板; 报错文案须单行; 语言文件排版规则(多字面量换行约定)由 `tests/test_i18n_format.py` 锁定, `pyproject.toml` 已对 `language_*.py` 豁免 ruff format(lint 仍生效)
 - 测试断言报错文案时引用 `LANG` 而非硬编码字符串, 使断言随语言文件自动跟随
-- 例外(不进 i18n): 任务预设与系统提示词预设(领域内容), chat handler 显示名(`handlers.py` 注册表 key, 功能性标识), video Instruct 注入的"连续视频"语义提示与 `MEDIA_WORD`(prompt 内容), `prompts.py` 的 import 期模态校验报错(开发期防御)
+- 例外(不进 i18n): 任务预设与系统提示词预设(领域内容), chat handler 显示名(`handlers.py` 注册表 key, 功能性标识), video Instruct 注入的"连续视频"语义提示与 `MEDIA_WORD`(prompt 内容), `prompts.py` 的 import 期模态校验报错(开发期防御), 根入口 `__init__.py` 的 import 失败安装指引(i18n 层可能同在失败的导入链上, 硬编码双语)
 
 ### 文档维护原则
 
