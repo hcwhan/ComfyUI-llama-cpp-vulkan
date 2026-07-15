@@ -33,7 +33,7 @@ class json_to_bboxes:
     INPUT_IS_LIST = True
 
     @classmethod
-    def INPUT_TYPES(s):
+    def INPUT_TYPES(cls):
         return {
             "required": {
                 "json": ("STRING", {"forceInput": True}),

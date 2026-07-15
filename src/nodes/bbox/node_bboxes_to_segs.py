@@ -27,7 +27,7 @@ class bboxes_to_segs:
     FUNCTION = "process"
 
     @classmethod
-    def INPUT_TYPES(s):
+    def INPUT_TYPES(cls):
         # label/confidence 是检测结果本身的元数据(紧跟 bboxes 输入),
         # dilation/feather 作用于掩码矩形, crop_factor 决定上下文窗口, 按此语义分组排序
         return {

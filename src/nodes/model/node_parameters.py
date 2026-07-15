@@ -17,7 +17,7 @@ class llama_cpp_parameters:
     FUNCTION = "process"
 
     @classmethod
-    def INPUT_TYPES(s):
+    def INPUT_TYPES(cls):
         # widget 默认值与 Instruct 未连接 parameters 端口时的生效值同源
         # (core/instruct.py 的 DEFAULT_SAMPLING_PARAMS), 保证两种接法行为一致
         return {

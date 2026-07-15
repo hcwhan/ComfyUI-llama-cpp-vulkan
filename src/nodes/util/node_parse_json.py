@@ -17,7 +17,7 @@ class parse_json_node:
     DESCRIPTION = _NODE["description"]
 
     @classmethod
-    def INPUT_TYPES(s):
+    def INPUT_TYPES(cls):
         return {
             "required": {
                 "input": ("STRING", {"forceInput": True}),

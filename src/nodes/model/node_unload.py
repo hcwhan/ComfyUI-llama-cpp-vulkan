@@ -20,7 +20,7 @@ class llama_cpp_unload_model:
     FUNCTION = "process"
 
     @classmethod
-    def INPUT_TYPES(s):
+    def INPUT_TYPES(cls):
         return {
             "required": {
                 "any": (

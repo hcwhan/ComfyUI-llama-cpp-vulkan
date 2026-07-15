@@ -9,7 +9,7 @@ class remove_code_block:
     FUNCTION = "process"
 
     @classmethod
-    def INPUT_TYPES(s):
+    def INPUT_TYPES(cls):
         return {
             "required": {
                 "input": ("STRING", {"forceInput": True}),

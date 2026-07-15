@@ -11,7 +11,7 @@ class system_prompt_preset:
     FUNCTION = "main"
 
     @classmethod
-    def INPUT_TYPES(s):
+    def INPUT_TYPES(cls):
         # "None" 占位在首位(即默认值), 与 model / mmproj / chat_handler 下拉框的
         # 显式选择惯例一致; 只在节点层特判, 不进 PRESETS 模板池
         return {

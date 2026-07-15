@@ -86,7 +86,7 @@ class llama_cpp_llm_model_loader:
     FUNCTION = "loadmodel"
 
     @classmethod
-    def INPUT_TYPES(s):
+    def INPUT_TYPES(cls):
         return {
             "required": {
                 "gpu_device": _GPU_DEVICE_FIELD,
@@ -122,7 +122,7 @@ class llama_cpp_vlm_model_loader:
     FUNCTION = "loadmodel"
 
     @classmethod
-    def INPUT_TYPES(s):
+    def INPUT_TYPES(cls):
         return {
             "required": {
                 "gpu_device": _GPU_DEVICE_FIELD,

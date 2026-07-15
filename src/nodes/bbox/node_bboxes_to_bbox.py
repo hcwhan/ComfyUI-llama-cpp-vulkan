@@ -17,7 +17,7 @@ class bboxes_to_bbox:
     INPUT_IS_LIST = True
 
     @classmethod
-    def INPUT_TYPES(s):
+    def INPUT_TYPES(cls):
         return {
             "required": {
                 "bboxes": ("BBOX",),
