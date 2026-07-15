@@ -128,6 +128,21 @@ class TestEstimateKvBytes(unittest.TestCase):
         self.assertIsNone(_estimate_kv_bytes({}, 32, 8192))
         self.assertIsNone(_estimate_kv_bytes({"head_count_kv": 8}, 32, 8192))
 
+    def test_swa_window_reduces_kv(self):
+        # SWA 模型 (如 Gemma3) 的滑窗层只分配约 (窗口 + n_ubatch) 的 KV,
+        # 按半数层 SWA 的保守占比折算: 有效 token = (8192 + 512 + 512) / 2 = 4608
+        base = {"head_count_kv": 8, "head_count": 32, "embedding_length": 4096}
+        meta = dict(base, sliding_window=512)
+        expected = int((8192 + 512 + 512) / 2 * 32 * 8 * (128 + 128) * 2)
+        self.assertEqual(_estimate_kv_bytes(meta, 32, 8192), expected)
+        self.assertLess(_estimate_kv_bytes(meta, 32, 8192), _estimate_kv_bytes(base, 32, 8192))
+
+    def test_swa_window_covering_ctx_no_reduction(self):
+        # 窗口 (含批处理余量) 不小于 n_ctx 时滑窗不生效, 按全量 n_ctx 计
+        base = {"head_count_kv": 8, "head_count": 32, "embedding_length": 4096}
+        meta = dict(base, sliding_window=4096)
+        self.assertEqual(_estimate_kv_bytes(meta, 32, 4096), _estimate_kv_bytes(base, 32, 4096))
+
 
 class TestEstimateVramBytes(unittest.TestCase):
     def _write_temp(self, data):

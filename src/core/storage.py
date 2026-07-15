@@ -43,11 +43,17 @@ def _as_number(value):
     return value if isinstance(value, (int, float)) else None
 
 
+# SWA 层 KV cache 在窗口之外的批处理余量: llama.cpp 的 iSWA cache 按约
+# n_swa + n_ubatch 分配, n_ubatch 默认 512 (对接 wheel 的 Llama 默认值)
+_SWA_UBATCH = 512
+
+
 def _estimate_kv_bytes(meta, layers, n_ctx):
     """按 GGUF 注意力元数据精确计算 KV cache 字节数(f16), 字段不全时返回 None.
 
     每 token 每层 KV = head_count_kv * (key_dim + value_dim) * 2 字节;
-    hybrid 模型(线性注意力层的 head_count_kv 为 0)经数组均值自然折算.
+    hybrid 模型(线性注意力层的 head_count_kv 为 0)经数组均值自然折算;
+    SWA(滑窗注意力)模型的滑窗层按窗口大小而非全量 n_ctx 折算 token 数.
     """
     kv_heads = _as_number(meta.get("head_count_kv"))
     if not layers or not kv_heads:
@@ -62,7 +68,15 @@ def _estimate_kv_bytes(meta, layers, n_ctx):
     value_dim = _as_number(meta.get("value_length"))
     if value_dim is None:
         value_dim = key_dim
-    return int(n_ctx * layers * kv_heads * (key_dim + value_dim) * 2)
+    kv_tokens = n_ctx
+    n_swa = _as_number(meta.get("sliding_window"))
+    if n_swa and n_swa + _SWA_UBATCH < n_ctx:
+        # SWA 层占比因架构而异 (gemma2/gpt-oss 1/2, cohere2 3/4, gemma3 5/6)
+        # 且 GGUF 元数据不含层型排布 (llama.cpp 按架构硬编码), 按已知架构的
+        # 占比下限 1/2 折算: 对任何已知 SWA 架构不低估 (方向保守),
+        # 同时消掉至少一半 "全部层按全量 n_ctx" 的高估
+        kv_tokens = (n_ctx + n_swa + _SWA_UBATCH) / 2
+    return int(kv_tokens * layers * kv_heads * (key_dim + value_dim) * 2)
 
 
 def _estimate_per_layer_bytes(model_path, n_ctx):

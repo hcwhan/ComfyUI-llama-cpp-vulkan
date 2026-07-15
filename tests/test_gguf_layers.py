@@ -64,6 +64,18 @@ class TestBlockCountParsing(unittest.TestCase):
         )
         self.assertEqual(_block_count(path), 32)
 
+    def test_sliding_window_parsed(self):
+        # SWA 模型 (如 Gemma3) 的滑窗元数据须进入 meta, 供 KV cache 折算
+        path = self._write_temp(
+            _gguf_bytes(
+                [
+                    _kv_uint32("gemma3.block_count", 34),
+                    _kv_uint32("gemma3.attention.sliding_window", 1024),
+                ]
+            )
+        )
+        self.assertEqual(get_model_meta(path).get("sliding_window"), 1024)
+
     def test_block_count_after_array_kv(self):
         # 命中前需要正确跳过数组类型的 KV
         path = self._write_temp(

@@ -67,7 +67,8 @@ def read_value(f):
 
 
 # 显存折算所需的元数据字段 -> GGUF key 后缀(实际 key 带架构名前缀, 按后缀匹配);
-# key_length/value_length 仅部分模型存在(head_dim 与 embedding/head_count 不一致时)
+# key_length/value_length 仅部分模型存在(head_dim 与 embedding/head_count 不一致时);
+# sliding_window 仅 SWA(滑窗注意力)模型存在, 用于折算滑窗层的 KV cache
 _META_SUFFIXES = {
     "block_count": ".block_count",
     "embedding_length": ".embedding_length",
@@ -75,6 +76,7 @@ _META_SUFFIXES = {
     "head_count_kv": ".attention.head_count_kv",
     "key_length": ".attention.key_length",
     "value_length": ".attention.value_length",
+    "sliding_window": ".attention.sliding_window",
 }
 
 
