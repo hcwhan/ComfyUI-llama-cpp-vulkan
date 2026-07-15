@@ -414,7 +414,7 @@ LANG = {
                     "Conversion rules: string outputs valid JSON text for dict/list, str() result otherwise;\n"
                     "int/float fall back to 0 / 0.0 on conversion failure; boolean tests numbers for non-zero,\n"
                     'and for text only "true" (case-insensitive) is true.\n'
-                    'When the key misses and default is unconnected, the five outputs are (None, "", 0, 0.0, False).'
+                    'When the key misses and default is empty (blank widget / unconnected), the five outputs are (None, "", 0, 0.0, False).'
                 ),
                 "tooltips": {
                     "key": (

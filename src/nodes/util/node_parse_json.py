@@ -38,6 +38,12 @@ class parse_json_node:
         if not key.strip():
             raise ValueError(_NODE["errors"]["key_empty"])
 
+        # optional STRING 在常规 UI 下渲染为文本 widget, 未填写时收到空串而非
+        # None (None 仅在 widget 转输入端口未连线或 API 直呼时可达);
+        # 空串归一为 None, 使两种连线形态的 any 输出一致 (与 DESCRIPTION 对齐)
+        if default == "":
+            default = None
+
         # parse_json 统一顶层报错(含代码围栏剥离), 嵌套字符串由 get_nested_value 容错
         val = get_nested_value(parse_json(input), key, default)
 

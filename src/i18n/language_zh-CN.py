@@ -414,7 +414,7 @@ LANG = {
                     "转换规则: string 遇 dict/list 输出合法 JSON 文本, 其余为 str() 结果;\n"
                     "int/float 转换失败时回退 0 / 0.0; boolean 对数字按非零判定,\n"
                     '对文本仅 "true" (忽略大小写) 为真.\n'
-                    'key 未命中且未连 default 时, 五个输出为 (None, "", 0, 0.0, False).'
+                    'key 未命中且 default 为空 (未填写/未连线) 时, 五个输出为 (None, "", 0, 0.0, False).'
                 ),
                 "tooltips": {
                     "key": (

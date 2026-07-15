@@ -77,6 +77,18 @@ class TestParseJsonNodeConversions(unittest.TestCase):
         self.assertEqual(number, 0.0)
         self.assertFalse(boolean)
 
+    def test_empty_string_default_normalized_to_none(self):
+        # 回归: optional STRING 在常规 UI 下是文本 widget, 未填写时传入空串;
+        # 空串须归一为 None, 使 widget 形态与未连线端口形态的 any 输出一致
+        any_val, string, *_ = self.node.process('{"a": 1}', "missing", default="")
+        self.assertIsNone(any_val)
+        self.assertEqual(string, "")
+
+    def test_non_empty_default_used_on_miss(self):
+        any_val, string, *_ = self.node.process('{"a": 1}', "missing", default="fallback")
+        self.assertEqual(any_val, "fallback")
+        self.assertEqual(string, "fallback")
+
 
 if __name__ == "__main__":
     unittest.main()
