@@ -112,6 +112,7 @@ LANG = {
                         "0 = CPU-only inference;\n"
                         ">0 = offloads as many layers as fit by per-layer size (weights + KV cache), total usage never exceeds this value.\n"
                         "If the budget cannot fit even one model layer, the model stays on CPU (limit strictly honored);\n"
+                        "with multiple discrete GPUs under Auto (layer split) the limit is the combined usage across all cards, not per card;\n"
                         "per-layer size is an estimate, actual usage may differ slightly."
                     ),
                 },
@@ -135,6 +136,7 @@ LANG = {
                         ">0 = the mmproj size is deducted from the budget first, the rest offloads as many layers as fit by per-layer size (weights + KV cache), total usage never exceeds this value (limit strictly honored).\n"
                         "If the budget cannot fit the mmproj, both stay on CPU;\n"
                         "if less than one main-model layer fits after the deduction, the main model stays on CPU while the mmproj still goes to VRAM.\n"
+                        "With multiple discrete GPUs under Auto (layer split) the limit is the combined usage across all cards, not per card;\n"
                         "per-layer size is an estimate, actual usage may differ slightly."
                     ),
                     "image_min_tokens": (
