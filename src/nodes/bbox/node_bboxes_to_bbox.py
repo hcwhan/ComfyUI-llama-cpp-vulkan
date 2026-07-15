@@ -21,7 +21,10 @@ class bboxes_to_bbox:
         return {
             "required": {
                 "bboxes": ("BBOX",),
-                "image_index": ("INT", {"default": 0, "min": 0, "max": 1000000, "step": 1}),
+                "image_index": (
+                    "INT",
+                    {"default": 0, "min": 0, "max": 1000000, "step": 1, "tooltip": _TIPS["image_index"]},
+                ),
                 "bbox_index": (
                     "INT",
                     {"default": 0, "min": -998, "max": 999, "step": 1, "tooltip": _TIPS["bbox_index"]},

@@ -370,6 +370,10 @@ LANG = {
 
             "bboxes_to_bbox": {
                 "tooltips": {
+                    "image_index": (
+                        "Which image's BBox group to pick (0-based).\n"
+                        "Group order matches the Image N numbering of the Per-Image multi-image output of image Instruct."
+                    ),
                     "bbox_index": (
                         "BBox index within the image, negative counts from the end.\n"
                         "Set to 999 to return all BBoxes of that image."

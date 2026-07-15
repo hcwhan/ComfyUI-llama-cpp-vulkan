@@ -370,6 +370,10 @@ LANG = {
 
             "bboxes_to_bbox": {
                 "tooltips": {
+                    "image_index": (
+                        "选取第几张图的 BBox 组 (从 0 起).\n"
+                        "组序与 image Instruct Per-Image 多图输出的 Image N 序号对齐."
+                    ),
                     "bbox_index": (
                         "图内 BBox 索引, 负数从尾部取.\n"
                         "设为 999 时返回该图全部 BBox."
