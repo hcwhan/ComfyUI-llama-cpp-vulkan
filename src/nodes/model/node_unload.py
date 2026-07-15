@@ -34,6 +34,8 @@ class llama_cpp_unload_model:
     RETURN_NAMES = ("any",)
 
     def process(self, any):
-        logger.info(LOG_PREFIX + LANG["logs"]["unload"]["unloading"])
+        # 空载时不打 "Unloading" 日志(避免误导排查); clean() 幂等, 仍无条件执行兜底
+        if LLAMA_CPP_STORAGE.llm is not None:
+            logger.info(LOG_PREFIX + LANG["logs"]["unload"]["unloading"])
         LLAMA_CPP_STORAGE.clean()
         return (any,)
