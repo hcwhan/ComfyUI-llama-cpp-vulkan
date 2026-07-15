@@ -1,5 +1,6 @@
 // vlm Model Loader 的 widget 联动 (纯 UX 增强, 行为正确性由 Python 侧保证):
 // - thinking 开关按 chat_handler 选值三态置灰 (可切换 / 强制开 / 强制关),
+//   强制档覆写前缓存用户在可切换档的设定, 切回可切换档时恢复;
 //   失效时由 clamp_thinking 钳制兜底
 // - image_min/max_tokens 仅在选中支持视觉的 handler 时显示 (音频专用与
 //   "None" 隐藏), 隐藏字段的值仍序列化并随 config 下发, 对音频路径无效
@@ -37,20 +38,30 @@ app.registerExtension({
         const thinkingWidget = node.widgets.find((w) => w.name === "thinking");
         const imageTokenWidgets = node.widgets.filter((w) => w.name === "image_min_tokens" || w.name === "image_max_tokens");
 
+        // forced/none 档覆写 thinking 值前, 把用户在 toggle 档的设定缓存到
+        // _userValue (仅在从 toggle 档切出的那一次记录), 切回 toggle 档时恢复;
+        // prevThinkingMode 起始为 null, 使 nodeCreated/onConfigure 的首次同步
+        // 不产生缓存, 载入工作流以序列化值为准
+        let prevThinkingMode = null;
         const applyMode = () => {
             const label = handlerWidget.value;
             if (thinkingWidget && thinkingModes) {
                 // "None" 与未知 label 按不支持处理 (无 handler 即无思考模式)
                 const mode = thinkingModes[label] ?? "none";
-                if (mode === "forced") {
-                    thinkingWidget.value = true;
-                    thinkingWidget.disabled = true;
-                } else if (mode === "none") {
-                    thinkingWidget.value = false;
-                    thinkingWidget.disabled = true;
-                } else {
+                if (mode === "toggle") {
+                    if (thinkingWidget._userValue !== undefined) {
+                        thinkingWidget.value = thinkingWidget._userValue;
+                        delete thinkingWidget._userValue;
+                    }
                     thinkingWidget.disabled = false;
+                } else {
+                    if (prevThinkingMode === "toggle") {
+                        thinkingWidget._userValue = thinkingWidget.value;
+                    }
+                    thinkingWidget.value = mode === "forced";
+                    thinkingWidget.disabled = true;
                 }
+                prevThinkingMode = mode;
             }
             if (imageTokenHandlers) {
                 const show = imageTokenHandlers.has(label);
