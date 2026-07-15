@@ -52,6 +52,8 @@ class TestWheelPrivateApiContract(unittest.TestCase):
         self.assertTrue(callable(multimodal.MTMDChatHandler.close))
 
     def test_ggml_device_symbols(self):
+        # devices.py 与 tools/check_devices.py (诊断脚本, 排障工具不能坏在
+        # 需要它的时刻) 引用的 _ggml 符号全集
         from llama_cpp import _ggml
 
         for name in (
@@ -59,6 +61,7 @@ class TestWheelPrivateApiContract(unittest.TestCase):
             "ggml_backend_dev_count",
             "ggml_backend_dev_get",
             "ggml_backend_load_all_from_path",
+            "ggml_backend_reg_count",
             "GGMLBackendDevType",
         ):
             self.assertTrue(hasattr(_ggml, name), f"llama_cpp._ggml missing symbol: {name}")
