@@ -44,6 +44,13 @@ class TestWheelPrivateApiContract(unittest.TestCase):
         source = inspect.getsource(multimodal.MTMDChatHandler)
         self.assertIn("self.mmproj_path", source)
 
+    def test_mtmd_chat_handler_close(self):
+        # storage.clean() 直接调用 chat handler 的 close() 并依赖其幂等性,
+        # 兜底 llm 未创建/主模型加载失败路径的 mtmd 资源级联释放
+        import llama_cpp.llama_multimodal as multimodal
+
+        self.assertTrue(callable(multimodal.MTMDChatHandler.close))
+
     def test_ggml_device_symbols(self):
         from llama_cpp import _ggml
 
