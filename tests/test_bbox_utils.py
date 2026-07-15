@@ -105,6 +105,14 @@ class TestValidIntBbox(unittest.TestCase):
     def test_non_numeric_value_returns_none(self):
         self.assertIsNone(valid_int_bbox([1, 2, 3, None]))
 
+    def test_non_finite_values_return_none(self):
+        # 回归: json.loads 接受 Infinity/NaN 字面量且上游换算原样放行,
+        # inf 的 round() 抛 OverflowError (NaN 抛 ValueError), 均须按
+        # 无效项跳过, 不得让 SEGS/MASK 整个节点崩溃
+        self.assertIsNone(valid_int_bbox([float("inf"), 0, 10, 10]))
+        self.assertIsNone(valid_int_bbox([0, float("-inf"), 10, 10]))
+        self.assertIsNone(valid_int_bbox([float("nan"), 0, 10, 10]))
+
 
 class TestFeatheredRectMask(unittest.TestCase):
     def test_no_feather_is_binary_rect(self):

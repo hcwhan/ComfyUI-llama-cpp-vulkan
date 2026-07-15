@@ -178,8 +178,10 @@ def valid_int_bbox(bbox):
         logger.warning(LOG_PREFIX + _LOGS["bbox_invalid_item"].format(bbox=bbox))
         return None
     try:
+        # OverflowError: json.loads 接受 Infinity/1e999 字面量, inf 经上游换算
+        # 原样到达此处, round(inf) 抛 OverflowError (NaN 抛 ValueError)
         return tuple(int(round(float(v))) for v in bbox[:4])
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         logger.warning(LOG_PREFIX + _LOGS["bbox_non_numeric"].format(bbox=bbox))
         return None
 
