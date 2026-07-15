@@ -1,4 +1,4 @@
-"""src/i18n 语言文件排版约定的单元测试.
+"""src/i18n 语言文件排版约定与跨语言一致性的单元测试.
 
 锁定 language_*.py 的排版规则 (见语言文件 docstring 的排版约定):
 - 多字面量拼接的非末位字面量必须以 \\n 结尾: 保证源码行与 UI 显示行一一对应,
@@ -8,11 +8,16 @@
 
 前两条基于 tokenize 做源码级检查, 不 import 语言文件, 与运行时行为解耦;
 第三条按路径加载 LANG dict 检查 (纯数据文件, 无第三方依赖).
+
+另锁定多语言文件间的结构契约 (AGENTS.md 的 "逐行一一对应" 约定):
+- 全部语言文件的 LANG 叶子键路径列表 (含顺序) 完全一致
+- 同一叶子键的 str.format 具名占位符名称集合完全一致
 """
 
 import ast
 import importlib.util
 import io
+import string
 import tokenize
 import unittest
 from pathlib import Path
@@ -42,6 +47,21 @@ def _iter_error_entries(node, path=()):
             yield from _iter_error_entries(value, sub_path)
         elif any(seg.endswith("errors") for seg in path):
             yield sub_path, value
+
+
+def _flatten_leaves(node, path=()):
+    """按声明顺序递归展平 LANG dict, 产出 (叶子键路径元组, 叶子值)."""
+    for key, value in node.items():
+        sub_path = (*path, key)
+        if isinstance(value, dict):
+            yield from _flatten_leaves(value, sub_path)
+        else:
+            yield sub_path, value
+
+
+def _placeholder_names(text):
+    """提取 str.format 具名占位符名称集合 ({{ }} 转义与空自动编号不计入)."""
+    return {field for _, field, _, _ in string.Formatter().parse(text) if field}
 
 
 def _concat_runs(source):
@@ -103,6 +123,38 @@ class TestLanguageFileLayout(unittest.TestCase):
                         "\n",
                         text,
                         f"{path.name} 的 {'.'.join(key_path)} 是报错文案, 必须为单行: {text!r}",
+                    )
+
+
+class TestLanguageFilesConsistency(unittest.TestCase):
+    """多语言文件间的键结构契约: 漏更新一侧时在此拦截 (默认 zh-CN 下 en-US 的缺键运行期永不触发)."""
+
+    def _leaves_by_file(self):
+        return {path.name: list(_flatten_leaves(_load_lang(path))) for path in _language_files()}
+
+    def test_leaf_key_paths_identical_in_order(self):
+        leaves = self._leaves_by_file()
+        base_name, *other_names = leaves
+        base_keys = [key_path for key_path, _ in leaves[base_name]]
+        for name in other_names:
+            with self.subTest(file=name):
+                self.assertEqual(
+                    base_keys,
+                    [key_path for key_path, _ in leaves[name]],
+                    f"{name} 与 {base_name} 的叶子键路径 (含顺序) 不一致",
+                )
+
+    def test_leaf_placeholder_names_identical(self):
+        leaves = self._leaves_by_file()
+        base_name, *other_names = leaves
+        base_placeholders = {key_path: _placeholder_names(value) for key_path, value in leaves[base_name]}
+        for name in other_names:
+            for key_path, value in leaves[name]:
+                with self.subTest(file=name, key=".".join(key_path)):
+                    self.assertEqual(
+                        base_placeholders.get(key_path),
+                        _placeholder_names(value),
+                        f"{name} 的 {'.'.join(key_path)} 占位符与 {base_name} 不一致",
                     )
 
 
