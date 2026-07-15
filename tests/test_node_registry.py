@@ -1,4 +1,4 @@
-"""src/nodes 注册表契约的单元测试: NODE_CLASS_MAPPINGS 与语言文件 display_names 的键一致性."""
+"""src/nodes 注册表契约的单元测试: display_names 键一致性, 全节点 INPUT_TYPES() smoke test."""
 
 import unittest
 
@@ -18,6 +18,16 @@ class TestNodeRegistry(unittest.TestCase):
 
     def test_display_name_mappings_mirror_language_file(self):
         self.assertEqual(NODE_DISPLAY_NAME_MAPPINGS, LANG["display_names"])
+
+    def test_all_nodes_input_types_callable(self):
+        # smoke test: INPUT_TYPES 内部的 LANG 键漏写/改名在 import 期不报错,
+        # 要到前端请求 /object_info 时才 KeyError; 全量调用一遍在测试期拦截,
+        # 一并锁定 parameters 节点 tooltip 的 {default} 填充路径
+        for name, node_cls in NODE_CLASS_MAPPINGS.items():
+            with self.subTest(node=name):
+                input_types = node_cls.INPUT_TYPES()
+                self.assertIsInstance(input_types, dict)
+                self.assertIn("required", input_types)
 
 
 if __name__ == "__main__":
