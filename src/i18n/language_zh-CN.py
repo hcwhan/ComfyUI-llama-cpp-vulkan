@@ -350,7 +350,10 @@ LANG = {
                         "掩码矩形向外扩张的像素数, 直接扩大下游的重绘区域.\n"
                         "(与 Impact Pack 检测器及 BBoxes to MASK 的 dilation 语义一致)"
                     ),
-                    "feather": "掩码边缘高斯羽化的 sigma (像素).",
+                    "feather": (
+                        "掩码边缘高斯羽化的 sigma (像素).\n"
+                        "羽化需要 crop_factor > 1 或 dilation 提供衰减空间, 否则无效果."
+                    ),
                     "crop_factor": (
                         "crop_region 相对掩码矩形的放大倍数, 为下游 Detailer 提供重绘上下文.\n"
                         "(Impact Pack 惯例, 1.0 = 不外扩)"

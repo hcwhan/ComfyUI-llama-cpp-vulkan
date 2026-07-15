@@ -350,7 +350,10 @@ LANG = {
                         "Pixels to expand the mask rectangle outward, directly enlarging the downstream repaint area.\n"
                         "(same dilation semantics as Impact Pack detectors and BBoxes to MASK)"
                     ),
-                    "feather": "Gaussian feather sigma of the mask edge (pixels).",
+                    "feather": (
+                        "Gaussian feather sigma of the mask edge (pixels).\n"
+                        "Feathering needs crop_factor > 1 or dilation to provide falloff room, otherwise it has no effect."
+                    ),
                     "crop_factor": (
                         "Scale of crop_region relative to the mask rectangle, giving the downstream Detailer repaint context.\n"
                         "(Impact Pack convention, 1.0 = no expansion)"
