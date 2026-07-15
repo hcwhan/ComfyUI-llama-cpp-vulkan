@@ -30,11 +30,14 @@ class llama_cpp_image_instruct(llama_cpp_media_instruct_base):
                 "images": ("IMAGE",),
                 **cls.seed_input(),
                 **cls.prompt_inputs(),
+                # batch_mode_value 是自定义 key, 经 /object_info 原样透传给前端 JS
+                # (web/image_instruct.js): max_size 仅在 Batch 档显示, 与常量单一真源
                 "mode": (
                     [IMAGE_MODE_EACH, IMAGE_MODE_BATCH],
                     {
                         "default": IMAGE_MODE_EACH,
                         "tooltip": _TIPS["mode"],
+                        "batch_mode_value": IMAGE_MODE_BATCH,
                     },
                 ),
                 "max_size": (

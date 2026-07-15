@@ -24,7 +24,9 @@ ComfyUI-llama-cpp-vulkan/
   docs/
     项目分析.html             # 历史快照(页头已注明生成 commit, 仅供历史参考)
   web/
+    widget_utils.js           # 前端共用工具: widget 显隐切换(hidden 标志 + type/computeSize 双轨)
     vlm_loader.js             # vlm loader widget 联动: thinking 三态置灰, image token 字段显隐(纯 UX 增强)
+    image_instruct.js         # image Instruct widget 联动: max_size 仅在 Batch 档显示(纯 UX 增强)
   src/
     i18n/                     # 文案层: 全部用户可见文案与控制台日志的单一来源
       lang.py                 #   语言加载器, LANGUAGE 常量切换语言, 导出 LANG 字典
@@ -148,7 +150,7 @@ image 逐张模式的多图结果以 "======== Image N ========" 分隔行拼接
 
 ### 多模态输入
 
-- image Instruct: `mode` 下拉框切换逐张模式 `Per-Image`(逐张推理, 多图结果以 `======== Image N ========` 分隔行拼接, `split_instruct_output` 节点与 `json_to_bboxes` 的内建拆分均可还原为逐张列表)与批量模式 `Batch`(全部图片并入单次请求); 批量多图时缩放到 `max_size`, 单图保持原分辨率
+- image Instruct: `mode` 下拉框切换逐张模式 `Per-Image`(逐张推理, 多图结果以 `======== Image N ========` 分隔行拼接, `split_instruct_output` 节点与 `json_to_bboxes` 的内建拆分均可还原为逐张列表)与批量模式 `Batch`(全部图片并入单次请求); 批量多图时缩放到 `max_size`, 单图保持原分辨率. `max_size` 仅在 Batch 档显示(`web/image_instruct.js` 按 mode widget options 透传的 `batch_mode_value` 联动, 隐藏值仍序列化; JS 失效只损失显隐效果)
 - video Instruct: `frames` 输入为 IMAGE 帧批次(ComfyUI 生态的视频通行形态), 按 `max_frames` linspace 均匀抽帧后缩放, 并在 system prompt 前注入"连续视频"语义提示
 - audio Instruct: ComfyUI `AUDIO` dict 由 `media/encoding.py` 的 `audio2base64()` 均值混为单声道 16-bit WAV, 以 `input_audio` 内容项注入(重采样由 llama.cpp 的 mtmd 解码端完成), 服务 Qwen3-ASR 等音频 handler; 音频是否被 mmproj 支持由 llama-cpp-python 侧校验
 
