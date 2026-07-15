@@ -58,3 +58,7 @@ ignore = [
 [tool.ruff.format]
 # 项目字符串引号风格以双引号为主, 与 format 默认一致; docstring 保持原样
 docstring-code-format = false
+# 语言文案文件是手工排版的数据文件: 含换行的文本按 "每 UI 行一个源码行" 的
+# 多字面量形态书写, 且用空行分隔条目组; ruff format 会把够短的相邻字面量
+# 合并回单行并删除 dict 内空行, 破坏该排版约定, 故排除 (lint 仍然生效)
+exclude = ["src/i18n/language_*.py"]
