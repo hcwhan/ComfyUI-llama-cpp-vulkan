@@ -32,6 +32,10 @@ class TestStripCodeFence(unittest.TestCase):
     def test_label_with_plus_and_dot(self):
         self.assertEqual(strip_code_fence("```c++\ncode\n```"), "code")
 
+    def test_cjk_after_fence_not_stripped_as_label(self):
+        # 回归: 标签字符类限 ASCII, "```中文" 的中文是正文而非 info string
+        self.assertEqual(strip_code_fence("```中文正文\n第二行\n```"), "中文正文\n第二行")
+
     def test_inner_backticks_preserved(self):
         text = "```\nuse `foo` here\n```"
         self.assertEqual(strip_code_fence(text), "use `foo` here")

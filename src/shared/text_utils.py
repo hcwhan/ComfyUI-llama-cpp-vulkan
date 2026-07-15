@@ -6,14 +6,15 @@ import re
 from ..i18n.common_static import IMAGE_RESULT_SEPARATOR_TEMPLATE
 from ..i18n.lang import LANG
 
-# 开头的 ```label(标签限单词类字符, 可无, 如 json/python/c++; CommonMark
-# 允许标签前有空格, 少数模型会输出 "``` json" 形态); 结尾的 ```.
+# 开头的 ```label(标签限 ASCII 单词类字符, 可无, 如 json/python/c++;
+# CommonMark 允许标签前有空格, 少数模型会输出 "``` json" 形态); 结尾的 ```.
 # 两端独立匹配, 生成被截断导致围栏未闭合时, 开头的标记仍能剥离.
-# 标签不能用 [^\s`]* 之类的宽匹配: 围栏后无换行直接跟正文时会把正文吞掉
-_FENCE_OPEN_RE = re.compile(r"^```[ \t]*[\w+.-]*[ \t]*\r?\n?")
+# 标签不能用 [^\s`]* 之类的宽匹配: 围栏后无换行直接跟正文时会把正文吞掉;
+# 也不能用 \w(默认匹配 Unicode 文字): "```中文" 形态的中文正文会被当标签剥掉
+_FENCE_OPEN_RE = re.compile(r"^```[ \t]*[A-Za-z0-9_+.-]*[ \t]*\r?\n?")
 _FENCE_CLOSE_RE = re.compile(r"\r?\n?```$")
 # 文本中部的完整围栏块(用于 "前导说明 + 围栏块" 形态的回退提取)
-_FENCE_BLOCK_RE = re.compile(r"```[ \t]*[\w+.-]*[ \t]*\r?\n(.*?)\r?\n?```", re.DOTALL)
+_FENCE_BLOCK_RE = re.compile(r"```[ \t]*[A-Za-z0-9_+.-]*[ \t]*\r?\n(.*?)\r?\n?```", re.DOTALL)
 
 
 def strip_code_fence(text):
