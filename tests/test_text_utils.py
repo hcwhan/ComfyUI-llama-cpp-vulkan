@@ -2,7 +2,11 @@
 
 import unittest
 
-from src.shared.text_utils import get_nested_value, parse_json, split_image_results, strip_code_fence
+from tests import comfy_stubs
+
+comfy_stubs.install()
+
+from src.shared.text_utils import get_nested_value, parse_json, split_image_results, strip_code_fence  # noqa: E402
 
 
 class TestStripCodeFence(unittest.TestCase):
