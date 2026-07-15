@@ -79,8 +79,7 @@ LANG = {
 
     "nodes": {
         # ================ model ================
-        # llm_loader / vlm_loader / parameters / unload;
-        # LLM Loader has no exclusive copy, see the group common
+        # llm_loader / vlm_loader / parameters / unload
         "model": {
             "common": {
                 # Fields shared by both Model Loaders (node_loaders.py)
@@ -96,18 +95,24 @@ LANG = {
                         "Prompt + generated tokens of a request cannot exceed this value.\n"
                         "KV cache grows linearly with it, oversizing wastes VRAM."
                     ),
+                },
+                # Same model-not-selected error for both Loaders (node_loaders.py)
+                "errors": {
+                    "model_not_selected": "Please select a gguf model file (placed in the llm folder).",
+                },
+            },
+
+            # The vram_limit copy is maintained per Loader: the VLM side adds the mmproj budget deduction semantics
+            "llm_loader": {
+                "tooltips": {
                     "vram_limit": (
                         "VRAM usage limit in GB.\n"
                         "-1 = auto (llama.cpp fits layers to free VRAM);\n"
                         "0 = CPU-only inference;\n"
                         ">0 = offloads as many layers as fit by per-layer size (weights + KV cache), total usage never exceeds this value.\n"
-                        "If the budget cannot fit even one model layer, everything stays on CPU (limit strictly honored);\n"
+                        "If the budget cannot fit even one model layer, the model stays on CPU (limit strictly honored);\n"
                         "per-layer size is an estimate, actual usage may differ slightly."
                     ),
-                },
-                # Same model-not-selected error for both Loaders (node_loaders.py)
-                "errors": {
-                    "model_not_selected": "Please select a gguf model file (placed in the llm folder).",
                 },
             },
 
@@ -121,6 +126,15 @@ LANG = {
                         "forced on for thinking-only models such as GLM-4.1V,\n"
                         "Gemma4 E2B/E4B still thinks in plain text when disabled.\n"
                         "Residual thinking content can be stripped by the strip_thinking switch of Instruct."
+                    ),
+                    "vram_limit": (
+                        "VRAM usage limit in GB.\n"
+                        "-1 = auto (llama.cpp fits layers to free VRAM);\n"
+                        "0 = CPU-only inference (the mmproj stays on CPU too);\n"
+                        ">0 = the mmproj size is deducted from the budget first, the rest offloads as many layers as fit by per-layer size (weights + KV cache), total usage never exceeds this value (limit strictly honored).\n"
+                        "If the budget cannot fit the mmproj, both stay on CPU;\n"
+                        "if less than one main-model layer fits after the deduction, the main model stays on CPU while the mmproj still goes to VRAM.\n"
+                        "per-layer size is an estimate, actual usage may differ slightly."
                     ),
                     "image_min_tokens": (
                         "Minimum tokens mmproj encodes per image, preserves encoding detail for low-resolution images.\n"

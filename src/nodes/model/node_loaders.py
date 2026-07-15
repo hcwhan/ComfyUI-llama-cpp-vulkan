@@ -20,6 +20,7 @@ from ...i18n.lang import LANG
 
 _COMMON_TIPS = LANG["nodes"]["model"]["common"]["tooltips"]
 _COMMON_ERRORS = LANG["nodes"]["model"]["common"]["errors"]
+_LLM_TIPS = LANG["nodes"]["model"]["llm_loader"]["tooltips"]
 _VLM_TIPS = LANG["nodes"]["model"]["vlm_loader"]["tooltips"]
 _VLM_ERRORS = LANG["nodes"]["model"]["vlm_loader"]["errors"]
 
@@ -50,16 +51,18 @@ def _ctx_size_field(default):
     )
 
 
-_VRAM_LIMIT_FIELD = (
-    "INT",
-    {
-        "default": -1,
-        "min": -1,
-        "max": 1024,
-        "step": 1,
-        "tooltip": _COMMON_TIPS["vram_limit"],
-    },
-)
+# 数值语义两个 Loader 相同, tooltip 分开维护 (VLM 侧多 mmproj 预算扣除语义)
+def _vram_limit_field(tooltip):
+    return (
+        "INT",
+        {
+            "default": -1,
+            "min": -1,
+            "max": 1024,
+            "step": 1,
+            "tooltip": tooltip,
+        },
+    )
 
 
 def _is_mmproj(path):
@@ -89,7 +92,7 @@ class llama_cpp_llm_model_loader:
                 "gpu_device": _GPU_DEVICE_FIELD,
                 "model": (_model_list(),),
                 "ctx_size": _ctx_size_field(_CTX_SIZE_DEFAULT),
-                "vram_limit": _VRAM_LIMIT_FIELD,
+                "vram_limit": _vram_limit_field(_LLM_TIPS["vram_limit"]),
             }
         }
 
@@ -142,7 +145,7 @@ class llama_cpp_vlm_model_loader:
                     },
                 ),
                 "ctx_size": _ctx_size_field(_CTX_SIZE_DEFAULT * 2),
-                "vram_limit": _VRAM_LIMIT_FIELD,
+                "vram_limit": _vram_limit_field(_VLM_TIPS["vram_limit"]),
                 "image_min_tokens": (
                     "INT",
                     {

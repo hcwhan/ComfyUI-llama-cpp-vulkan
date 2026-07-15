@@ -79,8 +79,7 @@ LANG = {
 
     "nodes": {
         # ================ model (模型) ================
-        # llm_loader / vlm_loader / parameters / unload;
-        # LLM Loader 无专属文案, 全部见本组 common
+        # llm_loader / vlm_loader / parameters / unload
         "model": {
             "common": {
                 # 两个 Model Loader 共用字段 (node_loaders.py)
@@ -96,18 +95,24 @@ LANG = {
                         "请求的 prompt + 生成 token 总量不能超过此值.\n"
                         "KV cache 随此值线性增长, 设置过大会浪费显存."
                     ),
+                },
+                # 两个 Loader 的未选模型报错同文 (node_loaders.py)
+                "errors": {
+                    "model_not_selected": "请选择 gguf 模型文件 (需放在 llm 目录).",
+                },
+            },
+
+            # vram_limit 文案两个 Loader 分开维护: VLM 侧多 mmproj 预算扣除语义
+            "llm_loader": {
+                "tooltips": {
                     "vram_limit": (
                         "显存占用上限, 单位 GB.\n"
                         "-1 = 自动 (llama.cpp 按空闲显存适配层数);\n"
                         "0 = 纯 CPU 推理;\n"
                         ">0 = 按每层体积 (权重 + KV cache) 折算可上 GPU 的层数, 总占用不超过该值.\n"
-                        "预算不足模型 1 层时全部留在 CPU (严格守上限);\n"
+                        "预算不足模型 1 层时模型留在 CPU (严格守上限);\n"
                         "层体积为估算值, 实际占用可能略有偏差."
                     ),
-                },
-                # 两个 Loader 的未选模型报错同文 (node_loaders.py)
-                "errors": {
-                    "model_not_selected": "请选择 gguf 模型文件 (需放在 llm 目录).",
                 },
             },
 
@@ -121,6 +126,15 @@ LANG = {
                         "GLM-4.1V 等纯思考模型强制为开,\n"
                         "Gemma4 E2B/E4B 关闭后仍会以纯文本形式思考.\n"
                         "残留的思考内容可由 Instruct 的 strip_thinking 开关剥离."
+                    ),
+                    "vram_limit": (
+                        "显存占用上限, 单位 GB.\n"
+                        "-1 = 自动 (llama.cpp 按空闲显存适配层数);\n"
+                        "0 = 纯 CPU 推理 (mmproj 也留在 CPU);\n"
+                        ">0 = mmproj 体积先从预算中扣除, 余量按每层体积 (权重 + KV cache) 折算可上 GPU 的层数, 总占用不超过该值 (严格守上限).\n"
+                        "预算装不下 mmproj 时两者全留 CPU;\n"
+                        "扣除后不足主模型 1 层时主模型留在 CPU, mmproj 仍进显存.\n"
+                        "层体积为估算值, 实际占用可能略有偏差."
                     ),
                     "image_min_tokens": (
                         "mmproj 编码每张图片的最小 token 数, 可保证低分辨率图片的编码精细度.\n"
