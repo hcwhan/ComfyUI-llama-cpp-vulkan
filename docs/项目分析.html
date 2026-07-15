@@ -276,7 +276,7 @@ table.io td.dim{color:var(--muted)}
   <div class="brand">
     <div class="k">项目分析报告</div>
     <h1>ComfyUI<br>llama-cpp-<span>vulkan</span></h1>
-    <div class="v">v2.0.0 · 2026-07-13 · commit bf4ba1e</div>
+    <div class="v">v2.1.0 · 2026-07-15 · commit d31eb4c</div>
   </div>
   <button class="nav-btn" data-view="overview"><span class="num">01</span>概览</button>
   <button class="nav-btn" data-view="flow"><span class="num">02</span>数据流图</button>
@@ -289,7 +289,7 @@ table.io td.dim{color:var(--muted)}
 <main class="main">
 
 <div style="margin:0 0 28px;padding:10px 16px;border:1px solid var(--line2);border-left:3px solid var(--accent);border-radius:8px;background:var(--surface2);color:var(--muted);font-size:13px">
-  本报告生成于 commit <code>bf4ba1e</code>, 不会自动跟随后续代码变更, 仅供参考; 当前实现以仓库源码与 AGENTS.md 为准.
+  本报告生成于 commit <code>d31eb4c</code>, 不会自动跟随后续代码变更, 仅供参考; 当前实现以仓库源码与 AGENTS.md 为准.
 </div>
 
 <!-- ================= 概览 ================= -->
@@ -297,16 +297,17 @@ table.io td.dim{color:var(--muted)}
   <div class="view-head">
     <div class="eyebrow">Overview</div>
     <h2>基于 llama.cpp 的 ComfyUI 本地 LLM / VLM 推理插件</h2>
-    <p>通过自编译的 Vulkan 版 llama-cpp-python 在 ComfyUI 中运行 GGUF 大模型, 提供文本, 图片, 视频帧, 音频四种模态的推理节点, 以及围绕 LLM 结构化输出的 JSON / BBox 后处理工具链. GPU 加速走 Vulkan 路径, 与 PyTorch 的 CUDA / ROCm 完全独立.</p>
+    <p>通过自编译的 Vulkan 版 llama-cpp-python 在 ComfyUI 中运行 GGUF 大模型, 提供文本, 图片, 视频帧, 音频四种模态的推理节点, 以及围绕 LLM 结构化输出的 JSON / BBox 后处理工具链. GPU 加速走 Vulkan 路径, 与 PyTorch 的 CUDA / ROCm 完全独立. 全部用户可见文案与控制台日志经 i18n 文案层提供 zh-CN / en-US 双语.</p>
   </div>
 
   <div class="stat-grid">
     <div class="stat"><div class="n">16</div><div class="l">注册节点</div></div>
     <div class="stat"><div class="n">4</div><div class="l">推理模态 text / image / video / audio</div></div>
-    <div class="stat"><div class="n">34</div><div class="l">VLM Chat Handler</div></div>
+    <div class="stat"><div class="n">26</div><div class="l">VLM Chat Handler</div></div>
     <div class="stat"><div class="n">13</div><div class="l">任务预设模板</div></div>
     <div class="stat"><div class="n">12</div><div class="l">系统提示词增强预设</div></div>
     <div class="stat"><div class="n">2</div><div class="l">平台 Windows / Linux</div></div>
+    <div class="stat"><div class="n">2</div><div class="l">UI 语言 zh-CN / en-US</div></div>
   </div>
 
   <div class="overview-cols">
@@ -314,18 +315,18 @@ table.io td.dim{color:var(--muted)}
       <h3>架构分层</h3>
       <div class="arch">
         <div class="arch-tier">
-          <div class="t">节点层 · src/nodes/</div>
-          <div class="d">16 个节点声明: model(4) + instruct(4) + bbox(4) + util(4) + 注册表</div>
+          <div class="t">节点层 · src/nodes/ + web/</div>
+          <div class="d">16 个节点声明: model(4) + instruct(4) + bbox(4) + util(4) + 注册表; 前端 widget 联动 JS</div>
         </div>
         <div class="arch-sep">&darr;</div>
         <div class="arch-tier">
-          <div class="t">核心层 · src/core/ + src/shared/</div>
-          <div class="d">storage / instruct / devices / handlers / prompts / gguf_layers / model_paths / cqdm / text_utils / types / logger</div>
+          <div class="t">核心层 · src/core/ + src/shared/ + src/i18n/</div>
+          <div class="d">storage / instruct / devices / handlers / prompts / gguf_layers / model_paths / cqdm · text_utils / encoding / types / logger · lang / language_* / common_static</div>
         </div>
         <div class="arch-sep">&darr;</div>
         <div class="arch-tier">
           <div class="t">运行时 · llama-cpp-python 0.3.42+vulkan</div>
-          <div class="d">JamePeng 分支自编译 ABI3 wheel, mtmd 多模态解码, 34 种 chat handler</div>
+          <div class="d">JamePeng 分支自编译 ABI3 wheel, mtmd 多模态解码, 24 个 chat handler 类</div>
         </div>
         <div class="arch-sep">&darr;</div>
         <div class="arch-tier">
@@ -337,7 +338,7 @@ table.io td.dim{color:var(--muted)}
     <div>
       <div class="panel" style="margin-bottom:20px">
         <h3>类型隔离设计</h3>
-        <p><b>llm Model Loader</b> 输出 <code>LLAMACPPLLM</code>, 只能连 text Instruct; <b>vlm Model Loader</b> 输出 <code>LLAMACPPVLM</code>, 只能连 image / video / audio Instruct. 连错在连线阶段即被 ComfyUI 类型系统拦截, 两种配置底层共用同一条加载路径.</p>
+        <p><b>LLM Model Loader</b> 输出 <code>LLAMACPPLLM</code>, 只能连 Text Instruct; <b>VLM Model Loader</b> 输出 <code>LLAMACPPVLM</code>, 只能连 Image / Video / Audio Instruct. 连错在连线阶段即被 ComfyUI 类型系统拦截, 两种配置底层共用同一条加载路径.</p>
         <p>采样参数节点输出 <code>LLAMACPPARAMS</code>, 是全部 Instruct 节点的可选输入.</p>
       </div>
       <div class="panel">
@@ -467,6 +468,11 @@ const PRESETS_IMAGE = '空白 - 空 | 常规 - 描述 | 创意 - 图片分析 | 
 const PRESETS_VIDEO = '空白 - 空 | 常规 - 描述 | 创意 - 视频总结 | 创意 - 短篇故事 | 提示词风格 - 标签 / 简洁 / 详细 / 极致详细 / 电影感';
 const PRESETS_AUDIO = '空白 - 空 | 常规 - 描述 | 常规 - 转写';
 
+function seedInput(){
+  return [
+    {n:'seed', t:'INT', d:'0', r:'0 ~ 4294967294', tip:'32 位种子; 上限 0xFFFFFFFE, 避开 llama.cpp 的随机种子哨兵值 0xFFFFFFFF(落在该值会静默失去可复现性)'}
+  ];
+}
 function promptInputs(presetList, defaultPreset){
   return [
     {n:'preset_prompt', t:'COMBO', d:defaultPreset, r:presetList, tip:'任务预设模板, 按模态过滤显示; 模板中 @@@ 按模态替换为 图像/视频/音频'},
@@ -476,9 +482,8 @@ function promptInputs(presetList, defaultPreset){
 }
 function runtimeInputs(){
   return [
-    {n:'seed', t:'INT', d:'0', r:'0 ~ 4294967294', tip:'32 位种子; 上限 0xFFFFFFFE, 避开 llama.cpp 的随机种子哨兵值 0xFFFFFFFF(落在该值会静默失去可复现性)'},
-    {n:'force_offload', t:'BOOLEAN', d:'false', r:'开 / 关', tip:'推理结束后立即卸载模型释放显存'},
-    {n:'strip_thinking', t:'BOOLEAN', d:'true', r:'开 / 关', tip:'移除输出中的思考/推理块(&lt;think&gt; 块, Gemma4 channel 格式, GLM-4.1V &lt;answer&gt; 包裹), Thinking 模型适用'}
+    {n:'strip_thinking', t:'BOOLEAN', d:'true', r:'开 / 关', tip:'移除输出中的思考/推理块(&lt;think&gt; 块, Gemma4 channel 格式, GLM-4.1V &lt;answer&gt; 包裹), Thinking 模型适用'},
+    {n:'force_offload', t:'BOOLEAN', d:'true', r:'开 / 关', tip:'推理结束后立即卸载模型释放显存; 关闭时模型常驻显存, 下次执行免重新加载'}
   ];
 }
 function optionalInputs(){
@@ -491,16 +496,16 @@ function optionalInputs(){
 /* ============ 16 个节点数据 ============ */
 const NODES = [
 {
-  id:'llama_cpp_llm_model_loader', name:'llama.cpp llm Model Loader', group:'model',
+  id:'llama_cpp_llm_model_loader', name:'llama.cpp LLM Model Loader', group:'model',
   file:'src/nodes/model/node_loaders.py',
   desc:'加载<b>纯文本 GGUF 模型</b>的配置节点. 只做快速失败校验(模型路径存在等)并输出配置 dict, <b>不实际加载模型</b> - 实际加载由下游 Instruct 节点按需触发(懒加载).',
   inputs:[
-    {n:'gpu_device', t:'COMBO', d:'Auto (独显优先)', r:'Auto + 可达 GPU 设备列表', tip:'Auto 走 llama.cpp 默认行为(独显优先, 多独显按层切分); 显式选择时整个模型加载到该单卡'},
-    {n:'model', t:'COMBO', d:'None', r:'llm/LLM 目录下全部 GGUF(自动排除文件名含 mmproj 的)', tip:'主模型文件'},
-    {n:'n_ctx', t:'INT', d:'8192', r:'1024 ~ 327680, 步进 128', tip:'上下文长度上限, 参与显存折算'},
+    {n:'gpu_device', t:'COMBO', d:'Auto (GPU First)', r:'Auto + 可达 GPU 设备列表', tip:'Auto 走 llama.cpp 默认行为(独显优先, 多独显按层切分); 显式选择时整个模型加载到该单卡'},
+    {n:'model', t:'COMBO', d:'None', r:'llm/LLM 目录下全部 GGUF(自动排除文件名含 mmproj 的)', tip:'主模型文件, 默认 "None" 强制显式选择'},
+    {n:'ctx_size', t:'INT', d:'8192', r:'1024 ~ 327680, 步进 128', tip:'上下文长度上限(即 llama.cpp 的 n_ctx), 参与显存折算'},
     {n:'vram_limit', t:'INT', d:'-1', r:'-1 ~ 1024 (GB)', tip:'显存占用上限: -1 自动(llama.cpp 按空闲显存适配层数), 0 纯 CPU 推理, 正数按 GGUF 层数折算 n_gpu_layers'}
   ],
-  outputs:[{n:'llm_model', t:'LLAMACPPLLM', tip:'模型配置 dict(mmproj / chat_handler 固定为 "None")'}],
+  outputs:[{n:'llm_model', t:'LLAMACPPLLM', tip:'模型配置 dict(mmproj / chat_handler 固定为 "None", thinking 固定 False)'}],
   up:[], upExt:[],
   down:['llama_cpp_text_instruct'], downExt:[],
   notes:[
@@ -510,35 +515,40 @@ const NODES = [
   ]
 },
 {
-  id:'llama_cpp_vlm_model_loader', name:'llama.cpp vlm Model Loader', group:'model',
+  id:'llama_cpp_vlm_model_loader', name:'llama.cpp VLM Model Loader', group:'model',
   file:'src/nodes/model/node_loaders.py',
   desc:'加载<b>多模态 VLM 模型</b>的配置节点, mmproj(视觉/音频编码器)与 chat_handler 均为必选. 同样只校验不加载.',
   inputs:[
-    {n:'gpu_device', t:'COMBO', d:'Auto (独显优先)', r:'Auto + 可达 GPU 设备列表', tip:'同 llm Loader'},
-    {n:'model', t:'COMBO', d:'None', r:'llm/LLM 目录下全部 GGUF(排除 mmproj)', tip:'主模型文件'},
-    {n:'mmproj', t:'COMBO', d:'-', r:'文件名含 mmproj 的 GGUF 列表', tip:'视觉/音频编码器, 必选; 缺失时报错并提示改用 llm Loader'},
-    {n:'chat_handler', t:'COMBO', d:'None', r:'34 种(Qwen3.6/3.5 / Qwen3-VL / Qwen2.5-VL / Qwen3-ASR / GLM-4.6V·4.1V / Gemma3·4 / MiniCPM-v2.6~4.6 / Step3-VL / LFM2·2.5-VL / DeepSeek-OCR / PaddleOCR-VL / MinerU2.5-Pro / Granite-Docling / LLaVA 系等, 含 -Thinking 变体, Generic-MTMD 兜底)', tip:'必须与模型格式配对; 带 -Thinking 后缀自动打开思考开关; 默认 "None" 强制用户显式选择, 避免首个 handler 被误用于不匹配的模型'},
-    {n:'n_ctx', t:'INT', d:'8192', r:'1024 ~ 327680, 步进 128', tip:'上下文长度上限'},
+    {n:'gpu_device', t:'COMBO', d:'Auto (GPU First)', r:'Auto + 可达 GPU 设备列表', tip:'同 LLM Loader'},
+    {n:'model', t:'COMBO', d:'None', r:'llm/LLM 目录下全部 GGUF(排除 mmproj)', tip:'主模型文件, 默认 "None" 强制显式选择'},
+    {n:'mmproj', t:'COMBO', d:'None', r:'文件名含 mmproj 的 GGUF 列表', tip:'视觉/音频编码器, 必选(默认 "None" 强制显式选择配对文件); 缺失时报错并提示改用 LLM Loader'},
+    {n:'chat_handler', t:'COMBO', d:'None', r:'26 种(Qwen3.6/3.5 / Qwen3-VL / Qwen2.5-VL / (ASR) Qwen3-ASR / GLM-4.6V·4.1V / Gemma3·4 / MiniCPM-v2.6·4.5·4.6 / Step3-VL / LFM2·2.5-VL / (OCR) DeepSeek-OCR·PaddleOCR-VL-1.5·MinerU2.5-Pro·Granite-Docling / LLaVA 系等早期模型, -Generic- 兜底)', tip:'必须与模型格式配对; 默认 "None" 强制用户显式选择, 避免首个 handler 被误用于不匹配的模型; 按家族聚组排序(新版本在前), OCR/ASR 类带前缀标注'},
+    {n:'thinking', t:'BOOLEAN', d:'false', r:'开 / 关', tip:'思考(reasoning)模式开关, 构造期参数(切换后下次执行整体重载); 按 handler 三态元数据生效: 可切换 / 不支持(强制关) / 强制思考(强制开), 前端 JS 自动置灰, 后端 clamp_thinking 钳制兜底'},
+    {n:'ctx_size', t:'INT', d:'16384', r:'1024 ~ 327680, 步进 128', tip:'上下文长度上限; 默认取 LLM Loader 的 2 倍(媒体 token 经 mmproj 编码直接占用上下文)'},
     {n:'vram_limit', t:'INT', d:'-1', r:'-1 ~ 1024 (GB)', tip:'显存上限; mmproj 体积会先从预算中扣除'},
-    {n:'image_min_tokens', t:'INT', d:'0', r:'0 ~ 4096, 步进 32', tip:'视觉 token 下限, 0 视为未设置'},
-    {n:'image_max_tokens', t:'INT', d:'0', r:'0 ~ 4096, 步进 32', tip:'视觉 token 上限, 0 视为未设置; max < min 时在 loader 侧提前报错'}
+    {n:'image_min_tokens', t:'INT', d:'0', r:'0 ~ 4096, 步进 32', tip:'mmproj 编码每张图片的 token 数下限, 0 视为未设置; 仅对图像/视频生效, 仅在视觉类 handler 下显示(前端 JS 联动)'},
+    {n:'image_max_tokens', t:'INT', d:'0', r:'0 ~ 4096, 步进 32', tip:'mmproj 编码每张图片的 token 数上限, 0 视为未设置; max < min 时在 loader 侧提前报错, 前端另做区间互钳'}
   ],
-  outputs:[{n:'vlm_model', t:'LLAMACPPVLM', tip:'模型配置 dict'}],
+  outputs:[{n:'vlm_model', t:'LLAMACPPVLM', tip:'模型配置 dict(thinking 已按 handler 三态钳制为实际生效值)'}],
   up:[], upExt:[],
   down:['llama_cpp_image_instruct','llama_cpp_video_instruct','llama_cpp_audio_instruct'], downExt:[],
   notes:[
     '<b>类型隔离</b>: 输出 LLAMACPPVLM 只能连 image / video / audio Instruct',
-    'mmproj 与 chat_handler 的配对合法性由 resolve_config() 统一校验(选了 handler 没选 mmproj, 或反之, 均有明确报错)',
-    'Generic-MTMD 兜底 handler 渲染 GGUF 内置 chat template 并归一化媒体占位符, 适配没有专用 handler 的 VLM'
+    'mmproj 与 chat_handler 的配对合法性由 resolve_config() 统一校验(选了 handler 没选 mmproj, 或反之, 均有明确报错); 名字未知与 wheel 缺类是两种不同报错',
+    '<b>thinking 三态</b>: 注册表按 handler 记录 可切换(enable_thinking / force_reasoning)/ 不支持 / 强制思考; 前端按透传的 thinking_modes 置灰开关, 后端 clamp_thinking 钳制绕过 UI 的提交',
+    'image_min/max_tokens 仅在视觉类 handler 下显示(音频专用的 Qwen3-ASR 与 "None" 隐藏); 音频专用 handler 下两值折算为 0 落盘, widget 值本身保留',
+    '-Generic- 兜底 handler 渲染 GGUF 内置 chat template 并归一化媒体占位符, 适配没有专用 handler 的 VLM'
   ]
 },
 {
-  id:'llama_cpp_text_instruct', name:'llama.cpp text Instruct', group:'instruct',
-  file:'src/nodes/type/text/node_instruct.py',
+  id:'llama_cpp_text_instruct', name:'llama.cpp Text Instruct', group:'instruct',
+  file:'src/nodes/instruct/text/node_instruct.py',
   desc:'<b>纯文本推理</b>节点, 典型用途是文生图提示词改写与增强. 只接受 LLAMACPPLLM 配置. 预设模板的 @@@ 占位符按文生图语境替换为"图像".',
   inputs:[
-    {n:'llm_model', t:'LLAMACPPLLM', port:true, d:'-', r:'-', tip:'来自 llm Model Loader'},
+    {n:'llm_model', t:'LLAMACPPLLM', port:true, d:'-', r:'-', tip:'来自 LLM Model Loader'},
+    ...seedInput(),
     ...promptInputs(PRESETS_TEXT,'空白 - 空'),
+    {n:'allow_thinking', t:'BOOLEAN', d:'false', r:'开 / 关', tip:'允许 Thinking 模型输出思考过程; 关闭时以 reasoning_budget=0 让思考块开启即强制闭合(请求期参数, 切换零成本, 非思考模型自动失效)'},
     ...runtimeInputs(), ...optionalInputs()
   ],
   outputs:[
@@ -550,43 +560,46 @@ const NODES = [
     '<b>无会话状态</b>: 每次执行都是全新请求(system + 本次提问), 不保留对话历史',
     '预设含 ### 时 custom_prompt 必填(填入占位符); 不含 ### 时非空 custom_prompt 整体覆盖预设',
     '<b>空请求拦截</b>: 最终 user 文本为空(空白预设 + 空 custom_prompt)时直接报错 - text 路径无媒体载荷, 空请求只会白白加载模型; 拦截发生在模型加载之前',
+    '<b>allow_thinking 放本节点而非 loader</b>: text 侧 wheel 无模板级思考开关, reasoning_budget 采样器是唯一通用机制(与 vlm 侧构造期开关的位置不对称是机制差异的忠实反映); 模板预注入 &lt;think&gt; 的形态无法被抑制, 残留思考块由 strip_thinking 剥离',
     '推理期间可被 ComfyUI 的 Cancel 立即中断(InterruptWatcher)',
     '纯文本路径的消息 content 扁平化为字符串, 兼容假定 content 是字符串的旧式 GGUF 内嵌模板(ChatML / Llama-3 / Mistral 等)'
   ]
 },
 {
-  id:'llama_cpp_image_instruct', name:'llama.cpp image Instruct', group:'instruct',
-  file:'src/nodes/type/media/image/node_instruct.py',
-  desc:'<b>图片推理</b>节点, 支持两种模式: <b>逐张推理</b>(每张图各得一条结果, 带前端进度条)与<b>批量单请求</b>(全部图片并入同一条消息一次推理).',
+  id:'llama_cpp_image_instruct', name:'llama.cpp Image Instruct', group:'instruct',
+  file:'src/nodes/instruct/media/image/node_instruct.py',
+  desc:'<b>图片推理</b>节点, mode 下拉框切换两种模式: <b>Per-Image 逐张推理</b>(每张图各得一条结果, 带前端进度条)与 <b>Batch 批量单请求</b>(全部图片并入同一条消息一次推理).',
   inputs:[
-    {n:'vlm_model', t:'LLAMACPPVLM', port:true, d:'-', r:'-', tip:'来自 vlm Model Loader'},
+    {n:'vlm_model', t:'LLAMACPPVLM', port:true, d:'-', r:'-', tip:'来自 VLM Model Loader'},
     {n:'images', t:'IMAGE', port:true, d:'-', r:'-', tip:'图片批次(可多张)'},
+    ...seedInput(),
     ...promptInputs(PRESETS_IMAGE,'空白 - 空'),
-    {n:'batch_images', t:'BOOLEAN', d:'false', r:'开 / 关', tip:'关 = 逐张推理各得一条结果; 开 = 全部图片并入单次请求'},
-    {n:'max_size', t:'INT', d:'256', r:'128 ~ 16384, 步进 64', tip:'批量模式下多图的最大边长; 单图始终保持原分辨率'},
+    {n:'mode', t:'COMBO', d:'Per-Image', r:'Per-Image / Batch', tip:'Per-Image = 逐张推理各得一条结果; Batch = 全部图片并入单次请求'},
+    {n:'max_size', t:'INT', d:'256', r:'128 ~ 16384, 步进 64', tip:'Batch 模式下多图的最大边长; 单图始终保持原分辨率; 仅在 Batch 档显示(前端 JS 按透传的 batch_mode_value 联动, 隐藏值仍序列化)'},
     ...runtimeInputs(), ...optionalInputs()
   ],
   outputs:[
-    {n:'output', t:'STRING', tip:'推理结果文本; 逐张模式的多图结果以 "====== Image N ======" 分隔行拼接为整段文本'}
+    {n:'output', t:'STRING', tip:'推理结果文本; Per-Image 模式的多图结果以 "======== Image N ========" 前缀行(N 从 1 起)拼接为整段文本, 单图直接输出'}
   ],
   up:['llama_cpp_vlm_model_loader','llama_cpp_parameters','system_prompt_preset'], upExt:['Load Image 等图像源'],
   down:['json_to_bboxes','split_instruct_output','parse_json_node','remove_code_block','llama_cpp_unload_model'], downExt:['CLIP Text Encode 等任意文本消费节点'],
   notes:[
-    '逐张模式的拼接输出可用 Split Instruct Output 节点拆回逐张列表; JSON to BBoxes 内建同款拆分, output 可直连',
-    '逐张模式下每张图前检查中断标志, 可随时取消; 进度同时驱动 ComfyUI 前端进度条与终端 tqdm(cqdm)',
+    'Per-Image 模式的拼接输出可用 Split Instruct Output 节点拆回逐张列表; JSON to BBoxes 内建同款拆分, output 可直连',
+    'Per-Image 模式下每张图前检查中断标志, 可随时取消; 进度同时驱动 ComfyUI 前端进度条与终端 tqdm(cqdm)',
     '搭配"视觉 - BBox 目标检测"预设 + JSON to BBoxes 可组成开放词汇目标检测工作流',
     'require_mmproj() 兜底校验: 加载的模型没有 mmproj 时给出明确报错'
   ]
 },
 {
-  id:'llama_cpp_video_instruct', name:'llama.cpp video Instruct', group:'instruct',
-  file:'src/nodes/type/media/video/node_instruct.py',
+  id:'llama_cpp_video_instruct', name:'llama.cpp Video Instruct', group:'instruct',
+  file:'src/nodes/instruct/media/video/node_instruct.py',
   desc:'<b>视频帧序列推理</b>节点. 输入为 IMAGE 帧批次(ComfyUI 生态的视频通行形态, 如 VHS Load Video 或视频模型 VAE Decode 的输出), 按 max_frames 均匀抽帧后一次性推理.',
   inputs:[
-    {n:'vlm_model', t:'LLAMACPPVLM', port:true, d:'-', r:'-', tip:'来自 vlm Model Loader'},
+    {n:'vlm_model', t:'LLAMACPPVLM', port:true, d:'-', r:'-', tip:'来自 VLM Model Loader'},
     {n:'frames', t:'IMAGE', port:true, d:'-', r:'-', tip:'IMAGE 帧批次形式的视频帧'},
+    ...seedInput(),
     ...promptInputs(PRESETS_VIDEO,'空白 - 空'),
-    {n:'max_frames', t:'INT', d:'24', r:'2 ~ 1024', tip:'均匀采样的帧数上限(linspace 等间隔取帧, clamp 到实际帧数避免重复采样)'},
+    {n:'max_frames', t:'INT', d:'30', r:'2 ~ 1024', tip:'均匀采样的帧数上限(linspace 等间隔取帧, 首尾帧恒被抽取, clamp 到实际帧数避免重复采样)'},
     {n:'max_size', t:'INT', d:'256', r:'128 ~ 16384, 步进 64', tip:'采样帧的最大边长; 单帧保持原分辨率'},
     ...runtimeInputs(), ...optionalInputs()
   ],
@@ -601,12 +614,13 @@ const NODES = [
   ]
 },
 {
-  id:'llama_cpp_audio_instruct', name:'llama.cpp audio Instruct', group:'instruct',
-  file:'src/nodes/type/media/audio/node_instruct.py',
+  id:'llama_cpp_audio_instruct', name:'llama.cpp Audio Instruct', group:'instruct',
+  file:'src/nodes/instruct/media/audio/node_instruct.py',
   desc:'<b>音频推理</b>节点, 服务 ASR / omni 模型(如 Qwen3-ASR), 可做语音转写, 音频内容描述.',
   inputs:[
     {n:'vlm_model', t:'LLAMACPPVLM', port:true, d:'-', r:'-', tip:'需搭配支持音频的 mmproj(如 Qwen3-ASR)'},
     {n:'audio', t:'AUDIO', port:true, d:'-', r:'-', tip:'ComfyUI AUDIO dict(waveform + sample_rate)'},
+    ...seedInput(),
     ...promptInputs(PRESETS_AUDIO,'空白 - 空'),
     ...runtimeInputs(), ...optionalInputs()
   ],
@@ -624,9 +638,9 @@ const NODES = [
 {
   id:'llama_cpp_parameters', name:'llama.cpp Parameters', group:'model',
   file:'src/nodes/model/node_parameters.py',
-  desc:'<b>采样参数配置</b>节点, 把 12 项参数打包成 kwargs dict, 原样透传给 create_chat_completion. 是全部 Instruct 节点的可选输入.',
+  desc:'<b>采样参数配置</b>节点, 把 12 项参数打包成 kwargs dict 透传给 create_chat_completion(UI 键 max_gen_tokens 由 Instruct 执行时映射回库参数 max_tokens). 是全部 Instruct 节点的可选输入.',
   inputs:[
-    {n:'max_tokens', t:'INT', d:'8192', r:'0 ~ 65536', tip:'生成 token 数上限; 0 = 不限制(受 n_ctx 约束)'},
+    {n:'max_gen_tokens', t:'INT', d:'0', r:'0 ~ 65536', tip:'单次生成 token 数上限; 0 = 不限制(实际受 ctx_size - prompt tokens 约束, 达到上限时静默截断)'},
     {n:'top_k', t:'INT', d:'40', r:'0 ~ 1000', tip:'只保留概率最高的 K 个候选再采样; 0 = 不裁剪'},
     {n:'top_p', t:'FLOAT', d:'0.95', r:'0.0 ~ 1.0', tip:'核采样: 按概率累计到 p 截断候选集; 1.0 = 禁用'},
     {n:'min_p', t:'FLOAT', d:'0.05', r:'0.0 ~ 1.0', tip:'相对概率下限: 剔除低于 最高候选概率 × min_p 的候选; 0 = 禁用'},
@@ -644,6 +658,7 @@ const NODES = [
   down:['llama_cpp_text_instruct','llama_cpp_image_instruct','llama_cpp_video_instruct','llama_cpp_audio_instruct'], downExt:[],
   notes:[
     'widget 默认值与 Instruct 未连接 parameters 端口时的生效值同源(core/instruct.py 的 DEFAULT_SAMPLING_PARAMS), 连不连默认参数节点行为一致',
+    'tooltip 末行的 "默认 N" 由代码按 DEFAULT_SAMPLING_PARAMS 自动填充, 与实际生效值同源',
     'Instruct 侧执行时合并生成新 dict 兼作防御性复制, 避免污染 ComfyUI 缓存的共享参数对象'
   ]
 },
@@ -667,13 +682,13 @@ const NODES = [
   desc:'<b>解析 JSON 字符串</b>并按点分 key 下钻取值(如 <code>a.b.c</code>), 同时输出五种类型, 接什么下游就取哪个口.',
   inputs:[
     {n:'input', t:'STRING', port:true, d:'-', r:'forceInput', tip:'JSON 字符串(自动剥离代码围栏后解析)'},
-    {n:'key', t:'STRING', d:'""', r:'点分路径', tip:'必填(为空时报错); 支持嵌套下钻, 遇到 JSON-in-string 字段会自动再解析'},
+    {n:'key', t:'STRING', d:'""', r:'点分路径', tip:'必填(为空时报错); 支持嵌套下钻与数组下标(如 items.0.label, 负数从尾部倒数), 遇到 JSON-in-string 字段会自动再解析'},
     {n:'default', t:'STRING', opt:true, d:'-', r:'-', tip:'key 不存在或无法下钻时的回落值'}
   ],
   outputs:[
     {n:'any', t:'*', tip:'原始取值(保持类型)'},
     {n:'string', t:'STRING', tip:'dict/list 输出合法 JSON 文本(可再接 Parse JSON), None 输出空串, 其余为 str() 结果'},
-    {n:'int', t:'INT', tip:'转换失败回退 0; 大整数不经 float 中转, 雪花 ID 不丢精度'},
+    {n:'int', t:'INT', tip:'转换失败回退 0(含 Infinity 的 OverflowError); 大整数不经 float 中转, 雪花 ID 不丢精度'},
     {n:'float', t:'FLOAT', tip:'转换失败回退 0.0'},
     {n:'boolean', t:'BOOLEAN', tip:'bool 原值; 数字按非零判定; 文本仅 "true"(忽略大小写)为真'}
   ],
@@ -683,12 +698,12 @@ const NODES = [
 },
 {
   id:'json_to_bboxes', name:'JSON to BBoxes', group:'bbox',
-  file:'src/nodes/type/media/bbox/node_bbox.py',
+  file:'src/nodes/bbox/node_json_to_bboxes.py',
   desc:'把 LLM 输出的检测 JSON(<code>{"bbox_2d":[x1,y1,x2,y2],"label":"..."}</code> 列表)转换为<b>像素坐标 BBox</b>, 可选输出画框预览图. BBox 检测工作流的枢纽节点.',
   inputs:[
-    {n:'json', t:'STRING', port:true, d:'-', r:'forceInput, 列表输入', tip:'LLM 输出的 JSON(自动剥离代码围栏); 内建拆分 image Instruct 逐张模式的 "====== Image N ======" 分隔行, output 可直连'},
-    {n:'mode', t:'COMBO', d:'simple', r:'simple / Qwen3-VL / Qwen2.5-VL', tip:'simple 视为已是原图像素坐标; Qwen3-VL 将 0~1000 归一化坐标按图像尺寸换算; Qwen2.5-VL 输出的是内部 smart_resize 空间的绝对坐标, 按 原图/resize 比例还原(Qwen 模式必须连 image; Qwen2.5-VL 需逐张模式, loader 改过 image_min/max_tokens 时换算有偏差)'},
-    {n:'label', t:'STRING', d:'""', r:'-', tip:'非空时只保留指定 label 的 BBox(兼容 label / text_content 两种字段, 匹配忽略大小写与首尾空格)'},
+    {n:'json', t:'STRING', port:true, d:'-', r:'forceInput, 列表输入', tip:'LLM 输出的 JSON(自动剥离代码围栏); 内建拆分 image Instruct Per-Image 模式的 "======== Image N ========" 前缀行, output 可直连'},
+    {n:'mode', t:'COMBO', d:'Simple', r:'Simple / Qwen3-VL / Qwen2.5-VL', tip:'Simple 视为已是原图像素坐标; Qwen3-VL 将 0~1000 归一化坐标按图像尺寸换算; Qwen2.5-VL 输出的是内部 smart_resize 空间的绝对坐标, 按 原图/resize 比例还原(Qwen 模式必须连 image; Qwen2.5-VL 需 Per-Image 模式或 Batch 单图, loader 改过 image_min/max_tokens 时换算有偏差)'},
+    {n:'label', t:'STRING', d:'""', r:'-', tip:'非空时只保留指定 label 的 BBox(兼容 label / text_content 两种字段, 匹配忽略大小写与首尾空格, 数字标签强转 str 后匹配)'},
     {n:'image', t:'IMAGE', port:true, opt:true, d:'-', r:'-', tip:'用于坐标换算与画框预览'}
   ],
   outputs:[
@@ -700,13 +715,14 @@ const NODES = [
   notes:[
     'INPUT_IS_LIST + OUTPUT_IS_LIST: JSON 与图像帧按索引配对; JSON 多于帧时复用末帧并作为单帧批次追加, 帧多于 JSON 时尾部帧原样透传(均打 warning), image_list 总帧数与 bboxes 组数保持对齐',
     '模型只检出单个目标直接输出对象(非列表)时自动包装为列表',
-    '画框颜色由 label 内容哈希生成, 同一 label 每次运行颜色一致; 画框失败不中断, 回退原图',
+    '逐段解析失败的报错带分段序号 JSON #N(从 1 起, 与前缀行 Image N 对齐), 便于定位坏段',
+    '画框颜色由 label 内容哈希生成, 同一 label 每次运行颜色一致; 画框逐框容错, 单个坏框跳过并打 warning, 不放弃整张图; 整图画框失败回退原图',
     '画框帧与回退/透传帧统一 .cpu(), 避免 --gpu-only 下 torch.cat 混拼报 device mismatch'
   ]
 },
 {
   id:'bboxes_to_segs', name:'BBoxes to SEGS', group:'bbox',
-  file:'src/nodes/type/media/bbox/node_bbox.py',
+  file:'src/nodes/bbox/node_bboxes_to_segs.py',
   desc:'把 BBox 转换为 <b>Impact Pack 兼容的 SEGS</b> 格式, 供 Detailer 等节点做局部重绘.',
   inputs:[
     {n:'bboxes', t:'BBOX', port:true, d:'-', r:'-', tip:'来自 JSON to BBoxes 或 BBoxes to BBox'},
@@ -727,7 +743,7 @@ const NODES = [
 },
 {
   id:'bboxes_to_mask', name:'BBoxes to MASK', group:'bbox',
-  file:'src/nodes/type/media/bbox/node_bbox.py',
+  file:'src/nodes/bbox/node_bboxes_to_mask.py',
   desc:'把 BBox 转换为<b>整图遮罩 MASK</b>, 多个框取 maximum 合并, 支持扩张与边缘羽化, 供重绘 / 合成使用.',
   inputs:[
     {n:'bboxes', t:'BBOX', port:true, d:'-', r:'-', tip:'来自 JSON to BBoxes 或 BBoxes to BBox'},
@@ -735,14 +751,14 @@ const NODES = [
     {n:'dilation', t:'INT', d:'10', r:'0 ~ 200', tip:'遮罩区域向外扩张的像素数(与 BBoxes to SEGS 的 dilation 语义一致)'},
     {n:'feather', t:'INT', d:'0', r:'0 ~ 100', tip:'高斯羽化强度 (sigma)'}
   ],
-  outputs:[{n:'mask', t:'MASK', tip:'[1,H,W] 浮点遮罩'}],
+  outputs:[{n:'mask', t:'MASK', tip:'[1,H,W] 浮点遮罩(恒在 CPU 上构建与输出, 与 JSON to BBoxes 的 image_list 策略一致)'}],
   up:['json_to_bboxes','bboxes_to_bbox'], upExt:['Load Image 等图像源'],
   down:[], downExt:['Inpaint / 遮罩合成等 MASK 消费节点'],
   notes:['羽化在含 4σ 边距的局部窗口内计算而非全图, 每个 bbox 的代价不随图像尺寸增长']
 },
 {
   id:'bboxes_to_bbox', name:'BBoxes to BBox', group:'bbox',
-  file:'src/nodes/type/media/bbox/node_bbox.py',
+  file:'src/nodes/bbox/node_bboxes_to_bbox.py',
   desc:'从多组 BBox 中按<b>二级索引</b>(第几张图 &rarr; 第几个框)选取特定框, 用于只处理检测结果中的某一个目标.',
   inputs:[
     {n:'bboxes', t:'BBOX', port:true, d:'-', r:'列表输入', tip:'来自 JSON to BBoxes 的分组列表'},
@@ -766,22 +782,23 @@ const NODES = [
   down:[], downExt:['任意文本消费节点'],
   notes:[
     '首尾两端独立匹配: 生成被截断导致围栏未闭合时, 开头的标记仍能正常剥离',
+    '兼容 "``` json" 标签前带空格的形态(CommonMark 允许, 少数模型会输出)',
     '模型输出"好的, 结果如下:"之类前导说明时, 回退为提取文本中第一个完整围栏块的内容'
   ]
 },
 {
   id:'split_instruct_output', name:'Split Instruct Output', group:'util',
   file:'src/nodes/util/node_split_output.py',
-  desc:'把 image Instruct <b>逐张模式的拼接输出拆回字符串列表</b>(按 "====== Image N ======" 分隔行拆分), 输出列表语义的 STRING, 供第三方列表节点逐条 map 执行或整表接收.',
+  desc:'把 image Instruct <b>Per-Image 模式的拼接输出拆回字符串列表</b>(按 "======== Image N ========" 前缀行拆分), 输出列表语义的 STRING, 供第三方列表节点逐条 map 执行或整表接收.',
   inputs:[
-    {n:'text', t:'STRING', port:true, d:'-', r:'forceInput', tip:'image Instruct 逐张模式的 output(或任意文本)'}
+    {n:'text', t:'STRING', port:true, d:'-', r:'forceInput', tip:'image Instruct Per-Image 模式的 output(或任意文本)'}
   ],
-  outputs:[{n:'list', t:'STRING', list:true, tip:'逐张结果列表; 无分隔行时为单元素列表, 普通文本 / 单图结果可安全通过'}],
+  outputs:[{n:'list', t:'STRING', list:true, tip:'逐张结果列表; 无前缀行时为单元素列表, 普通文本 / 单图结果可安全通过'}],
   up:['llama_cpp_image_instruct'], upExt:['任意 STRING 源'],
   down:[], downExt:['第三方列表语义节点(逐条 map 或 INPUT_IS_LIST 整表接收)'],
   notes:[
-    '分隔行独占一行, 行首行尾锚定匹配, JSON 文本中的 \\n 转义不会产生真实分隔行, 不会被误拆',
-    '只丢弃首个分隔行之前的空首段; 中间/末尾的空结果保留为空字符串占位, 维持"第 i 段对应第 i 张图"的索引对齐'
+    '前缀行独占一行, 行首行尾锚定匹配, JSON 文本中的 \\n 转义不会产生真实前缀行, 不会被误拆; 拆分正则由 common_static 的前缀行模板派生, 生成端与识别端同源',
+    '只丢弃首个前缀行之前的空首段; 中间/末尾的空结果保留为空字符串占位, 维持"第 i 段对应第 i 张图"的索引对齐'
   ]
 },
 {
@@ -789,9 +806,9 @@ const NODES = [
   file:'src/nodes/util/node_system_prompt.py',
   desc:'输出 <b>12 种中文提示词增强系统提示词</b>, 覆盖主流图像 / 视频生成模型的官方改写规范, 连到 Instruct 节点的 system_prompt(转输入)即可让本地 LLM 按对应模型的口径改写提示词.',
   inputs:[
-    {n:'preset', t:'COMBO', d:'Qwen-Image', r:'Qwen-Image | Qwen-Image 2512 | Qwen-Image-Edit | Qwen-Image-Edit 2509 | Qwen-Image-Edit 2511 | Z-Image Turbo | Flux.2 T2I | Flux.2 I2I | Wan T2V | Wan I2V | Wan I2V 全自动 | Wan FLF2V', tip:'12 种预设, dict 声明顺序即下拉框顺序'}
+    {n:'preset', t:'COMBO', d:'None', r:'None | Qwen-Image | Qwen-Image 2512 | Qwen-Image-Edit | Qwen-Image-Edit 2509 | Qwen-Image-Edit 2511 | Z-Image Turbo | Flux.2 T2I | Flux.2 I2I | Wan T2V | Wan I2V | Wan I2V 全自动 | Wan FLF2V', tip:'"None" 占位在首位作为默认值(输出空串, 下游不注入 system 消息), 与 model / mmproj / chat_handler 的显式选择惯例一致; 其余 12 种预设按 dict 声明顺序排列'}
   ],
-  outputs:[{n:'system_prompt', t:'STRING', tip:'完整的中文系统提示词模板'}],
+  outputs:[{n:'system_prompt', t:'STRING', tip:'完整的中文系统提示词模板; 选 "None" 时为空串'}],
   up:[], upExt:[],
   down:['llama_cpp_text_instruct','llama_cpp_image_instruct','llama_cpp_video_instruct','llama_cpp_audio_instruct'], downExt:[],
   notes:['模板内容来自各模型官方 / 社区提示词改写规范(Qwen-Image 系列, Z-Image, Flux.2, Wan 2.x), 均为中文']
@@ -803,44 +820,46 @@ const FEATURES = [
 { g:'模型加载与硬件控制', items:[
   {t:'本地 GGUF 模型推理', d:'直接加载 ComfyUI-X/models/llm(及 extra_model_paths.yaml 挂载目录)下的 GGUF 量化模型, 无需外部 API.'},
   {t:'Vulkan GPU 加速', d:'跨厂商 GPU 通吃(AMD / NVIDIA / Intel), 与 PyTorch 的 CUDA / ROCm 完全独立, 适合 AMD 显卡等非 CUDA 环境.'},
-  {t:'GPU 设备选择', d:'下拉框列出可达 GPU 设备: Auto(独显优先, 多独显按层切分)或显式指定某张卡(整模型单卡加载).'},
+  {t:'GPU 设备选择', d:'下拉框列出可达 GPU 设备: Auto (GPU First)(独显优先, 多独显按层切分)或显式指定某张卡(整模型单卡加载).'},
   {t:'显存上限控制 (vram_limit)', d:'按 GB 设置上限, 自动折算加载到 GPU 的层数; -1 自动(llama.cpp 按空闲显存适配), 0 纯 CPU 推理.'},
-  {t:'34 种 VLM Chat Handler', d:'覆盖 Qwen3.6/3.5, Qwen3-VL, Qwen2.5-VL, Qwen3-ASR, GLM-4.6V/4.1V, Gemma3/4, MiniCPM-v2.6~4.6, Step3-VL, LFM2/2.5-VL, DeepSeek-OCR, PaddleOCR-VL, MinerU2.5-Pro, Granite-Docling, LLaVA 系等格式, 含 -Thinking 变体, Generic-MTMD 兜底.'},
+  {t:'26 种 VLM Chat Handler', d:'覆盖 Qwen3.6/3.5, Qwen3-VL, Qwen2.5-VL, (ASR) Qwen3-ASR, GLM-4.6V/4.1V, Gemma3/4, MiniCPM-v2.6/4.5/4.6, Step3-VL, LFM2/2.5-VL, (OCR) DeepSeek-OCR/PaddleOCR-VL-1.5/MinerU2.5-Pro/Granite-Docling, LLaVA 系等格式, -Generic- 兜底; 按家族聚组排序, OCR/ASR 带前缀标注.'},
+  {t:'thinking 开关 (VLM)', d:'vlm Loader 上的思考模式开关, 按 handler 三态元数据生效(可切换 / 不支持强制关 / 纯思考模型强制开), 前端自动置灰, 后端钳制兜底.'},
   {t:'llm / vlm 类型隔离', d:'两个 Loader 输出类型不同, 连错线在连线阶段即被 ComfyUI 拦截, 不用等到运行时报错.'},
-  {t:'视觉 token 控制', d:'vlm Loader 的 image_min_tokens / image_max_tokens 控制图像编码 token 数, 平衡精度与上下文占用.'}
+  {t:'视觉 token 控制', d:'vlm Loader 的 image_min_tokens / image_max_tokens 控制图像编码 token 数, 平衡精度与上下文占用; 仅在视觉类 handler 下显示, 前端做区间互钳.'},
+  {t:'双语界面文案', d:'全部节点文案(tooltip / placeholder / 报错)与控制台日志经 i18n 文案层提供 zh-CN / en-US 两份语言文件, 切换 lang.py 的 LANGUAGE 常量即可换语言.'}
 ]},
 { g:'四种模态推理', items:[
-  {t:'文本推理 (text Instruct)', d:'提示词改写增强, 翻译, 问答等纯文本任务.'},
-  {t:'图片理解 (image Instruct)', d:'逐张模式(每张各得一条结果 + 进度条)与批量模式(多图并入单请求, 可控 max_size 缩放)双模式.'},
-  {t:'视频理解 (video Instruct)', d:'输入 IMAGE 帧批次, max_frames 均匀抽帧, 自动注入"连续视频"语义提示, 输出总结 / 描述.'},
-  {t:'音频转写 (audio Instruct)', d:'搭配 Qwen3-ASR 等模型做语音识别 / 音频描述.'}
+  {t:'文本推理 (Text Instruct)', d:'提示词改写增强, 翻译, 问答等纯文本任务; allow_thinking 开关控制 Thinking 模型是否输出思考过程(默认关, 请求期参数切换零成本).'},
+  {t:'图片理解 (Image Instruct)', d:'mode 下拉框切换 Per-Image(每张各得一条结果 + 进度条)与 Batch(多图并入单请求, 可控 max_size 缩放)双模式; max_size 仅在 Batch 档显示.'},
+  {t:'视频理解 (Video Instruct)', d:'输入 IMAGE 帧批次, max_frames 均匀抽帧(首尾帧恒被抽取), 自动注入"连续视频"语义提示, 输出总结 / 描述.'},
+  {t:'音频转写 (Audio Instruct)', d:'搭配 Qwen3-ASR 等模型做语音识别 / 音频描述.'}
 ]},
 { g:'提示词系统', items:[
   {t:'13 种任务预设模板', d:'描述 / 转写 / 提示词增强 / 图片分析 / 视频总结 / 短篇故事 / 标签·简洁·详细·极致详细·电影感提示词风格 / BBox 目标检测; 按模态自动过滤下拉框.'},
   {t:'custom_prompt 双语义', d:'预设含占位符时作为必填的填充内容(如检测类别, 缺填直接报错); 预设不含占位符时, 非空则整体覆盖预设实现纯自定义提问, 为空则使用预设原文.'},
-  {t:'12 种系统提示词增强预设', d:'System Prompt Preset 节点内置 Qwen-Image 系列 5 种, Z-Image Turbo, Flux.2 T2I/I2I, Wan T2V/I2V/I2V全自动/FLF2V 的官方口径改写模板.'}
+  {t:'12 种系统提示词增强预设', d:'System Prompt Preset 节点内置 Qwen-Image 系列 5 种, Z-Image Turbo, Flux.2 T2I/I2I, Wan T2V/I2V/I2V全自动/FLF2V 的官方口径改写模板; 首项 "None" 输出空串.'}
 ]},
 { g:'生成控制', items:[
-  {t:'完整采样参数', d:'Parameters 节点暴露 max_tokens, temperature, top_k/p, min_p, typical_p, 重复/频率/存在惩罚, Mirostat 共 12 项; 不连接时 Instruct 使用同一套默认值, 行为一致.'},
+  {t:'完整采样参数', d:'Parameters 节点暴露 max_gen_tokens, temperature, top_k/p, min_p, typical_p, 重复/频率/存在惩罚, Mirostat 共 12 项; 不连接时 Instruct 使用同一套默认值, 行为一致.'},
   {t:'seed 可复现', d:'32 位种子(上限 0xFFFFFFFE, 避开 llama.cpp 随机种子哨兵值), 配合 ComfyUI 的种子控制实现结果复现.'},
   {t:'strip_thinking 开关', d:'一键剥离 Thinking 模型输出中的思考块(&lt;think&gt; 块, Gemma4 channel 格式, GLM-4.1V &lt;answer&gt; 包裹), 默认开启.'},
-  {t:'force_offload 开关', d:'推理完立即卸载模型释放显存, 为后续扩散模型腾空间.'},
+  {t:'force_offload 开关', d:'推理完立即卸载模型释放显存, 为后续扩散模型腾空间; 默认开启, 关闭时模型常驻显存免重载.'},
   {t:'queue_handler 执行顺序控制', d:'万能端口, 把上一个节点的输出接入即可强制多个 Instruct 节点的先后顺序(配合单模型单例避免反复重载).'},
   {t:'手动卸载节点', d:'Unload Model 可串接在任意连线中间, 数据透传, 经过即卸载(受 ComfyUI 缓存语义约束, 仅上游输出变化时执行).'},
-  {t:'即时中断', d:'点 ComfyUI 的 Cancel 后推理立即停止(而非等本次生成结束), 逐张模式下逐图响应.'},
+  {t:'即时中断', d:'点 ComfyUI 的 Cancel 后推理立即停止(而非等本次生成结束), Per-Image 模式下逐图响应.'},
   {t:'双进度条', d:'逐张推理时 ComfyUI 前端进度条与终端 tqdm 同步推进.'}
 ]},
 { g:'结构化输出工具链', items:[
-  {t:'Parse JSON', d:'解析 LLM 输出的 JSON, 点分 key 下钻取值, 同时给出 any / string / int / float / boolean 五种类型输出.'},
-  {t:'Unpack Code Block', d:'剥离 ```json 等代码围栏, 兼容任意标签, 未闭合围栏与"前导说明 + 围栏块"形态.'},
-  {t:'Split Instruct Output', d:'把 image Instruct 逐张模式的拼接输出拆回 STRING 列表, 对接第三方列表语义节点.'},
+  {t:'Parse JSON', d:'解析 LLM 输出的 JSON, 点分 key 下钻取值(支持 items.0.label 式数组下标), 同时给出 any / string / int / float / boolean 五种类型输出.'},
+  {t:'Unpack Code Block', d:'剥离 ```json 等代码围栏, 兼容任意标签(含 "``` json" 带空格形态), 未闭合围栏与"前导说明 + 围栏块"形态.'},
+  {t:'Split Instruct Output', d:'把 image Instruct Per-Image 模式的拼接输出拆回 STRING 列表, 对接第三方列表语义节点.'},
   {t:'BBox 目标检测工作流', d:'image Instruct(BBox 检测预设)&rarr; JSON to BBoxes(坐标换算 + 画框预览)&rarr; SEGS / MASK / 单框选取, 直通 Impact Pack 与重绘管线.'},
   {t:'Qwen 坐标模式', d:'Qwen3-VL 模式换算 0~1000 归一化坐标; Qwen2.5-VL 模式复现 smart_resize 还原内部 resize 空间的绝对坐标.'},
   {t:'画框预览', d:'JSON to BBoxes 输出画好检测框和标签的预览图, 同一 label 颜色稳定, 中文标签自动匹配 CJK 字体.'},
   {t:'SEGS 元数据可配置', d:'BBoxes to SEGS 的 label / confidence / crop_factor 均可设置, 供 Impact Pack 下游按 label 过滤, 按阈值筛选, 控制 Detailer 重绘上下文.'}
 ]},
 { g:'输出形态', items:[
-  {t:'单输出口 + 按需拆分', d:'每个 Instruct 节点输出单端口 STRING; image 逐张模式的多图结果以分隔行拼接, 由 Split Instruct Output 或 JSON to BBoxes 的内建拆分还原为列表.'},
+  {t:'单输出口 + 按需拆分', d:'每个 Instruct 节点输出单端口 STRING; image Per-Image 模式的多图结果以 "======== Image N ========" 前缀行拼接, 由 Split Instruct Output 或 JSON to BBoxes 的内建拆分还原为列表.'},
   {t:'与 ComfyUI 生态互通', d:'输出为标准 STRING / IMAGE / MASK / SEGS / BBOX 类型, 可接 CLIP Text Encode, Impact Pack, 保存预览等任意节点.'}
 ]}
 ];
@@ -851,11 +870,11 @@ const INTERNALS = [
   {t:'懒加载', f:'src/core/storage.py · node_loaders.py', d:'Loader 只调用 resolve_config() 做快速失败校验并输出配置 dict, 实际加载由 Instruct 节点按需触发. 多组 loader+instruct 交错时避免全局单例被 loader 反复挤占.'},
   {t:'全局单例 + 按需重载', f:'src/core/storage.py · instruct.py', d:'LLAMA_CPP_STORAGE 持有唯一模型实例; Instruct 执行前比对 current_config, 配置变化才重载, 相同配置直接复用.'},
   {t:'先校验再卸载', f:'src/core/storage.py', d:'load_model 先跑 resolve_config 校验新配置, 通过后才卸载旧模型 - 无效配置不会破坏当前已加载的模型. 加载成功后才记录 current_config, 失败不会残留新配置导致误判"无需重载"; 主模型加载失败时立即回收已创建的 chat_handler, 不留半初始化状态.'},
-  {t:'vram_limit 显存折算', f:'src/core/storage.py · gguf_layers.py', d:'每层显存 =(文件体积 × (1 + 0.15 固定开销) + KV cache 字节数)/ 层数. KV 按 GGUF 注意力元数据(head_count_kv / embedding_length / key·value_length, hybrid 模型的逐层数组取均值)精确计算, 与权重量化无关; 元数据不全时回退体积折算经验系数(n_ctx=8192 时合计 1.55). mmproj 体积先从预算扣除, 预算装不下 mmproj 时两者全留 CPU.'},
+  {t:'vram_limit 显存折算', f:'src/core/storage.py · gguf_layers.py', d:'每层显存 =(文件体积 × (1 + 0.15 固定开销) + KV cache 字节数)/ 层数. KV 按 GGUF 注意力元数据(head_count_kv / embedding_length / key·value_length, hybrid 模型的逐层数组取均值)精确计算, 与权重量化无关; 元数据不全时回退体积折算经验系数(n_ctx=8192 时合计 1.55). mmproj 体积先从预算扣除, 预算装不下 mmproj 时两者全留 CPU; 扣除后不足主模型 1 层时主模型留 CPU, mmproj 照常进显存(全部分支严格守预算).'},
   {t:'GGUF 头快速解析', f:'src/core/gguf_layers.py', d:'顺序扫描 KV 区收集折算所需字段, block_count 到手后扫到 tokenizer 区即停止, 避免解析几十万条 token 元数据; 非法 UTF-8 容错解码, GGUF v1 明确按不支持报错, 解析失败回退默认 32 层.'},
   {t:'与 PyTorch 的显存协调', f:'src/core/storage.py', d:'Vulkan 与 PyTorch 共享物理显存但分配器互不感知. 加载前估算需求字节数并调用 mm.free_memory() 请求 ComfyUI 先卸载 torch 侧模型腾出空间, 否则 SD 模型占满显存时 Vulkan 分配直接失败.'},
   {t:'加载失败腾挪重试', f:'src/core/storage.py', d:'Windows WDDM 归还显存有延迟, 估算偏低时 Vulkan 分配仍可能失败; 首次加载失败后再腾挪一次 torch 显存, 等待 1 秒重试一轮, 非显存错误会再次快速失败.'},
-  {t:'ComfyUI 卸载钩子 (monkey-patch)', f:'src/core/storage.py', d:'替换 mm.unload_all_models: 用户点前端 Free 按钮或 ComfyUI 处理 OOM 时, 自动连带清理 llama 模型与 chat handler.'},
+  {t:'ComfyUI 卸载钩子 (monkey-patch)', f:'src/core/storage.py', d:'替换 mm.unload_all_models: 用户点前端 Free 按钮或 ComfyUI 处理 OOM 时, 自动连带清理 llama 模型与 chat handler; 钩子经 sys.modules 动态取当前生效模块的类, "删 sys.modules 再 import" 式热重载后新模块加载的模型不会失去清理入口.'},
   {t:'完整资源释放', f:'src/core/storage.py', d:'clean() 走公开的 close()(幂等且含 mtmd 视觉编码器释放), 再置空引用并 gc.collect().'},
   {t:'mmproj 惰性初始化', f:'src/core/storage.py', d:'handler 构造只校验路径, mmproj 真正加载进显存由 mtmd 在首次推理时惰性初始化, 与加载前的 free_memory 腾挪同在一次节点执行内, 时序有效.'}
 ]},
@@ -868,40 +887,43 @@ const INTERNALS = [
 { g:'推理执行骨架', items:[
   {t:'两级基类 + runner 闭包', f:'src/core/instruct.py', d:'llama_cpp_instruct_base 提供通用骨架(组消息, 复制参数, 中断监视, 收尾清理), media 基类附加 mmproj 兜底校验; 四个 Instruct 节点只声明 INPUT_TYPES 和模态专属的 runner 闭包, 无重复代码.'},
   {t:'无会话状态', f:'src/core/instruct.py', d:'每次执行都是全新的一次性请求(system prompt + 本次提问), 不保留任何跨执行的对话历史, 保证工作流可复现.'},
-  {t:'统一采样默认值', f:'src/core/instruct.py · node_parameters.py', d:'DEFAULT_SAMPLING_PARAMS 是 Parameters 节点 widget 默认值与未连接 parameters 端口时生效值的共同来源, 否则未连接时会落到 wheel 库签名默认值(temperature 0.2 / top_k 40 / max_tokens 不限), 与节点默认差异明显.'},
+  {t:'统一采样默认值', f:'src/core/instruct.py · node_parameters.py', d:'DEFAULT_SAMPLING_PARAMS 是 Parameters 节点 widget 默认值与未连接 parameters 端口时生效值的共同来源, 否则未连接时会落到 wheel 库签名默认值(temperature 0.2 等), 与节点默认差异明显; UI 键 max_gen_tokens 在 _run() 中映射回库参数 max_tokens.'},
   {t:'InterruptWatcher 中断监视', f:'src/core/instruct.py', d:'守护线程每 200ms 轮询 ComfyUI 的中断标志, 命中后调用 Llama.abort() 使生成立即停止. llama-cpp-python 每次请求开始会 clear abort 事件, 因此监视线程命中后持续重复 set 以抗竞态; 中断产生的截断结果被丢弃, 走标准中断流程.'},
   {t:'hybrid 架构 KV 重置', f:'src/core/instruct.py', d:'每次节点执行后按 C API(is_hybrid / is_recurrent)判断架构: Qwen3.5, LFM2 等线性注意力/循环架构的状态无法跨请求前缀复用, 不重置会导致后续输出错乱, 故整体清空 KV cache; 纯 SWA 模型(Gemma3)不受影响. 按架构判断而非维护 handler 名单; image 逐张模式中间的多次请求之间不重置.'},
   {t:'收尾放 finally', f:'src/core/instruct.py', d:'force_offload 卸载与 hybrid 重置放在 finally 块: 中断和异常路径同样执行, 不会泄漏显存或残留脏状态.'},
   {t:'参数 dict 防污染', f:'src/core/instruct.py', d:'ComfyUI 会缓存节点输出, Parameters 的 dict 是共享对象; 执行时合并生成新 dict 兼作防御性复制, 避免污染缓存.'},
   {t:'Prompt 校验前置', f:'src/core/instruct.py', d:'先做零成本的 prompt 校验(占位符预设缺 custom_prompt 时直接报错), 再触发可能长达数 GB 的模型加载, 避免漏填时白白完成一次全量加载才报错.'},
   {t:'预设与 custom_prompt 的 6 种组合', f:'src/core/prompts.py · instruct.py', d:'按模板内容判定: 含 ### 时 custom_prompt 必填并填入占位符; 不含 ### 时非空 custom_prompt 整体覆盖预设; 空白预设 + 空输入则只发送媒体内容(适合 chat 模板自带默认指令的模型; text 节点无媒体载荷, 此场景按 REQUIRE_USER_TEXT 在模型加载前拦截报错). 先替换 @@@ 再注入用户文本, 避免 custom_prompt 里的 @@@ 被误替换.'},
-  {t:'启动期预设校验', f:'src/core/prompts.py', d:'模块加载时校验每个预设 use 字段的模态名拼写, 写错在 ComfyUI 启动期即报错, 而不是运行到该节点才发现.'},
+  {t:'启动期预设校验', f:'src/core/prompts.py', d:'模块加载时校验每个预设 use 字段的模态名拼写, 写错在 ComfyUI 启动期即报错, 而不是运行到该节点才发现; 运行期预设名失配(旧工作流经连线传入已改名/删除的预设)抛带指引的 ValueError 而非裸 KeyError.'},
+  {t:'allow_thinking 的 reasoning_budget 机制', f:'src/nodes/instruct/text/node_instruct.py', d:'关闭时传 reasoning_budget=0, wheel 采样器按生成的 &lt;think&gt; 标签计数, 思考块一开启即强制闭合; 非思考模型由采样器的 reasoning_start 安全窗自动失效, 无副作用; 模板预注入 &lt;think&gt; 的形态等不到生成的开标签而无法抑制, 残留由 strip_thinking 剥离.'},
   {t:'纯文本 content 扁平化', f:'src/core/instruct.py', d:'user 消息只含单个 text 项时扁平化为纯字符串: 无 chat handler 的纯文本路径由 GGUF 内嵌模板渲染消息, 旧式模板(ChatML / Llama-3 / Mistral 等)假定 content 是字符串, 收到 content-part 列表会报错或渲染出 Python repr.'}
 ]},
 { g:'多模态编码与输出处理', items:[
-  {t:'PNG 无损编码', f:'src/nodes/type/media/encoding.py', d:'图像统一转 PNG 而非 JPEG: q85 的压缩伪影会影响 OCR 类模型的小字识别, 且 JPEG 不支持 RGBA.'},
-  {t:'张量转换的边缘情况', f:'src/nodes/type/media/encoding.py', d:'剥离批次维只取 arr[0] 而不用 squeeze(): squeeze 会把 H=1/W=1 的边缘尺寸也压掉, 导致 PIL 把 [W,C] 误解析为灰度图. 缩放极端长宽比时至少保留 1 像素; 不超 max_size 时短路返回, 跳过等尺寸重采样.'},
-  {t:'音频打包', f:'src/nodes/type/media/encoding.py', d:'多声道均值混为单声道 16-bit PCM WAV 减小 base64 载荷; 重采样交给 llama.cpp 的 mtmd 解码端, 插件侧不引入音频依赖.'},
-  {t:'视频均匀抽帧', f:'src/nodes/type/media/video/node_instruct.py', d:'linspace 等间隔采样并 clamp 到实际帧数, 避免帧少时重复采样同一帧浪费上下文.'},
+  {t:'PNG 无损编码', f:'src/shared/encoding.py', d:'图像统一转 PNG 而非 JPEG: q85 的压缩伪影会影响 OCR 类模型的小字识别, 且 JPEG 不支持 RGBA.'},
+  {t:'张量转换的边缘情况', f:'src/shared/encoding.py', d:'剥离批次维只取 arr[0] 而不用 squeeze(): squeeze 会把 H=1/W=1 的边缘尺寸也压掉, 导致 PIL 把 [W,C] 误解析为灰度图. 缩放极端长宽比时至少保留 1 像素; 不超 max_size 时短路返回, 跳过等尺寸重采样.'},
+  {t:'音频打包', f:'src/shared/encoding.py', d:'多声道均值混为单声道 16-bit PCM WAV 减小 base64 载荷; 重采样交给 llama.cpp 的 mtmd 解码端, 插件侧不引入音频依赖.'},
+  {t:'视频均匀抽帧', f:'src/nodes/instruct/media/video/node_instruct.py', d:'linspace 等间隔采样并 clamp 到实际帧数, 避免帧少时重复采样同一帧浪费上下文.'},
   {t:'thinking 剥离的三种形态', f:'src/core/instruct.py', d:'&lt;think&gt; 推理块(兼容 generation prompt 已注入 &lt;think&gt; 导致输出只含闭合标签的情况); Gemma4 channel 格式(取最后一个 &lt;channel|&gt; 之后, 覆盖 E 系列无开标签的纯文本思考); GLM-4.1V 的 &lt;answer&gt; 包裹(handler 以 &lt;/answer&gt; 为 stop token 导致开标签残留). 未闭合(生成截断)时均保持原样.'},
   {t:'输出前缀清理', f:'src/core/instruct.py', d:'剥离 Vicuna/LLaVA 风格模板下部分模型输出开头的 ": " 前缀与空白.'},
-  {t:'代码围栏容错剥离', f:'src/shared/text_utils.py', d:'首尾两端独立匹配: 生成截断导致围栏未闭合时开头标记仍能剥离; 标签用受限字符类而非宽匹配, 避免围栏后直接跟正文时把正文吞掉; 首部不是围栏时回退提取文本中第一个完整围栏块.'},
-  {t:'逐张结果分隔行拆分', f:'src/shared/text_utils.py', d:'"====== Image N ======" 分隔行独占一行, 行首行尾锚定, JSON 文本中的换行均为 \\n 转义不会误拆; Split Instruct Output 与 JSON to BBoxes 共用同一实现.'}
+  {t:'代码围栏容错剥离', f:'src/shared/text_utils.py', d:'首尾两端独立匹配: 生成截断导致围栏未闭合时开头标记仍能剥离; 标签用受限字符类而非宽匹配, 避免围栏后直接跟正文时把正文吞掉(兼容 "``` json" 标签前带空格的形态); 首部不是围栏时回退提取文本中第一个完整围栏块.'},
+  {t:'逐张结果前缀行拆分', f:'src/shared/text_utils.py', d:'"======== Image N ========" 前缀行独占一行, 行首行尾锚定, JSON 文本中的换行均为 \\n 转义不会误拆; 拆分正则由 common_static 的前缀行模板派生, 生成端与识别端同源; Split Instruct Output 与 JSON to BBoxes 共用同一实现.'}
 ]},
 { g:'健壮性与生态兼容', items:[
-  {t:'Handler 注册表防御性解析', f:'src/core/handlers.py', d:'启动时用 getattr 对照 llama-cpp-python 的 llama_multimodal 模块解析 34 个 handler 类名, 缺失的打 warning 并从下拉框剔除 - 防御未来 wheel 升级时的类变动, 不静默吞错.'},
-  {t:'-Thinking 后缀语义', f:'src/core/handlers.py', d:'同一 handler 类按显示名是否带 -Thinking 后缀经 functools.partial 预绑定对应 thinking 开关参数(enable_thinking / force_reasoning), storage.py 不感知 thinking 逻辑; 后缀与开关值的一致性由 tests/test_handlers.py 契约测试锁定.'},
-  {t:'LLM 输出不可信原则', f:'bbox_utils.py · node_bbox.py', d:'BBox 链路对 LLM 输出做全面防御: 结构显式校验(缺 bbox_2d, 非 dict 项给出期望格式的报错), 坐标裁剪到图像内, 非数字坐标跳过并 warning, 单对象自动包装为列表, label/text_content 字段兼容, 非字符串标签强转 str.'},
-  {t:'Qwen2.5-VL smart_resize 复现', f:'bbox_utils.py', d:'复现 mtmd 预处理的 smart_resize(patch 28, 上下限 token 数, 经多组尺寸实测反推), 把内部 resize 空间的绝对坐标还原为原图像素; floor/ceil 前加浮点容差防边界少算一个 patch.'},
-  {t:'CJK 字体回退', f:'bbox_utils.py', d:'BBox 标签常为中文, 按平台依次尝试微软雅黑 / 黑体 / Noto CJK / 文泉驿, 全部缺失时回退 PIL 默认字体并打 warning(pillow>=10.1 保证 load_default 支持字号).'},
-  {t:'Impact Pack 约定对齐', f:'node_bbox.py', d:'SEG namedtuple 与 Impact Pack 同定义(字段名与顺序不能改, 部分节点依赖 _replace 语义): cropped_image 形状 [1,H,W,C], crop_region 非负坐标, seg.bbox 保留原始检测框, 保证 Detailer 等下游节点直接可用.'},
-  {t:'羽化性能优化', f:'bbox_utils.py', d:'gaussian_filter 在含 4σ 边距的局部窗口上计算而非全图, 多框场景下代价不随图像尺寸增长; 多框遮罩用 maximum 合并.'},
-  {t:'ComfyUI 列表语义处理', f:'node_bbox.py', d:'json_to_bboxes 用 INPUT_IS_LIST 接收多条 JSON(含内建分隔行拆分), 拆平图像批次按索引配对, 画框结果再按原批次结构重组; bboxes_to_bbox 必须 INPUT_IS_LIST 才能实现二级索引.'},
+  {t:'Handler 注册表防御性解析', f:'src/core/handlers.py', d:'启动时用 getattr 对照 llama-cpp-python 的 llama_multimodal 模块解析 26 个显示名对应的 24 个 handler 类, 缺失的打 warning 并从下拉框剔除 - 防御未来 wheel 升级时的类变动, 不静默吞错; resolve_config 区分 "名字未知" 与 "注册过但本构建缺类" 两种报错.'},
+  {t:'thinking 三态元数据', f:'src/core/handlers.py', d:'注册表按 handler 记录 可切换(构造参数名 enable_thinking / force_reasoning)/ 不支持 / 强制思考三态; vlm loader 的 thinking 开关值经 handler_constructor 按三态绑定进构造器, 不可切换档由 clamp_thinking 钳制并打 warning(覆盖绕过前端的 API 提交路径), storage.py 不感知 thinking 逻辑; 三态元数据与类签名的一致性由 tests/test_handlers.py 契约测试锁定.'},
+  {t:'前端 widget 联动 (纯 UX 增强)', f:'web/vlm_loader.js · image_instruct.js · widget_utils.js', d:'按 widget options 透传的自定义 key(thinking_modes / image_token_handlers / batch_mode_value, 经 /object_info 原样下发, 与 Python 注册表单一真源)做联动: thinking 开关三态置灰, image_min/max_tokens 显隐与区间互钳, max_size 仅 Batch 档显示; JS 失效只损失置灰/显隐效果, 行为正确性由 Python 侧保证.'},
+  {t:'LLM 输出不可信原则', f:'src/nodes/bbox/', d:'BBox 链路对 LLM 输出做全面防御: 结构显式校验(缺 bbox_2d, 非 dict 项给出期望格式的报错), 坐标裁剪到图像内, 非数字坐标跳过并 warning(数字字符串经 float 强转), 单对象自动包装为列表, label/text_content 字段兼容, 非字符串标签强转 str.'},
+  {t:'Qwen2.5-VL smart_resize 复现', f:'src/nodes/bbox/bbox_utils.py', d:'复现 mtmd 预处理的 smart_resize(patch 28, 上下限 token 数, 经多组尺寸实测反推), 把内部 resize 空间的绝对坐标还原为原图像素; floor/ceil 前加浮点容差防边界少算一个 patch.'},
+  {t:'CJK 字体回退', f:'src/nodes/bbox/bbox_utils.py', d:'BBox 标签常为中文, 按平台依次尝试微软雅黑 / 黑体 / Noto CJK / 文泉驿, 全部缺失时回退 PIL 默认字体并打 warning(pillow>=10.1 保证 load_default 支持字号).'},
+  {t:'Impact Pack 约定对齐', f:'src/nodes/bbox/node_bboxes_to_segs.py', d:'SEG namedtuple 与 Impact Pack 同定义(字段名与顺序不能改, 部分节点依赖 _replace 语义): cropped_image 形状 [1,H,W,C], crop_region 非负坐标, seg.bbox 保留原始检测框, 保证 Detailer 等下游节点直接可用.'},
+  {t:'羽化性能优化', f:'src/nodes/bbox/bbox_utils.py', d:'gaussian_filter 在含 4σ 边距的局部窗口上计算而非全图, 多框场景下代价不随图像尺寸增长; 多框遮罩用 maximum 合并.'},
+  {t:'ComfyUI 列表语义处理', f:'src/nodes/bbox/', d:'json_to_bboxes 用 INPUT_IS_LIST 接收多条 JSON(含内建前缀行拆分), 拆平图像批次按索引配对, 画框结果再按原批次结构重组; bboxes_to_bbox 必须 INPUT_IS_LIST 才能实现二级索引.'},
+  {t:'i18n 文案层', f:'src/i18n/', d:'全部用户可见文案与控制台日志文本集中在 zh-CN / en-US 两份逐行一一对应的语言文件, lang.py 按 LANGUAGE 常量加载; 不随语言切换的下拉选项值/协议串放 common_static.py(工作流序列化的 widget 值不因换语言失效); 排版与逐行对应由 tests/test_i18n_format.py 锁定.'},
   {t:'模型目录双键注册', f:'src/core/model_paths.py', d:'同时注册 llm 与 LLM 两个目录键并去重合并, 兼容 extra_model_paths.yaml 挂载的外部模型目录; 键可能已被其他插件以 list/tuple 形态注册, 重建为 set 合并避免 import 期崩溃; 文件列表只保留 .gguf.'},
-  {t:'mmproj 过滤只看文件名', f:'node_loaders.py', d:'判断 mmproj 只看 basename, 避免目录名含 mmproj 时整个目录的主模型被误过滤.'},
+  {t:'mmproj 过滤只看文件名', f:'src/nodes/model/node_loaders.py', d:'判断 mmproj 只看 basename, 避免目录名含 mmproj 时整个目录的主模型被误过滤.'},
   {t:'cqdm 双进度条', f:'src/core/cqdm.py', d:'一个迭代器同时驱动 ComfyUI 前端 ProgressBar 与终端 tqdm; 起点立即推送 0/N 清掉上次中断残留的进度值; finally 确保中断时进度条正常收尾, 不在终端残留.'},
   {t:'AnyType 万能类型', f:'src/shared/types.py', d:'重载 __ne__ 恒等 False 的字符串子类, 使任意类型都能连入声明为 "*" 的端口(Unload Model 的透传, queue_handler).'},
-  {t:'wheel 私有 API 契约测试', f:'tests/test_wheel_contract.py · test_handlers.py', d:'静态检查依赖的 wheel 私有接口存在性(n_tokens / memory_clear / _hybrid_cache_mgr / is_hybrid 等, 不加载模型), 升级 wheel 后运行即可发现断裂; 公开 handler 类契约另由 test_handlers.py 锁定.'}
+  {t:'wheel 私有 API 契约测试', f:'tests/test_wheel_contract.py · test_handlers.py', d:'静态检查依赖的 wheel 接口存在性(n_tokens / memory_clear / _hybrid_cache_mgr / is_hybrid / 12 项采样参数 / seed / reasoning_budget 等, 不加载模型), 升级 wheel 后运行即可发现断裂; 公开 handler 类契约另由 test_handlers.py 锁定.'}
 ]}
 ];
 
@@ -913,15 +935,15 @@ const GRAPH = {
     {id:'ghost_frames', ghost:true, label:'VHS Load Video / VAE Decode', sub:'IMAGE 帧批次', x:16, y:506, w:158, h:62},
     {id:'ghost_audio',  ghost:true, label:'LoadAudio', sub:'AUDIO', x:16, y:602, w:158, h:54},
 
-    {id:'llama_cpp_llm_model_loader', label:'llm Model Loader', sub:'LLAMACPPLLM', x:214, y:34,  w:198, h:62},
-    {id:'llama_cpp_vlm_model_loader', label:'vlm Model Loader', sub:'LLAMACPPVLM', x:214, y:130, w:198, h:62},
+    {id:'llama_cpp_llm_model_loader', label:'LLM Model Loader', sub:'LLAMACPPLLM', x:214, y:34,  w:198, h:62},
+    {id:'llama_cpp_vlm_model_loader', label:'VLM Model Loader', sub:'LLAMACPPVLM', x:214, y:130, w:198, h:62},
     {id:'llama_cpp_parameters',       label:'Parameters',        sub:'采样参数',    x:214, y:226, w:198, h:62},
     {id:'system_prompt_preset',       label:'System Prompt Preset', sub:'12 种增强预设', x:214, y:322, w:198, h:62},
 
-    {id:'llama_cpp_text_instruct',  label:'text Instruct',  sub:'纯文本推理',   x:470, y:34,  w:214, h:66},
-    {id:'llama_cpp_image_instruct', label:'image Instruct', sub:'逐张 / 批量',  x:470, y:140, w:214, h:66},
-    {id:'llama_cpp_video_instruct', label:'video Instruct', sub:'均匀抽帧',     x:470, y:246, w:214, h:66},
-    {id:'llama_cpp_audio_instruct', label:'audio Instruct', sub:'ASR / omni',   x:470, y:352, w:214, h:66},
+    {id:'llama_cpp_text_instruct',  label:'Text Instruct',  sub:'纯文本推理',   x:470, y:34,  w:214, h:66},
+    {id:'llama_cpp_image_instruct', label:'Image Instruct', sub:'Per-Image / Batch',  x:470, y:140, w:214, h:66},
+    {id:'llama_cpp_video_instruct', label:'Video Instruct', sub:'均匀抽帧',     x:470, y:246, w:214, h:66},
+    {id:'llama_cpp_audio_instruct', label:'Audio Instruct', sub:'ASR / omni',   x:470, y:352, w:214, h:66},
 
     {id:'ghost_text_out', ghost:true, label:'CLIP Text Encode / 任意文本消费', sub:'STRING', x:744, y:26, w:204, h:56},
     {id:'remove_code_block', label:'Unpack Code Block', sub:'剥代码围栏', x:744, y:112, w:204, h:58},
