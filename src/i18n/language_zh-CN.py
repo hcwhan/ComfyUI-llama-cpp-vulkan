@@ -440,82 +440,82 @@ LANG = {
     "logs": {
         # core/devices.py
         "devices": {
-            "detection_failed": "GPU detection failed: {e}",
+            "detection_failed": "GPU 检测失败: {e}",
             # {summary} 列表项格式为 "名称 (描述) [类型]"
-            "detected_devices": "Detected {count} GPU device(s): {summary}",
-            "no_devices": "No GPU devices detected, running on CPU only",
-            "device_not_selectable": "device '{gpu_device}' is not selectable, falling back to Auto",
-            "no_backend": "No GPU backend detected, running on CPU only",
-            "active_gpus_layer_split": "Active GPUs (layer split): {names}",
-            "active_gpu": "Active GPU: {name} ({desc}) [{type}]",
+            "detected_devices": "检测到 {count} 个 GPU 设备: {summary}",
+            "no_devices": "未检测到 GPU 设备, 仅使用 CPU 运行",
+            "device_not_selectable": "设备 '{gpu_device}' 不可选, 回退为 Auto",
+            "no_backend": "未检测到 GPU 后端, 仅使用 CPU 运行",
+            "active_gpus_layer_split": "启用的 GPU (按层切分): {names}",
+            "active_gpu": "启用的 GPU: {name} ({desc}) [{type}]",
         },
 
         # core/handlers.py
         "handlers": {
             # {missing} 清单项格式为 "显示名 (类名)"
-            "handlers_unavailable": "chat handler(s) unavailable in this llama-cpp-python build: {missing}",
-            "thinking_unsupported": 'handler "{label}" does not support thinking, the switch is treated as off',
-            "thinking_forced": 'handler "{label}" is a thinking-only model, the switch is treated as on',
+            "handlers_unavailable": "以下 chat handler 在当前 llama-cpp-python 构建中不可用: {missing}",
+            "thinking_unsupported": 'handler "{label}" 不支持思考, thinking 开关按关处理',
+            "thinking_forced": 'handler "{label}" 为纯思考模型, thinking 开关按开处理',
         },
 
         # core/storage.py
         "storage": {
-            "vram_cannot_fit_mmproj": "vram_limit ({vram_limit} GB) cannot fit the mmproj file (~{mmproj_gb:.1f} GB), keeping the main model and mmproj on CPU to honor the budget",
-            "vram_no_room_for_layer": "vram_limit ({vram_limit} GB) leaves no room for even one model layer (~{layer_size:.1f} GB/layer), keeping the main model on CPU to honor the budget",
+            "vram_cannot_fit_mmproj": "vram_limit ({vram_limit} GB) 装不下 mmproj 文件 (约 {mmproj_gb:.1f} GB), 主模型与 mmproj 均留在 CPU 以严格守预算",
+            "vram_no_room_for_layer": "vram_limit ({vram_limit} GB) 装不下模型的任何一层 (每层约 {layer_size:.1f} GB), 主模型留在 CPU 以严格守预算",
             # 以下两条为 debug 级, 默认不输出
-            "llm_close_failed": "llm close failed: {e}",
-            "handler_close_failed": "chat_handler close failed: {e}",
-            "free_vram_failed": "failed to free torch VRAM before load: {e}",
-            "preparing_mmproj": "Preparing mmproj: {mmproj}",
-            "loading_model": "Loading model: {model}",
+            "llm_close_failed": "llm 关闭失败: {e}",
+            "handler_close_failed": "chat_handler 关闭失败: {e}",
+            "free_vram_failed": "加载前释放 torch 显存失败: {e}",
+            "preparing_mmproj": "正在准备 mmproj: {mmproj}",
+            "loading_model": "正在加载模型: {model}",
             "load_params": "n_gpu_layers = {n_gpu_layers}, main_gpu = {main_gpu}, split_mode = {split_mode}",
-            "load_failed_retry": "model load failed ({e}), freeing torch VRAM and retrying once",
-            "free_vram_retry_failed": "failed to free torch VRAM before retry: {free_err}",
-            "cpu_only": "CPU-only inference: no layers or mmproj offloaded to GPU",
-            "cleanup_hook_applied": "Model cleanup hook applied!",
+            "load_failed_retry": "模型加载失败 ({e}), 释放 torch 显存后重试一次",
+            "free_vram_retry_failed": "重试前释放 torch 显存失败: {free_err}",
+            "cpu_only": "纯 CPU 推理: 模型层与 mmproj 均未上 GPU",
+            "cleanup_hook_applied": "模型清理钩子已挂载!",
         },
 
         # core/gguf_layers.py
         "gguf": {
-            "block_count_missing": "block_count not found in GGUF metadata",
-            "parse_failed": "GGUF parse failed: {e}",
+            "block_count_missing": "GGUF 元数据中找不到 block_count",
+            "parse_failed": "GGUF 解析失败: {e}",
         },
 
         # core/cqdm.py (tqdm 终端进度条的描述文字, 非 logger 输出)
         "cqdm": {
-            "progress_desc": "Processing",
+            "progress_desc": "处理中",
         },
 
         # shared/encoding.py
         "encoding": {
-            "audio_batch_first_only": "AUDIO batch of {count} clips received; only the first clip is processed",
+            "audio_batch_first_only": "收到含 {count} 段音频的 AUDIO 批次; 仅处理第一段",
         },
 
         # nodes/model/node_unload.py
         "unload": {
-            "unloading": "Unloading llama model...",
+            "unloading": "正在卸载 llama 模型...",
         },
 
         # nodes/instruct/media/image/node_instruct.py
         "image_instruct": {
-            "start_processing": "Start processing {count} images",
+            "start_processing": "开始处理 {count} 张图片",
         },
 
         # nodes/bbox/ 各节点文件 + bbox_utils.py
         "bbox": {
             # {detail} 取下方两个 detail_* 变体之一
-            "json_frame_mismatch": "{json_count} JSON result(s) but {frame_count} image frame(s); pairing by index, {detail}",
-            "detail_extra_json": "extra JSON entries reuse the last frame, appended to image_list as single-frame batches",
-            "detail_extra_frames": "unpaired trailing frames are passed through without boxes",
-            "draw_failed_json": "Error drawing bboxes for JSON #{i}: {e}",
-            "segs_batch_first_frame": "BBoxes to SEGS received a batch of {batch_size} images; cropped images are taken from the first frame only",
+            "json_frame_mismatch": "JSON 结果 {json_count} 条与图像帧 {frame_count} 帧数量不符; 按索引配对, {detail}",
+            "detail_extra_json": "多出的 JSON 条目复用最后一帧, 以单帧批次追加到 image_list",
+            "detail_extra_frames": "未配对的末尾帧不画框, 原样透传",
+            "draw_failed_json": "为 JSON #{i} 画框时出错: {e}",
+            "segs_batch_first_frame": "BBoxes to SEGS 收到含 {batch_size} 张图像的批次; 裁剪图仅取自第一帧",
             # SEGS 与 MASK 两处同文
-            "bbox_out_of_bounds": "Skipping bbox outside image bounds: {bbox}",
-            "bbox_empty_area": "Skipping bbox with empty area: {bbox}",
-            "no_cjk_font": "No CJK font found, bbox labels may render as boxes",
-            "bbox_draw_failed": "Skipping bbox that failed to draw ({label!r}: ({x0}, {y0}, {x1}, {y1})): {e}",
-            "bbox_invalid_item": "Skipping invalid bbox item: {bbox}",
-            "bbox_non_numeric": "Skipping bbox with non-numeric coordinates: {bbox}",
+            "bbox_out_of_bounds": "跳过超出图像边界的 bbox: {bbox}",
+            "bbox_empty_area": "跳过面积为空的 bbox: {bbox}",
+            "no_cjk_font": "未找到 CJK 字体, bbox 标签可能渲染为方框",
+            "bbox_draw_failed": "跳过绘制失败的 bbox ({label!r}: ({x0}, {y0}, {x1}, {y1})): {e}",
+            "bbox_invalid_item": "跳过无效的 bbox 项: {bbox}",
+            "bbox_non_numeric": "跳过坐标非数字的 bbox: {bbox}",
         },
     },
 }
