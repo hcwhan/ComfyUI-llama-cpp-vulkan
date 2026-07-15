@@ -3,6 +3,8 @@
 //   失效时由 clamp_thinking 钳制兜底
 // - image_min/max_tokens 仅在选中支持视觉的 handler 时显示 (音频专用与
 //   "None" 隐藏), 隐藏字段的值仍序列化并随 config 下发, 对音频路径无效
+// - image_min/max_tokens 区间互钳: 修改任一侧越界时钳制另一侧 (max=0 视为
+//   未设置不参与), 前端阻止区间倒挂; loader 侧报错保留, 兜底绕过 UI 的提交
 // 能力名单来自 chat_handler widget options 的自定义 key thinking_modes /
 // image_token_handlers (/object_info 原样返回), 与 Python 注册表单一真源.
 // 联动只原位改值/置灰/改类型, 不增删 widget (widgets_values 按声明序序列化).
@@ -69,6 +71,31 @@ app.registerExtension({
             applyMode();
             return result;
         };
+
+        // 区间互钳: 只在用户修改一侧时动另一侧, 载入工作流不改存量值
+        // (倒挂的存量值由 loader 侧报错兜底)
+        const minWidget = node.widgets.find((w) => w.name === "image_min_tokens");
+        const maxWidget = node.widgets.find((w) => w.name === "image_max_tokens");
+        if (minWidget && maxWidget) {
+            const hookClamp = (widget, clamp) => {
+                const original = widget.callback;
+                widget.callback = function (...args) {
+                    const result = original?.apply(this, args);
+                    clamp();
+                    return result;
+                };
+            };
+            hookClamp(minWidget, () => {
+                if (maxWidget.value > 0 && minWidget.value > maxWidget.value) {
+                    maxWidget.value = minWidget.value;
+                }
+            });
+            hookClamp(maxWidget, () => {
+                if (maxWidget.value > 0 && maxWidget.value < minWidget.value) {
+                    minWidget.value = maxWidget.value;
+                }
+            });
+        }
 
         // 新建节点立即同步; 载入工作流时 configure 恢复 widget 值后再同步
         applyMode();
