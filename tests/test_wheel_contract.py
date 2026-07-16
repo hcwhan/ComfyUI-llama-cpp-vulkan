@@ -82,6 +82,29 @@ class TestWheelPrivateApiContract(unittest.TestCase):
         self.assertTrue(hasattr(llama_cpp_lib.llama_split_mode, "LLAMA_SPLIT_MODE_NONE"))
         self.assertTrue(hasattr(llama_cpp_lib.llama_split_mode, "LLAMA_SPLIT_MODE_LAYER"))
 
+    def test_message_content_is_str_in_no_tools_path(self):
+        # instruct._make_extract 对 message.content 直接调 str.removeprefix,
+        # 依赖 "无 tools 路径下 content 恒为 str" (OpenAI 协议允许 None).
+        # 静态锁定收敛链: 文本路径 (chat_formatter_to_chat_completion_handler,
+        # GGUF 内嵌模板经 Jinja2ChatFormatter.to_chat_handler 走此函数) 与
+        # MTMD 路径 (MTMDChatHandler.__call__) 的无 tool 分支均经
+        # _convert_completion_to_chat 收敛, 其非流式分支把 completion 的
+        # text 字段 (恒为 str) 原样放入 message.content
+        import llama_cpp.llama_chat_format as chat_format_module
+        import llama_cpp.llama_multimodal as multimodal
+
+        source = inspect.getsource(chat_format_module._convert_text_completion_to_chat)
+        self.assertIn('"content": completion["choices"][0]["text"]', source)
+
+        source = inspect.getsource(chat_format_module._convert_completion_to_chat)
+        self.assertIn("_convert_text_completion_to_chat(", source)
+
+        for func in (
+            chat_format_module.chat_formatter_to_chat_completion_handler,
+            multimodal.MTMDChatHandler.__call__,
+        ):
+            self.assertIn("_convert_completion_to_chat(", inspect.getsource(func))
+
     def test_create_chat_completion_accepts_all_sampling_params(self):
         # Parameters 节点全部字段 + seed + text Instruct allow_thinking 开关折算的
         # reasoning_budget 必须被 create_chat_completion 签名接受;
