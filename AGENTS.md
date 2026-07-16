@@ -115,58 +115,41 @@ image 逐张模式的多图结果以 "======== Image N ========" 前缀行拼接
 
 ### GPU 设备管理
 
-`src/core/devices.py` 通过 ggml C API (ctypes) 直接枚举 Vulkan GPU 设备, 区分独显 (GPU) 和核显 (IGPU). 这是独立于 PyTorch/CUDA 的 Vulkan 推理路径.
+`src/core/devices.py` 通过 ggml C API (ctypes) 直接枚举 Vulkan GPU 设备, 区分独显 (GPU) 和核显 (IGPU).
 
-关键函数链: `_detect_gpu_devices()` -> `_selectable_devices()` -> `gpu_device_choices` / `resolve_device_selection()`
-
-选择语义(与 llama.cpp 构建 `model->devices` 的规则对齐):
-
-- llama.cpp 只把独显按枚举顺序收入设备列表, 仅当无独显时才收第一个核显, 其余设备无法通过 `main_gpu` 到达, 因此下拉框只展示可达设备
-- `Auto (GPU First)`: 走 llama.cpp 默认行为(`LLAMA_SPLIT_MODE_LAYER`, 独显优先, 多独显按层切分)
-- 显式选择某设备: 传 `LLAMA_SPLIT_MODE_NONE` + 该设备在可选列表中的索引, 整个模型加载到单卡; `main_gpu` 在 LAYER 模式下会被 llama.cpp 忽略, 这是显式选择必须切 NONE 的原因
+选择语义与 llama.cpp 构建 `model->devices` 的规则对齐: 下拉框只展示 `main_gpu` 可达的设备, 显式选卡必须切 `LLAMA_SPLIT_MODE_NONE`(LAYER 模式下 `main_gpu` 被 llama.cpp 忽略), `Auto (GPU First)` 走 llama.cpp 默认行为; 规则细节见该文件 docstring.
 
 ### 模型生命周期
 
 `src/core/storage.py` 的 `LLAMA_CPP_STORAGE` 类管理全局单例模型状态:
 
-- 懒加载: 两个 Loader 只调用 `resolve_config()` 做快速失败校验(模型/mmproj 路径存在, mmproj 与 chat_handler 配对合法)并返回 config, 实际加载由 Instruct 节点按需触发; 多组 loader+instruct 交错时避免全局单例被 loader 反复挤占
-- `load_model()`: 先 `resolve_config()` 校验再卸载旧模型(无效配置不影响已加载的模型), 随后加载 GGUF 模型; 可选的 mmproj(视觉编码器)在此处只构造 chat_handler(校验路径), 真正加载进显存由 mtmd 在首次推理时惰性初始化(与加载前的 `mm.free_memory` 腾挪同在一次节点执行内, 时序有效)
-- `clean()`: 释放模型和 chat_handler 资源
+- 懒加载: Loader 只做 `resolve_config()` 快速失败校验并返回 config, 实际加载由 Instruct 节点按需触发(理由见 `node_loaders.py` docstring); mmproj(视觉编码器)在 `load_model()` 只构造 chat_handler, 真正进显存由 mtmd 在首次推理时惰性初始化(时序说明见 `storage.py` 注释)
 - 通过 monkey-patch `mm.unload_all_models` 实现 ComfyUI 模型卸载(前端 Free 按钮 / OOM 处理)时自动清理
-- `vram_limit` 折算 `n_gpu_layers` 集中在 `_estimate_n_gpu_layers()`: 每层显存 =(文件体积 x (1 + 固定开销系数) + KV cache 字节数)/ 层数. KV 按 `core/gguf_layers.py` 解析的注意力元数据(`head_count_kv`/`embedding_length` 等, hybrid 模型的逐层数组取均值)精确计算, 与权重量化无关; 元数据不全时回退 `_vram_factor(n_ctx)` 体积折算经验系数(n_ctx=8192 时合计 1.55, 对强量化模型会低估 KV). mmproj 体积先从预算中扣除, 预算装不下 mmproj 时两者全留 CPU; 扣除后不足主模型 1 层时主模型留 CPU, mmproj 照常进显存(全部分支严格守预算, 不足 1 层不强制上卡)
+- `vram_limit` 折算 `n_gpu_layers` 集中在 `_estimate_n_gpu_layers()`: KV 按 `core/gguf_layers.py` 解析的注意力元数据精确计算, 元数据不全时回退体积折算经验系数(对强量化模型会低估 KV); 全部分支严格守预算, 不足 1 层不强制上卡. 系数校准与各分支细节见 `storage.py` 注释
 
 ### Instruct 继承体系
 
-`src/core/instruct.py` 提供两级基类, 四个 Instruct 节点只声明 `INPUT_TYPES` 与模态专属的 runner 闭包:
-
-- `llama_cpp_instruct_base`: 通用骨架. `_run()` 负责组消息(system + user), 复制采样参数, `InterruptWatcher` 监视, force_offload / hybrid KV 重置收尾; `seed_input()/prompt_inputs()/runtime_inputs()/optional_inputs()` 是 INPUT_TYPES 字段组装块
-- `llama_cpp_media_instruct_base`: 多模态骨架, `MODEL_TYPE = "LLAMACPPVLM"`, 附 `require_mmproj()` 兜底校验
+`src/core/instruct.py` 提供两级基类(`llama_cpp_instruct_base` 通用骨架 + `llama_cpp_media_instruct_base` 多模态骨架), 四个 Instruct 节点只声明 `INPUT_TYPES` 与模态专属的 runner 闭包; 推理骨架 `_run()` 与 INPUT_TYPES 字段组装块的职责划分见该文件.
 
 ### 任务预设系统
 
-预设模板池在 `core/prompts.py`, 任务预设与增强预设文本均为中文:
-
-- 显示范围由每个预设的 `use` 字段声明(text/image/video/audio), 节点类通过 `MODALITY` 类属性对号入座; dict 声明顺序即 UI 下拉框顺序, 各模态过滤结果的第一项即该节点的默认预设
-- `@@@` 占位符替换为节点类的 `MEDIA_WORD`(text/image -> 图像, video -> 视频, audio -> 音频)
-- `###` 占位符由 custom_prompt 填充: 模板含 `###` 时必填, 否则非空 custom_prompt 整体覆盖预设
+预设模板池在 `core/prompts.py`, 任务预设与增强预设文本均为中文. 显示范围由预设的 `use` 字段与节点类的 `MODALITY` 属性对号入座, `@@@`/`###` 占位符的完整填充规则见该文件 docstring(含 6 分支决策表).
 
 ### Chat Handler 注册表
 
-`src/core/handlers.py` 的 `_HANDLER_SPECS` 表集中定义全部 handler, 数据形态, 排序约定与新增须知见该表头注释. 要点: 每个条目附 thinking 三态元数据(可切换档记构造参数名 / 不支持 / 强制思考), VLM Loader 的 `thinking` 开关值经 `handler_constructor` 按三态绑定, 不可切换档由 `clamp_thinking` 钳制并打 warning(覆盖绕过前端的 API 提交路径), `storage.py` 因此不感知 thinking 逻辑; 构造期固定参数(-Generic- 兜底的 `chat_format` 等)经 `functools.partial` 预绑定进 `HANDLERS` 的构造器; 启动时解析失败的类只从下拉框剔除并打 warning(防御 wheel 升级时的类变动, 不静默, 不阻断 import); 三态元数据与类签名的一致性由 `tests/test_handlers.py` 契约测试锁定. 前端 `web/vlm_loader.js` 按 `chat_handler` widget options 的自定义 key(经 `/object_info` 原样透传, 与注册表单一真源)做联动: `thinking_modes` 对 thinking 开关三态置灰, `image_token_handlers` 控制 image_min/max_tokens 仅在视觉类 handler 下显示(音频专用与 "None" 隐藏; widget 值本身不动, 重新显示时保留原值, loadmodel 对无视觉路径的 handler 把两值折算为 0 落盘); 另对 image_min/max_tokens 做区间互钳(修改任一侧越界时钳制另一侧, max=0 视为未设置; 只在用户编辑时触发, 载入工作流不改存量值, loader 侧报错保留兜底); JS 失效只损失置灰/显隐/互钳效果, 行为正确性由 Python 侧保证.
+`src/core/handlers.py` 的 `_HANDLER_SPECS` 表集中定义全部 handler, 数据形态, 排序约定与新增须知见该表头注释. 跨文件要点: 每个条目附 thinking 三态元数据, VLM Loader 的 `thinking` 开关值经 `handler_constructor` 按三态绑定, 不可切换档由 `clamp_thinking` 钳制(覆盖绕过前端的 API 提交路径), `storage.py` 因此不感知 thinking 逻辑; 三态元数据与类签名的一致性由 `tests/test_handlers.py` 契约测试锁定. 前端 `web/vlm_loader.js` 按 `chat_handler` widget options 的自定义 key `thinking_modes`/`image_token_handlers`(经 `/object_info` 原样透传, 与注册表单一真源)做 thinking 置灰, image_min/max_tokens 显隐与区间互钳(联动规则见该文件头注释); JS 失效只损失 UX 效果, 行为正确性由 Python 侧保证.
 
 ### 多模态输入
 
-- image Instruct: `mode` 下拉框切换逐张模式 `Per-Image`(逐张推理, 多图结果以 `======== Image N ========` 前缀行拼接, `split_instruct_output` 节点与 `json_to_bboxes` 的内建拆分均可还原为逐张列表)与批量模式 `Batch`(全部图片并入单次请求); 批量多图时缩放到 `max_size`, 单图保持原分辨率. `max_size` 仅在 Batch 档显示(`web/image_instruct.js` 按 mode widget options 透传的 `batch_mode_value` 联动, 隐藏值仍序列化; JS 失效只损失显隐效果)
-- video Instruct: `frames` 输入为 IMAGE 帧批次(ComfyUI 生态的视频通行形态), 按 `max_frames` linspace 均匀抽帧后缩放, 并在 system prompt 前注入"连续视频"语义提示
-- audio Instruct: ComfyUI `AUDIO` dict 由 `shared/encoding.py` 的 `audio2base64()` 均值混为单声道 16-bit WAV, 以 `input_audio` 内容项注入(重采样由 llama.cpp 的 mtmd 解码端完成), 服务 Qwen3-ASR 等音频 handler; 音频是否被 mmproj 支持由 llama-cpp-python 侧校验
+三个媒体 Instruct 的输入形态与处理流程见各自节点文件的模块 docstring. 跨文件要点: `max_size` 仅在 Batch 档显示(`web/image_instruct.js` 按 mode widget options 透传的 `batch_mode_value` 联动, 隐藏值仍序列化, JS 失效只损失显隐效果); audio 的重采样由 llama.cpp 的 mtmd 解码端完成, 音频是否被 mmproj 支持由 llama-cpp-python 侧校验.
 
 ### 推理输出与中断
 
 - 无会话状态: 每次执行都是全新的一次性请求(system prompt + 本次提问), 不保留任何跨执行的对话历史
-- text Instruct 的 `allow_thinking` 开关(默认关): 关闭时以 `reasoning_budget=0` 让思考块开启即强制闭合(请求期参数, 切换零成本; 非思考模型由 wheel 采样器的 reasoning_start 安全窗自动失效). 放 Instruct 而非 LLM Loader 是因为 text 侧 wheel 无模板级开关, reasoning_budget 采样器是唯一通用机制; 与 vlm 侧构造期 thinking 开关(切换需重载)的位置不对称是机制差异的忠实反映. 采样器按生成的 `<think>` 标签计数, 模板预注入 `<think>` 的形态无法被抑制, 残留思考块由 strip_thinking 剥离
-- `strip_thinking` 开关(默认开): 剥离三种思考形态 - `<think>...</think>` 推理块(兼容 generation prompt 已注入 `<think>` 导致输出只含闭合标签的情况), Gemma4 的 channel 格式(取最后一个 `<channel|>` 之后, 覆盖 E 系列无开标签的纯文本思考形态), GLM-4.1V 的 `<answer>` 包裹(handler 以 `</answer>` 为 stop token 导致开标签残留); 未闭合(生成截断)时均保持原样
-- `InterruptWatcher`: 推理期间守护线程每 200ms 轮询 `mm.processing_interrupted()`, 命中后调用 `Llama.abort()` 使生成立即停止; llama-cpp-python 在每次请求开始会 clear abort 事件, 因此监视线程命中后持续重复 set 以抗竞态
-- 每次节点执行结束后按 `is_hybrid_arch()`(`_model.is_hybrid()`/`is_recurrent()` C API)判断是否整体重置 KV cache(重置在 `_run()` 的 finally 中, image 逐张模式中间的多次请求之间不重置, 依赖 wheel 内置的 hybrid checkpoint 前缀匹配): hybrid/recurrent 架构(Qwen3.5, LFM2 系等)的线性注意力状态无法跨请求前缀复用; 纯 SWA 模型(Gemma3)不受影响
+- text Instruct 的 `allow_thinking` 开关(默认关)放 Instruct 而非 LLM Loader: text 侧 wheel 无模板级开关, `reasoning_budget` 采样器是唯一通用机制(请求期参数, 切换零成本); 与 vlm 侧构造期 thinking 开关(切换需重载)的位置不对称是机制差异的忠实反映. 折算与失效边界见 text 节点内注释
+- `strip_thinking` 开关(默认开)剥离三种思考形态(`<think>` 推理块, Gemma4 channel 格式, GLM-4.1V `<answer>` 包裹), 各形态成因与未闭合处理见 `instruct.py` 剥离函数 docstring
+- `InterruptWatcher`: 推理期间轮询 ComfyUI 中断标志, 命中后 `Llama.abort()` 立即停止生成, 抗竞态细节见类 docstring
+- 每次节点执行结束后按 `is_hybrid_arch()` 判断是否整体重置 KV cache: hybrid/recurrent 架构(Qwen3.5, LFM2 系等)的线性注意力状态无法跨请求前缀复用; 纯 SWA 模型(Gemma3)不受影响. 重置时机与逐张模式的例外见 `_run()` finally 处注释
 
 ## 修改代码须知
 
@@ -175,7 +158,7 @@ image 逐张模式的多图结果以 "======== Image N ========" 前缀行拼接
 - 全部用户可见文案(节点显示名, tooltip, placeholder, 报错)与控制台日志文本统一放 `src/i18n/` 语言文件, 代码经 `from ..i18n.lang import LANG` 取用; 不随语言切换的字符串(下拉框选项值, 分类名, `======== Image N ========` 前缀行模板, 日志前缀)放 `common_static.py`. 新增/修改文案必须同步更新 zh-CN 与 en-US 两份语言文件并保持逐行一一对应
 - 带运行时值的文案写成 `str.format` 具名占位符模板; 报错文案须单行; 语言文件排版规则(多字面量换行约定)由 `tests/test_i18n_format.py` 锁定, `pyproject.toml` 已对 `language_*.py` 豁免 ruff format(lint 仍生效)
 - 测试断言报错文案时引用 `LANG` 而非硬编码字符串, 使断言随语言文件自动跟随
-- 例外(不进 i18n): 任务预设与系统提示词预设(领域内容), chat handler 显示名(`handlers.py` 注册表 key, 功能性标识), video Instruct 注入的"连续视频"语义提示与 `MEDIA_WORD`(prompt 内容), `prompts.py` 的 import 期模态校验报错(开发期防御), 根入口 `__init__.py` 的 import 失败安装指引(i18n 层可能同在失败的导入链上, 硬编码英文), `lang.py` 的语言文件缺失警告与报错(加载器自身不能依赖语言文件, 警告文案硬编码 {语言: 文案} 查表; 所选语言缺失时打 warning 并回退默认英语, 默认英语文件也缺失时抛错)
+- 例外(不进 i18n): 任务预设与系统提示词预设(领域内容), chat handler 显示名(`handlers.py` 注册表 key, 功能性标识), video Instruct 注入的"连续视频"语义提示与 `MEDIA_WORD`(prompt 内容), `prompts.py` 的 import 期模态校验报错(开发期防御), 根入口 `__init__.py` 的 import 失败安装指引(i18n 层可能同在失败的导入链上, 硬编码英文), `lang.py` 的语言文件缺失警告与报错(加载器自身不能依赖语言文件, 回退行为见其 docstring)
 
 ### 文档维护原则
 
@@ -185,7 +168,7 @@ image 逐张模式的多图结果以 "======== Image N ========" 前缀行拼接
 ### 提交前检查
 
 - 每次 git commit 前必须先修复全部 ruff 问题: 依次运行 `python -m ruff check src tests --fix` 与 `python -m ruff format src tests`(用 ComfyUI 嵌入式 Python, 即 `python_embeded/python.exe`), 两者均无报告后再提交
-- 改动 `web/*.js` 时必须运行 JS 测试并全部通过: `node --test "tests/web/*.test.mjs"`(需本机 Node >= 22.15, 零 npm 依赖, 无 package.json; app 对象与 widget 均为替身, 只锁 JS 自身逻辑, 与 ComfyUI 前端渲染层的真实契约仍靠手动验证)
+- 改动 `web/*.js` 时必须运行 JS 测试并全部通过: `node --test "tests/web/*.test.mjs"`(需本机 Node >= 22.15, 零 npm 依赖; 测试只锁 JS 自身逻辑, 与 ComfyUI 前端渲染层的真实契约仍靠手动验证)
 
 ### Commit message 规范
 
@@ -209,7 +192,7 @@ image 逐张模式的多图结果以 "======== Image N ========" 前缀行拼接
 
 项目代码只对接 `requirements.txt` 中固定的依赖版本(特别是 llama-cpp-python 的 JamePeng Vulkan wheel), 不为历史版本或官方构建编写兼容/回退代码. mmproj 路径统一用 `mmproj_path` 键传入 handler.
 
-当前依赖的 wheel 对接面清单(升级 wheel 时按单复核, 与 `tests/test_wheel_contract.py` 一一对应): `llm.n_tokens`, `llm._ctx.memory_clear`, `llm._hybrid_cache_mgr`, `llm._model.is_hybrid()/is_recurrent()`, `llama_cpp._ggml`(设备枚举符号), chat handler 的 `mmproj_path` 实例属性(`require_mmproj` 的判定依据, getattr 兜底使重命名不报错而是恒判"未配置"), chat handler 的 `close()`(`clean()` 的级联释放兜底, 依赖其幂等性), `Llama.close()/abort()`(公开方法, 但同为按单复核的对接面), `llama_cpp.llama_cpp.llama_split_mode` 枚举(NONE/LAYER), `create_chat_completion` 接受 Parameters 节点全部 12 个采样参数(UI 键 `max_gen_tokens` 由 instruct 的 `_run()` 映射回 `max_tokens`), `seed` 与 `reasoning_budget`(text Instruct 的 `allow_thinking` 开关折算). 契约测试静态检查上述接口存在性(不加载模型), 升级 wheel 后运行即可发现断裂; 公开 handler 类的契约另由 `tests/test_handlers.py` 锁定. 另有一条无法静态锁定的行为性假设, 升级时人工复核: chat handler 渲染消息时不改写 messages 入参(image 逐张模式复用同一 messages 列表, 仅原位改写其中 image_url 项, handler 若就地规范化 messages 会使逐张结果串味).
+当前依赖的 wheel 对接面清单(升级 wheel 时按单复核, 与 `tests/test_wheel_contract.py` 一一对应, 各项的依赖缘由见测试注释): `llm.n_tokens`, `llm._ctx.memory_clear`, `llm._hybrid_cache_mgr`, `llm._model.is_hybrid()/is_recurrent()`, `llama_cpp._ggml`(设备枚举符号), chat handler 的 `mmproj_path` 实例属性与 `close()`, `Llama.close()/abort()`, `llama_cpp.llama_cpp.llama_split_mode` 枚举(NONE/LAYER), `create_chat_completion` 接受 Parameters 节点全部 12 个采样参数与 `seed`, `reasoning_budget`. 契约测试静态检查上述接口存在性(不加载模型), 升级 wheel 后运行即可发现断裂; 公开 handler 类的契约另由 `tests/test_handlers.py` 锁定. 另有一条无法静态锁定的行为性假设, 升级时人工复核: chat handler 渲染消息时不改写 messages 入参(image 逐张模式复用同一 messages 列表, 仅原位改写其中 image_url 项, handler 若就地规范化 messages 会使逐张结果串味).
 
 ### INPUT_TYPES 字段顺序
 
@@ -219,14 +202,9 @@ Instruct 子类的字段顺序约定: 模型端口 -> 媒体输入 -> `seed_inpu
 
 ### Wheel 构建与发布 (CI)
 
-`.github/workflows/build-vulkan-wheels-abi3.yml` 手动触发(workflow_dispatch, 输入 JamePeng/llama-cpp-python 的 ref), 并行构建 Windows + Linux 两个 ABI3 wheel 并自动发布 GitHub Release. 要点:
+`.github/workflows/build-vulkan-wheels-abi3.yml` 手动触发(workflow_dispatch, 输入 JamePeng/llama-cpp-python 的 ref), 并行构建 Windows + Linux 两个 ABI3 wheel 并自动发布 GitHub Release; 构建配置的取舍与坑(`+vulkan` 版本注入, manylinux_2_31 目标, SPIRV-Headers 路径, repair 的 LD_LIBRARY_PATH 限制等)见 workflow 文件内注释. Windows 编译走 sccache, 冷缓存约 25 分钟, 热缓存约 5 分钟.
 
-- `+vulkan` 本地版本在构建前注入 `llama_cpp/__init__.py` 的 `__version__`, wheel 文件名与 METADATA 天然一致(不做构建后重命名)
-- 两平台均开启 `GGML_BACKEND_DL + GGML_CPU_ALL_VARIANTS`(CPU 后端按指令集运行时分发)
-- Windows: Vulkan SDK 走 action 缓存(stripdown 后缓存), 编译走 sccache; 冷缓存约 25 分钟, 热缓存约 5 分钟
-- Linux: Vulkan 头文件/glslc/loader 来自 conda-forge(不下载 LunarG SDK tarball); `CMAKE_PREFIX_PATH=/opt/vulkan` 是 `find_package(SPIRV-Headers)` 的必需项, 不能删
-- Linux repair 目标为 `manylinux_2_31`(gcc-toolset-14 产物引用 GLIBCXX_3.4.25, 超出 2_28 白名单), 且 repair 的 `LD_LIBRARY_PATH` 不能包含 `/opt/vulkan/lib`(避免 auditwheel 解析到 conda 的新版 libstdc++)
-- 发布新 wheel 后需同步更新 `requirements.txt` 的两个 URL 和两个 README 的平台说明
+发布新 wheel 后需同步更新 `requirements.txt` 的两个 URL 和两个 README 的平台说明.
 
 ## 已知问题
 
