@@ -66,6 +66,16 @@ class TestWheelPrivateApiContract(unittest.TestCase):
         ):
             self.assertTrue(hasattr(_ggml, name), f"llama_cpp._ggml missing symbol: {name}")
 
+        # devices.py 与 check_devices.py 绕过 _ggml 封装 (wheel 未提供),
+        # 经 libggml_base CDLL 直取的三个 C 符号; CDLL 的 hasattr 会真实
+        # 解析符号 (getattr -> dlsym/GetProcAddress), 与 import 期同路径
+        for name in (
+            "ggml_backend_dev_name",
+            "ggml_backend_dev_description",
+            "ggml_backend_dev_type",
+        ):
+            self.assertTrue(hasattr(_ggml.libggml_base, name), f"libggml_base missing C symbol: {name}")
+
     def test_split_mode_enum(self):
         import llama_cpp.llama_cpp as llama_cpp_lib
 
