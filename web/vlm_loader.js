@@ -53,18 +53,24 @@ app.registerExtension({
                 // 不置灰不覆写, 使缺类 handler 的工作流在保存时不丢序列化的
                 // thinking 值; 实际生效值由 Python 侧钳制/校验兜底
                 const mode = thinkingModes[label] ?? "toggle";
+                // forced/none 档共用的覆写动作: 从 toggle 档切出的那一次缓存用户设定
+                const overrideThinking = (value) => {
+                    if (prevThinkingMode === "toggle") {
+                        thinkingWidget._userValue = thinkingWidget.value;
+                    }
+                    thinkingWidget.value = value;
+                    thinkingWidget.disabled = true;
+                };
                 if (mode === "toggle") {
                     if (thinkingWidget._userValue !== undefined) {
                         thinkingWidget.value = thinkingWidget._userValue;
                         delete thinkingWidget._userValue;
                     }
                     thinkingWidget.disabled = false;
-                } else {
-                    if (prevThinkingMode === "toggle") {
-                        thinkingWidget._userValue = thinkingWidget.value;
-                    }
-                    thinkingWidget.value = mode === "forced";
-                    thinkingWidget.disabled = true;
+                } else if (mode === "forced") {
+                    overrideThinking(true);
+                } else if (mode === "none") {
+                    overrideThinking(false);
                 }
                 prevThinkingMode = mode;
             }

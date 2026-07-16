@@ -102,14 +102,18 @@ def resolve_device_selection(gpu_device):
     model->devices 列表(即 _selectable_devices 的顺序), 不是 ggml 全局设备序号.
     Auto 保持 llama.cpp 默认行为: LAYER 模式, 独显优先, 多独显按层切分.
     """
-    if gpu_device != AUTO_LABEL:
-        for i, dev in enumerate(_selectable_devices()):
-            if _device_label(dev) == gpu_device:
-                return i, SPLIT_MODE_NONE
-        # 防御分支: 选项列表与 _selectable_devices 同源且进程内静态, 跨进程的
-        # 过期 label(硬件/驱动变更后的旧工作流)会先被 ComfyUI 对 combo 输入的
-        # 前置校验(value_not_in_list)拒绝, 正常执行走不到这里
-        logger.warning(LOG_PREFIX + _LOGS["device_not_selectable"].format(gpu_device=gpu_device))
+    if gpu_device == AUTO_LABEL:
+        return 0, SPLIT_MODE_LAYER
+
+    for i, dev in enumerate(_selectable_devices()):
+        if _device_label(dev) == gpu_device:
+            return i, SPLIT_MODE_NONE
+
+    # 防御分支: 选项列表与 _selectable_devices 同源且进程内静态, 跨进程的
+    # 过期 label(硬件/驱动变更后的旧工作流)会先被 ComfyUI 对 combo 输入的
+    # 前置校验(value_not_in_list)拒绝, 正常执行走不到这里; 未知值按 Auto
+    # 语义回退并留警告
+    logger.warning(LOG_PREFIX + _LOGS["device_not_selectable"].format(gpu_device=gpu_device))
     return 0, SPLIT_MODE_LAYER
 
 

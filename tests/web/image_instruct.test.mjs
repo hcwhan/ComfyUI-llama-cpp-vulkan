@@ -1,6 +1,6 @@
 // web/image_instruct.js 的单元测试: increment_seed 仅在 Per-Image 档显示,
-// max_size 仅在 Batch 档显示, 显隐切换保留值, batch_mode_value 缺失时不联动,
-// onConfigure 再同步.
+// max_size 仅在 Batch 档显示, 显隐切换保留值, 自定义 key (each_mode_value /
+// batch_mode_value) 任一缺失时不联动, onConfigure 再同步.
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -16,8 +16,8 @@ const ext = extensions.find((e) => e.name === "llama-cpp-vulkan.image-instruct")
 const MODE_EACH = "Per-Image";
 const MODE_BATCH = "Batch";
 
-// 模块级 batchModeValue 在每个测试开头显式重置, 测试之间互不泄漏
-const registerDef = (options = { batch_mode_value: MODE_BATCH }) => {
+// 模块级 eachModeValue/batchModeValue 在每个测试开头显式重置, 测试之间互不泄漏
+const registerDef = (options = { each_mode_value: MODE_EACH, batch_mode_value: MODE_BATCH }) => {
     ext.beforeRegisterNodeDef(null, {
         name: NODE_NAME,
         input: { required: { mode: [[MODE_EACH, MODE_BATCH], options] } },
@@ -77,12 +77,21 @@ test("切换 mode: 显隐互补随动且值保留, 无变化时不重排", () =>
     assert.equal(node.setSizeCalls, 3);
 });
 
-test("batch_mode_value 缺失时不联动", () => {
+test("自定义 key 全缺失时不联动", () => {
     registerDef({});
     const node = createNode(MODE_EACH);
     assert.equal(findWidget(node, "max_size").type, "number");
     assert.equal(findWidget(node, "increment_seed").type, "toggle");
     assert.equal(findWidget(node, "mode").callback, undefined);
+});
+
+test("自定义 key 任一缺失时不联动", () => {
+    registerDef({ each_mode_value: MODE_EACH });
+    const nodeA = createNode(MODE_BATCH);
+    assert.equal(findWidget(nodeA, "increment_seed").type, "toggle");
+    registerDef({ batch_mode_value: MODE_BATCH });
+    const nodeB = createNode(MODE_EACH);
+    assert.equal(findWidget(nodeB, "max_size").type, "number");
 });
 
 test("其他 comfyClass 的节点不被处理", () => {

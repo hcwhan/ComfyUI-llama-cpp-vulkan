@@ -65,11 +65,10 @@ class TestJsonToPixelBboxes(unittest.TestCase):
         with self.assertRaises(ValueError):
             json_to_pixel_bboxes(["not a dict"], BBOX_MODE_SIMPLE)
 
-    def test_unknown_mode_passthrough(self):
-        # 显式锁定 fallthrough 行为: 两种 Qwen 模式之外的任意 mode 字符串
-        # 一律视为已是原图像素坐标透传 (Simple 档位即经由该分支到达)
-        items = [{"bbox_2d": [10, 20, 30, 40]}]
-        self.assertEqual(json_to_pixel_bboxes(items, "unknown-mode"), [(10, 20, 30, 40)])
+    def test_unknown_mode_raises_value_error(self):
+        # 三个已知档位均显式比对 (枚举分支规范), 名单外的 mode 报错而非静默透传
+        with self.assertRaises(ValueError):
+            json_to_pixel_bboxes([{"bbox_2d": [10, 20, 30, 40]}], "unknown-mode")
 
 
 class TestDrawBbox(unittest.TestCase):

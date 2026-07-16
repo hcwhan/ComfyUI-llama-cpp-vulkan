@@ -357,6 +357,7 @@ LANG = {
                     "item_not_object": '期望列表项为形如 {{"bbox_2d": [x1, y1, x2, y2], "label": "..."}} 的对象, 实际列表项为: {item!r}',
                     "missing_bbox_2d": 'BBox 项缺少有效的 "bbox_2d": [x1, y1, x2, y2] 字段: {item!r}',
                     "coords_not_numeric": 'BBox 的 "bbox_2d" 坐标必须为数字: {item!r}',
+                    "unknown_mode": "未知的坐标换算模式: {mode}",
                 },
             },
 

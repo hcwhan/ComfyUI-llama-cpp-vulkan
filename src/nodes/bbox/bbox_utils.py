@@ -9,7 +9,7 @@ import torch
 from PIL import Image, ImageDraw, ImageFont
 from scipy.ndimage import gaussian_filter
 
-from ...i18n.common_static import BBOX_MODE_QWEN3, BBOX_MODE_QWEN25_VL, LOG_PREFIX
+from ...i18n.common_static import BBOX_MODE_QWEN3, BBOX_MODE_QWEN25_VL, BBOX_MODE_SIMPLE, LOG_PREFIX
 from ...i18n.lang import LANG
 from ...shared.encoding import tensor_to_uint8
 from ...shared.logger import logger
@@ -104,13 +104,17 @@ def json_to_pixel_bboxes(json_items, mode, width=0, height=0):
     反向坐标 (x0 > x1 或 y0 > y1, LLM 常见错误) 按 min/max 归一为规范 xyxy
     次序, 下游三条消费路径 (画框 / SEGS / MASK) 因此天然一致.
     """
-    if mode == BBOX_MODE_QWEN25_VL:
-        rw, rh = qwen25_smart_resize(width, height)
-        sx, sy = width / rw, height / rh
+    if mode == BBOX_MODE_SIMPLE:
+        sx = sy = 1.0
     elif mode == BBOX_MODE_QWEN3:
         sx, sy = width / 1000, height / 1000
+    elif mode == BBOX_MODE_QWEN25_VL:
+        rw, rh = qwen25_smart_resize(width, height)
+        sx, sy = width / rw, height / rh
     else:
-        sx = sy = 1.0
+        # 正常路径不可达 (mode 来自 combo, ComfyUI 前置校验拒绝名单外的值),
+        # 防御未知值
+        raise ValueError(_ERRORS["unknown_mode"].format(mode=mode))
 
     bboxes = []
     for item in json_items:

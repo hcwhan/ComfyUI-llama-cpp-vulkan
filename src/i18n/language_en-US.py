@@ -357,6 +357,7 @@ LANG = {
                     "item_not_object": 'Expected list items to be objects like {{"bbox_2d": [x1, y1, x2, y2], "label": "..."}}, got item: {item!r}',
                     "missing_bbox_2d": 'BBox item is missing a valid "bbox_2d": [x1, y1, x2, y2] field: {item!r}',
                     "coords_not_numeric": 'BBox "bbox_2d" coordinates must be numeric: {item!r}',
+                    "unknown_mode": "Unknown coordinate mode: {mode}",
                 },
             },
 
