@@ -1,5 +1,6 @@
-// web/image_instruct.js 的单元测试: max_size 仅在 mode 为 Batch 档时显示,
-// 显隐切换保留值, batch_mode_value 缺失时不联动, onConfigure 再同步.
+// web/image_instruct.js 的单元测试: increment_seed 仅在 Per-Image 档显示,
+// max_size 仅在 Batch 档显示, 显隐切换保留值, batch_mode_value 缺失时不联动,
+// onConfigure 再同步.
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -26,6 +27,7 @@ const registerDef = (options = { batch_mode_value: MODE_BATCH }) => {
 const createNode = (modeValue) => {
     const node = makeNode(NODE_NAME, [
         makeWidget("mode", modeValue, "combo"),
+        makeWidget("increment_seed", false, "toggle"),
         makeWidget("max_size", 256, "number"),
     ]);
     ext.nodeCreated(node);
@@ -42,46 +44,57 @@ test("扩展已注册", () => {
     assert.ok(ext);
 });
 
-test("Per-Image 档创建: max_size 隐藏并重排尺寸", () => {
+test("Per-Image 档创建: max_size 隐藏, increment_seed 可见", () => {
     registerDef();
     const node = createNode(MODE_EACH);
     assert.equal(findWidget(node, "max_size").type, "hidden");
+    assert.equal(findWidget(node, "increment_seed").type, "toggle");
     assert.equal(node.setSizeCalls, 1);
 });
 
-test("Batch 档创建: max_size 可见且不重排尺寸", () => {
+test("Batch 档创建: max_size 可见, increment_seed 隐藏", () => {
     registerDef();
     const node = createNode(MODE_BATCH);
     assert.equal(findWidget(node, "max_size").type, "number");
-    assert.equal(node.setSizeCalls, 0);
+    assert.equal(findWidget(node, "increment_seed").type, "hidden");
+    assert.equal(node.setSizeCalls, 1);
 });
 
-test("切换 mode: 显隐随动且值保留, 无变化时不重排", () => {
+test("切换 mode: 显隐互补随动且值保留, 无变化时不重排", () => {
     registerDef();
     const node = createNode(MODE_BATCH);
     switchMode(node, MODE_EACH);
     assert.equal(findWidget(node, "max_size").type, "hidden");
-    assert.equal(node.setSizeCalls, 1);
+    assert.equal(findWidget(node, "increment_seed").type, "toggle");
+    assert.equal(node.setSizeCalls, 2);
     switchMode(node, MODE_EACH);
-    assert.equal(node.setSizeCalls, 1);
+    assert.equal(node.setSizeCalls, 2);
     switchMode(node, MODE_BATCH);
     assert.equal(findWidget(node, "max_size").type, "number");
     assert.equal(findWidget(node, "max_size").value, 256);
-    assert.equal(node.setSizeCalls, 2);
+    assert.equal(findWidget(node, "increment_seed").type, "hidden");
+    assert.equal(findWidget(node, "increment_seed").value, false);
+    assert.equal(node.setSizeCalls, 3);
 });
 
 test("batch_mode_value 缺失时不联动", () => {
     registerDef({});
     const node = createNode(MODE_EACH);
     assert.equal(findWidget(node, "max_size").type, "number");
+    assert.equal(findWidget(node, "increment_seed").type, "toggle");
     assert.equal(findWidget(node, "mode").callback, undefined);
 });
 
 test("其他 comfyClass 的节点不被处理", () => {
     registerDef();
-    const node = makeNode("other_node", [makeWidget("mode", MODE_EACH, "combo"), makeWidget("max_size", 256, "number")]);
+    const node = makeNode("other_node", [
+        makeWidget("mode", MODE_EACH, "combo"),
+        makeWidget("increment_seed", false, "toggle"),
+        makeWidget("max_size", 256, "number"),
+    ]);
     ext.nodeCreated(node);
     assert.equal(findWidget(node, "max_size").type, "number");
+    assert.equal(findWidget(node, "increment_seed").type, "toggle");
 });
 
 test("onConfigure 恢复序列化值后再同步", () => {
@@ -91,6 +104,7 @@ test("onConfigure 恢复序列化值后再同步", () => {
     findWidget(node, "mode").value = MODE_EACH;
     node.onConfigure();
     assert.equal(findWidget(node, "max_size").type, "hidden");
+    assert.equal(findWidget(node, "increment_seed").type, "toggle");
 });
 
 test("原有 widget callback 仍被调用", () => {
@@ -100,7 +114,11 @@ test("原有 widget callback 仍被调用", () => {
     modeWidget.callback = () => {
         called += 1;
     };
-    const node = makeNode(NODE_NAME, [modeWidget, makeWidget("max_size", 256, "number")]);
+    const node = makeNode(NODE_NAME, [
+        modeWidget,
+        makeWidget("increment_seed", false, "toggle"),
+        makeWidget("max_size", 256, "number"),
+    ]);
     ext.nodeCreated(node);
     modeWidget.callback();
     assert.equal(called, 1);

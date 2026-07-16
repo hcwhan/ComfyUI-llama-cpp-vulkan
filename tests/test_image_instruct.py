@@ -7,6 +7,8 @@
   字面量断言能报出
 - 逐张模式: 单图输出不加前缀行
 - 逐张模式: 中断置位时循环立即抛 InterruptProcessingException, 不再发起请求
+- 逐张模式: increment_seed 关闭 (默认) 时各请求复用同一 seed, 开启时第 i 张
+  用 seed+i 派生, 且回绕避开 llama.cpp 的随机种子哨兵值 0xFFFFFFFF
 - 批量模式: 全部图片并入单条 user 消息 (文本项 + N 个 image_url 项),
   多图逐张缩放到 max_size, 单图保持原分辨率 (tooltip 承诺 "仅在发送
   多张图片时生效")
@@ -38,6 +40,7 @@ class _FakeVlm:
     def __init__(self, outputs):
         self._outputs = list(outputs)
         self.calls = 0
+        self.seeds = []
         self.last_messages = None
         self.n_tokens = 0
         self._model = types.SimpleNamespace(is_hybrid=lambda: False, is_recurrent=lambda: False)
@@ -49,6 +52,7 @@ class _FakeVlm:
 
     def create_chat_completion(self, messages, seed, **params):
         self.last_messages = messages
+        self.seeds.append(seed)
         text = self._outputs[self.calls]
         self.calls += 1
         return {"choices": [{"message": {"content": text}}]}
@@ -79,15 +83,16 @@ class _ImageInstructTestBase(unittest.TestCase):
         LLAMA_CPP_STORAGE.chat_handler = types.SimpleNamespace(mmproj_path="fake.mmproj")
         LLAMA_CPP_STORAGE.current_config = self.config
 
-    def _process(self, images, max_size=256):
+    def _process(self, images, max_size=256, seed=0, increment_seed=False):
         (out,) = self.node.process(
             vlm_model=self.config,
             images=images,
-            seed=0,
+            seed=seed,
             preset_prompt="空白 - 空",
             custom_prompt="一只猫",
             system_prompt="",
             mode=self.MODE,
+            increment_seed=increment_seed,
             max_size=max_size,
             strip_thinking=True,
             force_offload=False,
@@ -112,6 +117,25 @@ class TestImageInstructInferEach(_ImageInstructTestBase):
         self.assertEqual(llm.calls, 1)
         self.assertEqual(out, "唯一结果")
         self.assertEqual(split_image_results(out), ["唯一结果"])
+
+    def test_same_seed_reused_by_default(self):
+        llm = _FakeVlm(["a", "b"])
+        self._install(llm)
+        self._process(torch.zeros(2, 4, 4, 3), seed=7)
+        self.assertEqual(llm.seeds, [7, 7])
+
+    def test_increment_seed_derives_per_image(self):
+        llm = _FakeVlm(["a", "b", "c"])
+        self._install(llm)
+        self._process(torch.zeros(3, 4, 4, 3), seed=7, increment_seed=True)
+        self.assertEqual(llm.seeds, [7, 8, 9])
+
+    def test_increment_seed_wraps_around_sentinel(self):
+        # seed 上限 0xFFFFFFFE, +1 后回绕到 0, 不落在哨兵值 0xFFFFFFFF
+        llm = _FakeVlm(["a", "b"])
+        self._install(llm)
+        self._process(torch.zeros(2, 4, 4, 3), seed=0xFFFFFFFE, increment_seed=True)
+        self.assertEqual(llm.seeds, [0xFFFFFFFE, 0])
 
     def test_interrupt_raises_before_request(self):
         # 循环起点检查中断标志, 命中即抛且不再发起补全请求

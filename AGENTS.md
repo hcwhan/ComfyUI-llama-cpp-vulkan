@@ -26,7 +26,7 @@ ComfyUI-llama-cpp-vulkan/
   web/
     widget_utils.js           # 前端共用工具: widget 显隐切换(hidden 标志 + type/computeSize 双轨)
     vlm_loader.js             # VLM Loader widget 联动: thinking 三态置灰, image token 字段显隐(纯 UX 增强)
-    image_instruct.js         # image Instruct widget 联动: max_size 仅在 Batch 档显示(纯 UX 增强)
+    image_instruct.js         # image Instruct widget 联动: increment_seed 仅 Per-Image 档 / max_size 仅 Batch 档显示(纯 UX 增强)
   src/
     i18n/                     # 文案层: 全部用户可见文案与控制台日志的单一来源
       lang.py                 #   语言加载器, LANGUAGE 常量切换语言, 导出 LANG 字典
@@ -141,7 +141,7 @@ image 逐张模式的多图结果以 "======== Image N ========" 前缀行拼接
 
 ### 多模态输入
 
-三个媒体 Instruct 的输入形态与处理流程见各自节点文件的模块 docstring. 跨文件要点: `max_size` 仅在 Batch 档显示(`web/image_instruct.js` 按 mode widget options 透传的 `batch_mode_value` 联动, 隐藏值仍序列化, JS 失效只损失显隐效果); audio 的重采样由 llama.cpp 的 mtmd 解码端完成, 音频是否被 mmproj 支持由 llama-cpp-python 侧校验.
+三个媒体 Instruct 的输入形态与处理流程见各自节点文件的模块 docstring. 跨文件要点: `increment_seed` 仅在 Per-Image 档显示, `max_size` 仅在 Batch 档显示(均由 `web/image_instruct.js` 按 mode widget options 透传的 `batch_mode_value` 联动, 隐藏值仍序列化, JS 失效只损失显隐效果); audio 的重采样由 llama.cpp 的 mtmd 解码端完成, 音频是否被 mmproj 支持由 llama-cpp-python 侧校验.
 
 ### 推理输出与中断
 

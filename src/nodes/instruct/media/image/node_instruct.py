@@ -1,7 +1,8 @@
 """llama.cpp image Instruct 节点, 图片推理.
 
 - 逐张模式 (Per-Image): 逐张推理, 多图结果用 "======== Image N ========" 前缀行拼接输出
-  (下游用 Split Instruct Output 拆回列表, JSON to BBoxes 会自动拆分)
+  (下游用 Split Instruct Output 拆回列表, JSON to BBoxes 会自动拆分);
+  increment_seed 开启时第 i 张图 (0 起) 以 seed+i 为种子, 使相同图片也能得到不同结果
 - 批量模式 (Batch): 全部图片并入同一条 user 消息, 一次推理; 多图时缩放到 max_size
 """
 
@@ -31,7 +32,8 @@ class llama_cpp_image_instruct(llama_cpp_media_instruct_base):
                 **cls.seed_input(),
                 **cls.prompt_inputs(),
                 # batch_mode_value 是自定义 key, 经 /object_info 原样透传给前端 JS
-                # (web/image_instruct.js): max_size 仅在 Batch 档显示, 与常量单一真源
+                # (web/image_instruct.js): increment_seed 仅在 Per-Image 档显示,
+                # max_size 仅在 Batch 档显示, 与常量单一真源
                 "mode": (
                     [IMAGE_MODE_EACH, IMAGE_MODE_BATCH],
                     {
@@ -40,6 +42,7 @@ class llama_cpp_image_instruct(llama_cpp_media_instruct_base):
                         "batch_mode_value": IMAGE_MODE_BATCH,
                     },
                 ),
+                "increment_seed": ("BOOLEAN", {"default": False, "tooltip": _TIPS["increment_seed"]}),
                 "max_size": (
                     "INT",
                     {
@@ -55,7 +58,17 @@ class llama_cpp_image_instruct(llama_cpp_media_instruct_base):
             "optional": cls.optional_inputs(),
         }
 
-    def _infer_each(self, messages, user_content, images, seed, params, extract_text, watcher):
+    def _infer_each(
+        self,
+        messages,
+        user_content,
+        images,
+        seed,
+        increment_seed,
+        params,
+        extract_text,
+        watcher,
+    ):
         # 同一 messages 列表跨多次请求复用, 每轮仅原位改写 image_content 的
         # url: 依赖 handler 渲染消息时不改写 messages 入参 (当前 wheel 的
         # MTMD handler 满足; 行为性假设无法静态锁定, 已记入 AGENTS.md
@@ -70,7 +83,10 @@ class llama_cpp_image_instruct(llama_cpp_media_instruct_base):
             if watcher.interrupted or mm.processing_interrupted():
                 raise mm.InterruptProcessingException()
             image_content["image_url"] = image_content_item(tensor_to_uint8(image))["image_url"]
-            output = LLAMA_CPP_STORAGE.llm.create_chat_completion(messages=messages, seed=seed, **params)
+            # 取模 0xFFFFFFFF 使派生值回绕到 [0, 0xFFFFFFFE], 避开 llama.cpp
+            # 的随机种子哨兵值 0xFFFFFFFF (语义见 seed_input 的注释)
+            request_seed = (seed + i) % 0xFFFFFFFF if increment_seed else seed
+            output = LLAMA_CPP_STORAGE.llm.create_chat_completion(messages=messages, seed=request_seed, **params)
             # 前缀行模板与 shared/text_utils 的拆分正则同源 (common_static)
             if len(images) > 1:
                 tmp_list.append(IMAGE_RESULT_SEPARATOR_TEMPLATE.format(n=i + 1))
@@ -78,7 +94,16 @@ class llama_cpp_image_instruct(llama_cpp_media_instruct_base):
 
         return "\n\n".join(tmp_list)
 
-    def _infer_batch(self, messages, user_content, images, max_size, seed, params, extract_text):
+    def _infer_batch(
+        self,
+        messages,
+        user_content,
+        images,
+        seed,
+        max_size,
+        params,
+        extract_text,
+    ):
         for image in images:
             if len(images) > 1:
                 user_content.append(image_content_item(scale_image(image, max_size)))
@@ -95,6 +120,7 @@ class llama_cpp_image_instruct(llama_cpp_media_instruct_base):
         custom_prompt,
         system_prompt,
         mode,
+        increment_seed,
         max_size,
         strip_thinking,
         force_offload,
@@ -106,8 +132,9 @@ class llama_cpp_image_instruct(llama_cpp_media_instruct_base):
 
         def runner(messages, user_content, seed, params, extract_text, watcher):
             self.require_mmproj("Image")
+            if mode == IMAGE_MODE_EACH:
+                return self._infer_each(messages, user_content, images, seed, increment_seed, params, extract_text, watcher)
             if mode == IMAGE_MODE_BATCH:
-                return self._infer_batch(messages, user_content, images, max_size, seed, params, extract_text)
-            return self._infer_each(messages, user_content, images, seed, params, extract_text, watcher)
+                return self._infer_batch(messages, user_content, images, seed, max_size, params, extract_text)
 
         return self._run(vlm_model, seed, preset_prompt, custom_prompt, system_prompt, strip_thinking, force_offload, parameters, runner)

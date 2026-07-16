@@ -293,6 +293,10 @@ LANG = {
                         'Per-Image = each image is inferred separately for its own result; a single image is output directly, multiple images are joined into one output with "======== Image N ========" prefix lines (N starts at 1).\n'
                         "Batch = all images go into a single request (multiple images are scaled to max_size, a single image keeps its original resolution)."
                     ),
+                    "increment_seed": (
+                        "Per-Image mode only: when on, the N-th image uses seed+N-1 as its seed (the random-seed sentinel value is skipped),\n"
+                        "so identical images can still produce different results; when off, all images reuse the same seed."
+                    ),
                     "max_size": (
                         "Maximum edge length of input image resolution in Batch mode, downscaled proportionally when exceeded.\n"
                         "Only applies when sending multiple images, a single image keeps its original resolution."
