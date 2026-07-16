@@ -36,6 +36,13 @@ class TestTensorToUint8(unittest.TestCase):
         arr = tensor_to_uint8(t)
         self.assertEqual(arr.tolist(), [[[0, 127, 255], [0, 255, 63]]])
 
+    def test_single_channel_repeated_to_rgb(self):
+        # 灰度输入 (个别第三方节点输出 [H,W,1]) 复制为 3 通道:
+        # Image.fromarray 对 [H,W,1] 抛 TypeError, 三个 PIL 消费点同时受益
+        arr = tensor_to_uint8(torch.full((1, 2, 2, 1), 0.5))
+        self.assertEqual(arr.shape, (2, 2, 3))
+        self.assertTrue((arr == 127).all())
+
 
 class TestAudio2Base64(unittest.TestCase):
     def test_multichannel_mean_mix_to_mono(self):

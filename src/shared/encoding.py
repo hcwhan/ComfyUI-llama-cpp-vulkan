@@ -18,10 +18,15 @@ def tensor_to_uint8(image: torch.Tensor):
 
     只剥离批次维, 不用 squeeze(): squeeze 会把 H=1/W=1 的边缘尺寸也压掉,
     导致 PIL 把 [W,C] 误解析为灰度图.
+    单通道输入 (个别第三方节点的灰度输出) 复制为 3 通道: Image.fromarray
+    对 [H,W,1] 抛 TypeError, 转 RGB 使全部 PIL 消费点 (编码/缩放/画框)
+    一致可用.
     """
     arr = image.cpu().numpy()
     if arr.ndim == 4:
         arr = arr[0]
+    if arr.ndim == 3 and arr.shape[-1] == 1:
+        arr = np.repeat(arr, 3, axis=-1)
     return np.clip(255.0 * arr, 0, 255).astype(np.uint8)
 
 
