@@ -53,11 +53,18 @@ def _estimate_kv_bytes(meta, layers, n_ctx):
 
     每 token 每层 KV = head_count_kv * (key_dim + value_dim) * 2 字节;
     hybrid 模型(线性注意力层的 head_count_kv 为 0)经数组均值自然折算;
+    纯 recurrent 模型(head_count_kv 为 0 或全 0 数组)明确无 KV cache, 返回 0
+    (循环状态本身占用 O(1) 且小, 由 _BASE_OVERHEAD 缓冲), 与字段缺失区分,
+    不落含随 n_ctx 线性放大 KV 项的体积折算回退;
     SWA(滑窗注意力)模型的滑窗层按窗口大小而非全量 n_ctx 折算 token 数.
     """
     kv_heads = _as_number(meta.get("head_count_kv"))
-    if not layers or not kv_heads:
+    if not layers or kv_heads is None:
         return None
+    if kv_heads == 0:
+        # 提前返回, 纯 recurrent 模型缺 head_count/embedding_length 等
+        # 注意力字段属正常, 不应因此误入回退
+        return 0
     key_dim = _as_number(meta.get("key_length"))
     if key_dim is None:
         heads = _as_number(meta.get("head_count"))

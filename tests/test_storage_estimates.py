@@ -178,6 +178,15 @@ class TestEstimateKvBytes(unittest.TestCase):
         self.assertIsNone(_estimate_kv_bytes({}, 32, 8192))
         self.assertIsNone(_estimate_kv_bytes({"head_count_kv": 8}, 32, 8192))
 
+    def test_zero_kv_heads_returns_zero(self):
+        # 纯 recurrent 架构 (纯 Mamba 类): head_count_kv 明确为 0 表示无 KV cache,
+        # 即使缺少其余注意力字段也返回 0, 不落含 KV 项的体积折算回退
+        self.assertEqual(_estimate_kv_bytes({"head_count_kv": 0}, 32, 8192), 0)
+
+    def test_all_zero_array_kv_heads_returns_zero(self):
+        # 逐层 head_count_kv 全 0 (数组均值 0.0) 与标量 0 同义
+        self.assertEqual(_estimate_kv_bytes({"head_count_kv": [0, 0, 0, 0]}, 32, 8192), 0)
+
     def test_swa_window_reduces_kv(self):
         # SWA 模型 (如 Gemma3) 的滑窗层只分配约 (窗口 + n_ubatch) 的 KV,
         # 按半数层 SWA 的保守占比折算: 有效 token = (8192 + 512 + 512) / 2 = 4608
@@ -232,6 +241,21 @@ class TestEstimateVramBytes(unittest.TestCase):
         kv = 8192 * 2 * 2 * (16 + 16) * 2
         expected = int(os.path.getsize(model) * (1.0 + _BASE_OVERHEAD) + kv)
         self.assertEqual(_vram_bytes(model, None, -1, 8192), expected)
+
+    def test_zero_kv_heads_skips_fallback(self):
+        # 纯 recurrent GGUF (head_count_kv=0): 按 KV=0 精确估算, 不落体积
+        # 折算回退, 也不打降级 warning (元数据其实是全的)
+        data = _gguf_bytes(
+            [
+                _kv_u32("mamba.block_count", 2),
+                _kv_u32("mamba.attention.head_count_kv", 0),
+            ]
+        )
+        data += b"\x00" * (1024 * 1024 - len(data))
+        model = self._write_temp(data)
+        expected = int(os.path.getsize(model) * (1.0 + _BASE_OVERHEAD))
+        with self.assertNoLogs("llama-cpp-vulkan", level="WARNING"):
+            self.assertEqual(_vram_bytes(model, None, -1, 8192), expected)
 
 
 if __name__ == "__main__":
