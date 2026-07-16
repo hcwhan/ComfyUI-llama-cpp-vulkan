@@ -68,6 +68,15 @@ class TestResolveLanguage(unittest.TestCase):
         resolved, _ = self._resolve(json.dumps({"Comfy.Locale": "ja"}))
         self.assertEqual(resolved, lang._DEFAULT_LANGUAGE)
 
+    def test_non_string_locale_falls_through_to_frontend_locale(self):
+        # 回归: 旧实现只判 is not None, list 型 Comfy.Locale (设置文件被外力写坏)
+        # 查映射表抛 TypeError 阻断插件加载; 现按缺失处理, 继续下一级
+        resolved, _ = self._resolve(
+            json.dumps({"Comfy.Locale": ["zh"]}),
+            project_settings={"language": {"frontend_locale": "zh"}},
+        )
+        self.assertEqual(resolved, "zh-CN")
+
     def test_comfy_locale_beats_frontend_locale(self):
         resolved, _ = self._resolve(
             json.dumps({"Comfy.Locale": "en"}),
@@ -92,6 +101,12 @@ class TestResolveLanguage(unittest.TestCase):
         resolved, _ = self._resolve(None, project_settings={"language": {"frontend_locale": "ja"}})
         self.assertEqual(resolved, lang._DEFAULT_LANGUAGE)
 
+    def test_non_string_frontend_locale_falls_back_to_default(self):
+        # 回归: 旧实现只判 is not None, dict 型 frontend_locale (settings.json 被外力写坏)
+        # 查映射表抛 TypeError 阻断插件加载; 现按缺失处理, 落默认英语
+        resolved, _ = self._resolve(None, project_settings={"language": {"frontend_locale": {"a": 1}}})
+        self.assertEqual(resolved, lang._DEFAULT_LANGUAGE)
+
     # ---- 第 3 级: 默认英语 ----
 
     def test_nothing_available_falls_back_to_default(self):
@@ -100,6 +115,12 @@ class TestResolveLanguage(unittest.TestCase):
 
     def test_corrupted_comfy_settings_falls_back_to_default(self):
         resolved, _ = self._resolve("{not valid json")
+        self.assertEqual(resolved, lang._DEFAULT_LANGUAGE)
+
+    def test_non_object_comfy_settings_falls_back_to_default(self):
+        # 回归: 旧实现对 json.loads 结果直接 .get, 顶层非对象的合法 JSON (如数组)
+        # 抛 AttributeError 阻断插件加载; 现视同键缺失, 落默认英语
+        resolved, _ = self._resolve(json.dumps([]))
         self.assertEqual(resolved, lang._DEFAULT_LANGUAGE)
 
     # ---- comfy_locale 落盘 (忠实记录) ----

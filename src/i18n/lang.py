@@ -6,7 +6,9 @@
    服务端无从得知) 时, 读插件根 settings.json 的 language.frontend_locale -
    上次会话前端上报的实际显示语言 (上报链路见 core/locale_sync.py);
 3. 都没有时回退默认英语. 短码经 _LOCALE_TO_LANGUAGE 映射到语言文件,
-   未映射的短码 (无对应文案) 同样落默认英语.
+   未映射的短码 (无对应文案) 同样落默认英语; 非字符串短码 (设置文件被
+   外力写坏) 视同缺失, 继续下一级 (list/dict 不可哈希, 若直接查表会抛
+   TypeError 阻断插件加载).
 LANGUAGE 为具体语言代码时强制使用, 跳过全部读写. 节点文案在插件 import 期
 固化, 多用户模式下无法按用户区分语言, 只读 default 用户的设置 (尽力而为).
 
@@ -53,11 +55,11 @@ def _resolve_language():
         return LANGUAGE
 
     locale = locale_settings.read_comfy_locale()
-    if locale is not None:
+    if isinstance(locale, str):
         return _LOCALE_TO_LANGUAGE.get(locale, _DEFAULT_LANGUAGE)
 
     frontend_locale = locale_settings.get_language_setting("frontend_locale")
-    if frontend_locale is not None:
+    if isinstance(frontend_locale, str):
         return _LOCALE_TO_LANGUAGE.get(frontend_locale, _DEFAULT_LANGUAGE)
 
     return _DEFAULT_LANGUAGE

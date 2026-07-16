@@ -20,14 +20,16 @@ def read_comfy_locale():
     """实时读 ComfyUI 用户设置的 Comfy.Locale 并落盘到 language.comfy_locale, 返回原始短码 (缺失时 None).
 
     非 --multi-user 模式下用户固定为 "default" (ComfyUI app/user_manager.py);
-    设置文件缺失 (用户从未保存过设置) 或损坏 (ComfyUI 自身会报告) 视同键缺失.
-    落盘是忠实记录 (键缺失时移除), 语言解析用返回的实时值, 不消费落盘副本.
+    设置文件缺失 (用户从未保存过设置), 损坏 (ComfyUI 自身会报告) 或顶层非对象
+    视同键缺失. 落盘是忠实记录 (键缺失时移除), 语言解析用返回的实时值,
+    不消费落盘副本.
     """
     settings_path = Path(folder_paths.get_user_directory()) / "default" / "comfy.settings.json"
     try:
-        locale = json.loads(settings_path.read_text(encoding="utf-8")).get("Comfy.Locale")
+        settings = json.loads(settings_path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        locale = None
+        settings = None
+    locale = settings.get("Comfy.Locale") if isinstance(settings, dict) else None
     set_language_setting("comfy_locale", locale)
     return locale
 
