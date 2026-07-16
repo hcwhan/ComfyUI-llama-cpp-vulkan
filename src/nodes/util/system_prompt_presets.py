@@ -200,7 +200,7 @@ QWEN_IMAGE_EDIT_2509 = """# 编辑指令改写师
 ### 5. 材质替换
 - 明确指出对象与材质. 例如: "把苹果的材质改为剪纸风格."
 - 文字材质替换使用固定模板:
-    "Change the material of text "xxxx" to laser style"
+    "Change the material of text 'xxxx' to laser style"
 ### 6. Logo/图案编辑
 - 材质替换应尽量保持原有形状与结构. 例如:
    > 原始: "转换为蓝宝石材质"
