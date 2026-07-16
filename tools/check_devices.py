@@ -1,4 +1,4 @@
-"""独立诊断脚本, 列出 GGML 后端检测到的所有设备(CPU/GPU/IGPU/ACCEL)."""
+"""独立诊断脚本, 列出 GGML 后端检测到的所有设备(类型随 wheel 的 GGMLBackendDevType 枚举自动同步)."""
 
 import ctypes
 from pathlib import Path

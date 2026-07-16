@@ -1,10 +1,11 @@
 // VLM Model Loader 的 widget 联动 (纯 UX 增强, 行为正确性由 Python 侧保证):
 // - thinking 开关按 chat_handler 选值三态置灰 (可切换 / 强制开 / 强制关),
 //   强制档覆写前缓存 toggle 档的设定, 切回 toggle 档时恢复; 未知 label
-//   (含 "None" 占位与 wheel 缺类) 归一为 toggle 档: 不置灰不动值,
+//   (含 "None" 占位与 wheel 缺类) 归一为 toggle 档: 不置灰不覆写,
 //   保存工作流不丢序列化设定; 失效时由 clamp_thinking 钳制兜底
 // - image_min/max_tokens 仅在选中支持视觉的 handler 时显示 (音频专用与
-//   "None" 隐藏), 隐藏字段的值仍序列化并随 config 下发, 对音频路径无效
+//   "None" 隐藏), 隐藏字段的值仍序列化随工作流保存; 音频专用 handler 下
+//   loader 侧把两参数折算为 0 落盘 config, 残留值不生效
 // - image_min/max_tokens 区间互钳: 修改任一侧越界时钳制另一侧 (max=0 视为
 //   未设置不参与), 前端阻止区间倒挂; loader 侧报错保留, 兜底绕过 UI 的提交
 // 能力名单来自 chat_handler widget options 的自定义 key thinking_modes /

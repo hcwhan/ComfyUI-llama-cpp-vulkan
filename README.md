@@ -25,14 +25,14 @@ Vulkan provides near-native GPU performance without requiring CUDA or ROCm toolk
 | Qwen3-VL | Yes |
 | Qwen2.5-VL | - |
 | GLM-4.6V | Yes |
-| GLM-4.1V | Always on |
+| GLM-4.1V-Thinking | Always on |
 | Gemma4 | Yes |
 | Gemma3 | - |
 | MiniCPM-v4.6 / v4.5 | Yes |
 | Step3-VL | Yes |
 | LFM2.5-VL / LFM2-VL | - |
 
-> Thinking is controlled by the `thinking` toggle on the VLM Model Loader (a construction-time parameter; changing it reloads the model). Handlers marked "Yes" honor the toggle; GLM-4.1V is a thinking-only model where the toggle is forced on; handlers marked "-" do not support thinking and the toggle is forced off (greyed out in the UI, clamped on the backend). Gemma4 E2B/E4B think even when disabled (only 31B/26BA4B honor the toggle); the reasoning is stripped from the output either way. The dropdown groups handlers by family (newest first) and is the authoritative list.
+> Thinking is controlled by the `thinking` toggle on the VLM Model Loader (a construction-time parameter; changing it reloads the model). Handlers marked "Yes" honor the toggle; GLM-4.1V-Thinking is a thinking-only model where the toggle is forced on; handlers marked "-" do not support thinking and the toggle is forced off (greyed out in the UI, clamped on the backend). Gemma4 E2B/E4B think even when disabled (only 31B/26BA4B honor the toggle); either way the reasoning is stripped by the Instruct node's `strip_thinking` switch (on by default). The dropdown groups handlers by family (newest first) and is the authoritative list.
 
 Legacy handlers (LLaVA-1.6 / 1.5, llama3-Vision-Alpha, nanoLLaVA, Moondream2, Obsidian, MiniCPM-v2.6) are also available.
 

@@ -88,7 +88,8 @@ def _concat_runs(source):
 
 class TestLanguageFileLayout(unittest.TestCase):
     def test_language_files_exist(self):
-        # 目录结构变动导致 glob 落空时, 后两条规则会静默变成空跑, 在此拦截
+        # 目录结构变动导致 glob 落空时, 三条逐文件排版测试会静默变成空跑
+        # (循环体不执行), 在此拦截; 两条跨语言测试对空集是解包报错, 不静默
         self.assertTrue(_language_files(), f"{_I18N_DIR} 下找不到 language_*.py")
 
     def test_non_last_literals_end_with_newline(self):

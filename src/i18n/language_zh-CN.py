@@ -354,7 +354,7 @@ LANG = {
                     # {i} 为该段 JSON 的序号 (从 1 起, 与前缀行 Image N 对齐), {error} 为原始解析错误
                     "json_parse_failed": "JSON #{i} 解析失败: {error}",
                     "not_a_list": '期望 JSON 为由 {{"bbox_2d": [...], "label": "..."}} 对象组成的列表, 实际为: {type_name}',
-                    # 以下三条位于 bbox_utils.py 的结构校验
+                    # 以下四条位于 bbox_utils.py: 前三条为结构校验, unknown_mode 为 mode 分支防御
                     "item_not_object": '期望列表项为形如 {{"bbox_2d": [x1, y1, x2, y2], "label": "..."}} 的对象, 实际列表项为: {item!r}',
                     "missing_bbox_2d": 'BBox 项缺少有效的 "bbox_2d": [x1, y1, x2, y2] 字段: {item!r}',
                     "coords_not_numeric": 'BBox 的 "bbox_2d" 坐标必须为数字: {item!r}',

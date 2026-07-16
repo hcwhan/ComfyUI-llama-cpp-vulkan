@@ -354,7 +354,7 @@ LANG = {
                     # {i} is the index of the JSON segment (1-based, matching the Image N prefix line), {error} is the original parse error
                     "json_parse_failed": "Failed to parse JSON #{i}: {error}",
                     "not_a_list": 'Expected a JSON list of {{"bbox_2d": [...], "label": "..."}} objects, got: {type_name}',
-                    # The next three live in the structure validation of bbox_utils.py
+                    # The next four live in bbox_utils.py: the first three are structure validation, unknown_mode guards the mode branch
                     "item_not_object": 'Expected list items to be objects like {{"bbox_2d": [x1, y1, x2, y2], "label": "..."}}, got item: {item!r}',
                     "missing_bbox_2d": 'BBox item is missing a valid "bbox_2d": [x1, y1, x2, y2] field: {item!r}',
                     "coords_not_numeric": 'BBox "bbox_2d" coordinates must be numeric: {item!r}',

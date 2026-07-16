@@ -9,7 +9,8 @@ from src.core.gguf_layers import get_model_meta
 
 
 def _block_count(path):
-    # 生产路径 (storage._estimate_per_layer_bytes) 取层数的同款写法:
+    # 生产路径取层数的同款取值链 (get_model_meta -> .get; 生产侧在
+    # storage._estimate_per_layer_bytes 再经 _as_number(...) or 32 归一回退):
     # 解析失败 get_model_meta 返回空 dict, block_count 缺失得 None
     return get_model_meta(path).get("block_count")
 

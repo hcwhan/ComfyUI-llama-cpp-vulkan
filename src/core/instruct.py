@@ -290,7 +290,9 @@ class llama_cpp_instruct_base:
             elif LLAMA_CPP_STORAGE.llm is not None and is_hybrid_arch(LLAMA_CPP_STORAGE.llm):
                 # 真 hybrid/recurrent 架构(Qwen3.5, LFM2 系等)的线性注意力状态无法
                 # 跨请求做前缀复用, 不重置会导致后续请求输出错乱; 按架构判断而非
-                # handler 名单, 避免每加一个 hybrid 模型都要维护名单
+                # handler 名单, 避免每加一个 hybrid 模型都要维护名单.
+                # 重置只在节点执行收尾做一次: image 逐张模式中间的多次请求之间
+                # 不重置, 依赖 wheel 内置的 hybrid checkpoint 前缀匹配
                 llm = LLAMA_CPP_STORAGE.llm
                 llm.n_tokens = 0
                 llm._ctx.memory_clear(True)

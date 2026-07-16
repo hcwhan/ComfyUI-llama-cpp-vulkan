@@ -58,9 +58,9 @@ def _read_scalar(f, vtype):
 
 
 # 数组 count 的合理性上限: 真实模型最大的数组是 tokenizer 的几十万条 token
-# 元数据, 1e8 留足量级余量. KV 区损坏/错位把 count 读成天文数字时, 逐元素
-# 解析会以每次几字节的步长扫过文件剩余内容 (GB 级文件在 EOF 报错前可打转
-# 数分钟, 且发生在节点执行期), 超限直接报错走 get_model_meta 的回退路径
+# 元数据, 1e8 留足量级余量. KV 区损坏/错位把 count 读成天文数字时, 若不设限
+# 逐元素解析会以每次几字节的步长扫过文件剩余内容 (GB 级文件在 EOF 报错前可
+# 打转数分钟, 且发生在节点执行期), 超限直接报错走 get_model_meta 的回退路径
 _MAX_ARRAY_COUNT = 100_000_000
 
 
@@ -94,9 +94,10 @@ def _parse_metadata(path):
 
     架构键通常排在 tokenizer 数组之前; 关键的 block_count 到手后一旦扫到
     tokenizer 区即停止, 不为可选字段解析几十万条 token 元数据(慢且占内存).
-    代价: 个别模型把可选键 (如 sliding_window) 排在 tokenizer 区之后时
-    (GGUF 格式不强制键序) 会被跳过, SWA 折算回退到全量 n_ctx 计 KV;
-    方向保守, 只会高估显存少上层, 不会爆显存.
+    代价: 个别模型把可选键排在 tokenizer 区之后时(GGUF 格式不强制键序)
+    该键会被跳过, 影响随键而异: 跳过 sliding_window 时 SWA 折算回退到全量
+    n_ctx 计 KV, 方向保守只会高估; 跳过 head_count_kv 等注意力键时落体积
+    折算回退, 对强量化模型会低估 KV(见 storage.py 的回退系数注释).
     """
     found = {}
     with open(path, "rb") as f:

@@ -43,7 +43,7 @@ ComfyUI-llama-cpp-vulkan/
       devices.py              #   Vulkan GPU 设备检测与选择(ggml C API / ctypes)
       handlers.py             #   Chat handler 注册表(数十种 VLM 格式)
       model_paths.py          #   llm/LLM 模型目录注册与路径查找
-      gguf_layers.py          #   GGUF 文件解析: 读取模型层数 (block_count)
+      gguf_layers.py          #   GGUF 文件解析: 读取显存折算所需元数据(层数与注意力 KV 参数)
       cqdm.py                 #   进度条封装: 同时驱动 ComfyUI ProgressBar 和 tqdm
     shared/                   # 跨领域纯工具(非节点)
       logger.py               #   插件统一 logging logger(沿用 ComfyUI 的日志配置)
@@ -145,7 +145,7 @@ image 逐张模式的多图结果以 "======== Image N ========" 前缀行拼接
 
 ### 多模态输入
 
-三个媒体 Instruct 的输入形态与处理流程见各自节点文件的模块 docstring. 跨文件要点: `increment_seed` 仅在 Per-Image 档显示, `max_size` 仅在 Batch 档显示(均由 `web/image_instruct.js` 按 mode widget options 透传的 `batch_mode_value` 联动, 隐藏值仍序列化, JS 失效只损失显隐效果); audio 的重采样由 llama.cpp 的 mtmd 解码端完成, 音频是否被 mmproj 支持由 llama-cpp-python 侧校验.
+三个媒体 Instruct 的输入形态与处理流程见各自节点文件的模块 docstring. 跨文件要点: `increment_seed` 仅在 Per-Image 档显示, `max_size` 仅在 Batch 档显示(均由 `web/image_instruct.js` 按 mode widget options 透传的 `each_mode_value`/`batch_mode_value` 联动, 隐藏值仍序列化, JS 失效只损失显隐效果); audio 的重采样由 llama.cpp 的 mtmd 解码端完成, 音频是否被 mmproj 支持由 llama-cpp-python 侧校验.
 
 ### 推理输出与中断
 
@@ -169,6 +169,12 @@ image 逐张模式的多图结果以 "======== Image N ========" 前缀行拼接
 
 - 本文件只记录无法从代码直接看出的内容: 架构决策, 跨文件约束, 易踩的坑. 一般性内容(如"在某个 dict 加一行"式的操作步骤, 读代码即可自然得出的说明)不要写入本文件
 - 根目录 `复核结论.md` 是复核结论存档, 用于避免重复排查或重新争论. 只收录两类条目: 项目外事实与跨边界对接结论(经明确源码分析确立, 对照 wheel / ComfyUI / llama.cpp 上游 / 下游生态实际源码核实), 设计决策/权衡存档; 项目内代码行为不在其中复述, 以代码与注释本身为准. 写入前需与用户确认
+
+### 注释与文档准确性
+
+- 描述危害场景或被防护掉的行为时必须带假设标记("若不设限"/"若不重置"/"修改前"等), 反事实描述不得写成读起来像现行行为的陈述句; 回归测试注释沿用既有的 "回归:"/"旧实现:" 标记惯例
+- 注释/文档中的行为断言(标识符, 数值, 调用关系, 计数)在改动相关代码时必须同步更新, 不同步会积累成误导; "见 XXX 注释" 型指引在写入或精简文档时须确认目标注释真实存在且涵盖所指内容
+- 实测结论的适用范围如实标注, 测过什么写什么, 不外推到未实测的对象(如实测仅覆盖某一型号时不得写成整个系列 "实测确认")
 
 ### 提交前检查
 
@@ -201,7 +207,7 @@ image 逐张模式的多图结果以 "======== Image N ========" 前缀行拼接
 
 项目代码只对接 `requirements.txt` 中固定的依赖版本(特别是 llama-cpp-python 的 JamePeng Vulkan wheel), 不为历史版本或官方构建编写兼容/回退代码. mmproj 路径统一用 `mmproj_path` 键传入 handler.
 
-当前依赖的 wheel 对接面清单(升级 wheel 时按单复核, 与 `tests/test_wheel_contract.py` 一一对应, 各项的依赖缘由见测试注释): `llm.n_tokens`, `llm._ctx.memory_clear`, `llm._hybrid_cache_mgr`, `llm._model.is_hybrid()/is_recurrent()`, `llama_cpp._ggml`(设备枚举符号), chat handler 的 `mmproj_path` 实例属性与 `close()`, `Llama.close()/abort()`, `llama_cpp.llama_cpp.llama_split_mode` 枚举(NONE/LAYER), `create_chat_completion` 接受 Parameters 节点全部 12 个采样参数与 `seed`, `reasoning_budget`, 无 tools 路径下 `message.content` 恒为 str(`_make_extract` 直接调 `str.removeprefix`). 契约测试静态检查上述接口存在性(不加载模型), 升级 wheel 后运行即可发现断裂; 公开 handler 类的契约另由 `tests/test_handlers.py` 锁定. 另有一条无法静态锁定的行为性假设, 升级时人工复核: chat handler 渲染消息时不改写 messages 入参(image 逐张模式复用同一 messages 列表, 仅原位改写其中 image_url 项, handler 若就地规范化 messages 会使逐张结果串味).
+当前依赖的 wheel 对接面清单(升级 wheel 时按单复核, 与 `tests/test_wheel_contract.py` 一一对应, 各项的依赖缘由见测试注释): `llm.n_tokens`, `llm._ctx.memory_clear`, `llm._hybrid_cache_mgr`, `llm._model.is_hybrid()/is_recurrent()`, `llama_cpp._ggml`(设备枚举符号), chat handler 的 `mmproj_path` 实例属性与 `close()`, `Llama.close()/abort()`, `llama_cpp.llama_cpp.llama_split_mode` 枚举(NONE/LAYER), `create_chat_completion` 接受 Parameters 节点全部 12 个采样参数(UI 键 `max_gen_tokens` 经 `_run()` 映射为 `max_tokens`)与 `seed`, `reasoning_budget`, 无 tools 路径下 `message.content` 恒为 str(`_make_extract` 直接调 `str.removeprefix`). 契约测试静态检查上述接口存在性(不加载模型), 升级 wheel 后运行即可发现断裂; 公开 handler 类的契约另由 `tests/test_handlers.py` 锁定. 另有一条无法静态锁定的行为性假设, 升级时人工复核: chat handler 渲染消息时不改写 messages 入参(image 逐张模式复用同一 messages 列表, 仅原位改写其中 image_url 项, handler 若就地规范化 messages 会使逐张结果串味).
 
 ### INPUT_TYPES 字段顺序
 
