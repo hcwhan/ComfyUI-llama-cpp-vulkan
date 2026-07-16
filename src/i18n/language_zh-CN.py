@@ -70,6 +70,7 @@ LANG = {
             "version_too_old": "GGUF v{version} 版本太低 (需要 v2 及以上)",
             "unknown_value_type": "未知的 gguf 元数据类型 {vtype}",
             "array_count_implausible": "gguf 元数据数组长度异常 ({count}), 文件可能损坏或错位",
+            "string_length_implausible": "gguf 元数据字符串长度异常 ({length}), 文件可能损坏或错位",
         },
 
         # JSON 解析共用报错 (shared/text_utils.py 的 parse_json)

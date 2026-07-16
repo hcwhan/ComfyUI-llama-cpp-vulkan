@@ -70,6 +70,7 @@ LANG = {
             "version_too_old": "GGUF v{version} is too old (v2+ required)",
             "unknown_value_type": "Unknown gguf metadata value type {vtype}",
             "array_count_implausible": "Implausible gguf metadata array length ({count}); file may be corrupted or misaligned",
+            "string_length_implausible": "Implausible gguf metadata string length ({length}); file may be corrupted or misaligned",
         },
 
         # Shared JSON parsing error (parse_json in shared/text_utils.py)

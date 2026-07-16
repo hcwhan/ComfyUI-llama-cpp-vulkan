@@ -33,8 +33,17 @@ def read_u64(f):
     return struct.unpack("<Q", f.read(8))[0]
 
 
+# 字符串长度的合理性上限: 真实模型最大的字符串值是 chat template (几十 KB
+# 量级), 16MB 留足量级余量. KV 区损坏/错位把长度读成天文数字时, 若不设限
+# f.read 会按该值一次性预分配缓冲区 (GB 级瞬时内存尖峰或 MemoryError/
+# OverflowError), 超限直接报错走 get_model_meta 的回退路径
+_MAX_STRING_LEN = 16 * 1024 * 1024
+
+
 def read_string(f):
     ln = read_u64(f)
+    if ln > _MAX_STRING_LEN:
+        raise ValueError(_ERRORS["string_length_implausible"].format(length=ln))
     # BPE 模型的 tokenizer 元数据可能含非法 UTF-8 字节序列, 严格解码会中断整个解析
     return f.read(ln).decode("utf-8", errors="replace")
 

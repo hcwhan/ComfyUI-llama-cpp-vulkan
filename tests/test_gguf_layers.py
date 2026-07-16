@@ -115,6 +115,13 @@ class TestBlockCountParsing(unittest.TestCase):
         path = self._write_temp(_gguf_bytes([huge_array, _kv_uint32("llama.block_count", 32)]))
         self.assertIsNone(_block_count(path))
 
+    def test_implausible_string_length_falls_back(self):
+        # 回归: KV 区错位使字符串长度读成天文数字时, 须立即报错走回退
+        # (返回空 dict), 而不是按该长度尝试一次大缓冲分配
+        huge_key = struct.pack("<Q", 10**12) + b"general.architecture"
+        path = self._write_temp(_gguf_bytes([huge_key, _kv_uint32("llama.block_count", 32)]))
+        self.assertIsNone(_block_count(path))
+
     def test_gguf_v1_rejected(self):
         # v1 的计数字段是 32 位, 按 v2+ 布局读会错乱, 应直接按不支持返回 None
         data = b"GGUF" + struct.pack("<I", 1) + struct.pack("<I", 0) + struct.pack("<I", 1)
