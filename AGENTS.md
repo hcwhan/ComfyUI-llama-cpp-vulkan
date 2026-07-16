@@ -188,6 +188,10 @@ image 逐张模式的多图结果以 "======== Image N ========" 前缀行拼接
 - 每个 .py 文件顶部必须有描述整个文件用途的模块 docstring, docstring 之后空一行再写代码
 - 无实际代码的包不创建 `__init__.py`(子包走 Python 隐式命名空间包); 仅根入口, `src/nodes/__init__.py` 注册表与 `tests/__init__.py`(测试导入引导)三处有 `__init__.py`
 
+### 枚举分支规范
+
+枚举值(下拉框选项, 模式常量等)驱动的分支, 每个已知场景都显式与对应枚举值比对, 不写 "比对其一, 其余隐式归 else" 的互补兜底逻辑; else/fall-through 只承接未知值, 行为为不动作或报错. 复合条件的非枚举分派(如日志文案选择)不受此限. Python 与 web/*.js 同样适用.
+
 ### 依赖版本对接原则
 
 项目代码只对接 `requirements.txt` 中固定的依赖版本(特别是 llama-cpp-python 的 JamePeng Vulkan wheel), 不为历史版本或官方构建编写兼容/回退代码. mmproj 路径统一用 `mmproj_path` 键传入 handler.
