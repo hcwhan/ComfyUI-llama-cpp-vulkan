@@ -375,7 +375,8 @@ LANG = {
                     ),
                     "feather": (
                         "Gaussian feather sigma of the mask edge (pixels).\n"
-                        "crop_factor > 1 or dilation provides full outward falloff room; otherwise feathering only keeps the soft edge inside the region."
+                        "Only with crop_factor > 1 does the outward falloff of the mask edge have room inside crop_region;\n"
+                        "with crop_factor = 1 the edge is clipped to a ~0.5 hard edge at the crop border, and dilation merely pushes it away from the original detection box."
                     ),
                     "crop_factor": (
                         "Scale of crop_region relative to the mask rectangle, giving the downstream Detailer repaint context.\n"

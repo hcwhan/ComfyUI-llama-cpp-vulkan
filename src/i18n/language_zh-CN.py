@@ -375,7 +375,8 @@ LANG = {
                     ),
                     "feather": (
                         "掩码边缘高斯羽化的 sigma (像素).\n"
-                        "crop_factor > 1 或 dilation 可提供完整的向外衰减空间, 否则羽化只保留区域内侧的软边."
+                        "crop_factor > 1 时掩码边缘的外侧衰减才有空间落入 crop_region;\n"
+                        "crop_factor = 1 时边缘在 crop 边界被裁成 ~0.5 硬边, dilation 仅把硬边推离原始检测框."
                     ),
                     "crop_factor": (
                         "crop_region 相对掩码矩形的放大倍数, 为下游 Detailer 提供重绘上下文.\n"
