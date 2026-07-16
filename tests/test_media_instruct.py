@@ -91,7 +91,8 @@ class TestVideoInstructProcess(_MediaInstructTestBase):
         return out
 
     def test_multi_frame_sampled_scaled_into_single_message(self):
-        # 5 帧按 max_frames=3 均匀抽帧, 多帧逐帧缩放 (8x16 按 max_size=8 -> 8x4),
+        # 5 帧按 max_frames=3 均匀抽帧, 多帧逐帧缩放 (H8xW16 按 max_size=8
+        # -> H4xW8, 断言取 PIL (宽, 高) 即 (8, 4)),
         # 全部帧并入单条 user 消息 (文本项 + 3 个 image_url 项), 一次推理
         out = self._process(torch.zeros(5, 8, 16, 3), max_frames=3, max_size=8)
         self.assertEqual(out, "结果文本")

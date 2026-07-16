@@ -1,4 +1,4 @@
-"""采样参数配置节点, 打包成 kwargs dict 供 Instruct 传给 create_chat_completion."""
+"""采样参数配置节点, 打包成 kwargs dict 供 Instruct 传给 create_chat_completion (UI 键 max_gen_tokens 由 _run() 映射为 max_tokens)."""
 
 from ...core.instruct import DEFAULT_SAMPLING_PARAMS as _DEFAULTS
 from ...i18n.common_static import CATEGORY as _CATEGORY

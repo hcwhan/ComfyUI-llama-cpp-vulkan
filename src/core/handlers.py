@@ -125,7 +125,7 @@ def is_registered(label):
 
 
 def handler_constructor(label, thinking):
-    """返回按三态绑定 thinking 后的 handler 构造器 (label 未知时抛 KeyError).
+    """返回按三态绑定 thinking 后的 handler 构造器 (label 不在 HANDLERS 时抛 KeyError, 含未知名字与注册过但 wheel 缺类两种情形).
 
     可切换档把开关值绑到声明的参数名上; 不支持/强制档的类没有开关参数,
     原样返回构造器 (强制档的思考由模板固化, 无需传参).

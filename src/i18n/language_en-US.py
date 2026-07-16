@@ -7,7 +7,7 @@ Structure conventions:
   model / instruct / bbox (BBox toolchain) / util.
   Within each group: common is the group-shared copy (used only by nodes of the group),
   other keys are per-node copy, grouped by description / tooltips / placeholders / errors.
-- logs: console logs, grouped by source module (one-to-one with code files).
+- logs: console logs, grouped by source module (mostly one-to-one with code files; the bbox group spans multiple files, see its comment).
 
 Layout conventions:
 - Texts containing newlines use the parenthesized multi-literal form, one source line per UI display line
@@ -24,10 +24,10 @@ Placeholder conventions:
 - {{ and }} are escaped literal braces, rendered as { and }.
 - {default} in parameters node tooltips is auto-filled by code from the widget default value.
 
-Not in this file (not switched with language, centralized in common_static.py):
-- Dropdown option values: Per-Image/Batch, Auto (GPU First), the chat handler list etc. (widget values serialized into workflows).
-- The node category (llama-cpp-vulkan), the "======== Image N ========" prefix line (protocol strings matched by regex).
-- Task presets and system prompt presets (names and contents).
+Not in this file (not switched with language), respective homes:
+- Dropdown option values (widget values serialized into workflows): Per-Image/Batch, Auto (GPU First) etc. in common_static.py; the chat handler list is the keys of the core/handlers.py registry.
+- The node category (llama-cpp-vulkan) and the "======== Image N ========" prefix line (protocol strings matched by regex): common_static.py.
+- Task presets and system prompt presets (names and contents): core/prompts.py and nodes/util/system_prompt_presets.py.
 """
 
 LANG = {
@@ -443,7 +443,7 @@ LANG = {
         },
     },
 
-    # ---- Console logs (grouped by source module, one-to-one with code files) ----
+    # ---- Console logs (grouped by source module, mostly one-to-one with code files, see the bbox group comment) ----
     # The fixed prefix "[llama-cpp-vulkan] " is a log filter tag, added at call sites, not in templates;
     # log levels (info/warning/debug) are code behavior, not in this file, special levels are noted in comments
     "logs": {

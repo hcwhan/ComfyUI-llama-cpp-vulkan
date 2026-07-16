@@ -1,4 +1,4 @@
-"""src/core/storage.py resolve_config 的单元测试: loader 快速失败校验的报错路径."""
+"""src/core/storage.py resolve_config 的单元测试: loader 快速失败校验的报错路径与成功解析结果."""
 
 import re
 import unittest

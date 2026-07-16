@@ -1,4 +1,4 @@
-"""src/core/instruct.py 的单元测试: thinking 块剥离, 预设/自定义提示词组装, 预设配置一致性, 以及 FakeLlm 打桩的 content 扁平化, allow_thinking 折算与 REQUIRE_USER_TEXT 守卫 (走 _run)."""
+"""instruct.py 工具函数与 prompts.py 预设的单元测试: thinking 块剥离, 预设/自定义提示词组装, 预设 use 配置一致性 (prompts.py + 节点类 MODALITY), FakeLlm 打桩的 content 扁平化 (_single_completion), 以及 text 节点的 allow_thinking 折算与 REQUIRE_USER_TEXT 守卫 (经 _run)."""
 
 import re
 import types

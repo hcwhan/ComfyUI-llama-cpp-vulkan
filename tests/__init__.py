@@ -2,7 +2,7 @@
 
 运行方式(仓库根目录): python -m unittest discover -s tests -t . -v
 使用 ComfyUI 的嵌入式 Python 运行时, torch/llama_cpp 为真实安装,
-comfy/folder_paths 由 comfy_stubs 注入最小替身.
+comfy/folder_paths/server 由 comfy_stubs 注入最小替身.
 
 插件的 src 是隐式命名空间包, 而嵌入式 Python 的 ._pth 把 ComfyUI 主程序
 目录固定加入 sys.path; 路径上任何位置若出现同名常规包 src, 都会使命名空间包

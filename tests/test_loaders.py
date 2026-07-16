@@ -1,4 +1,4 @@
-"""src/nodes/model/node_loaders.py 的单元测试: loadmodel 快速失败校验分支."""
+"""src/nodes/model/node_loaders.py 的单元测试: loadmodel 快速失败校验分支与合法配置的落盘结果 (thinking 钳制, image token 折算)."""
 
 import re
 import unittest

@@ -28,7 +28,7 @@ test("重新显示: 恢复原始 type 与 computeSize", () => {
     assert.equal(widget.computeSize, origComputeSize);
 });
 
-test("无变化时短路返回 false 且不动 widget", () => {
+test("无变化时短路返回 false 且不改显隐状态", () => {
     const widget = makeWidget("max_size", 256, "number");
     assert.equal(toggleWidget(widget, true), false);
     assert.equal(widget.type, "number");

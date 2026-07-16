@@ -2,7 +2,8 @@
 
 覆盖: watcher 命中后置位并持续 abort, 无中断时干净收线; _run 的 finally
 收尾 (force_offload 卸载, hybrid 三件套重置, 中断丢弃截断结果抛
-InterruptProcessingException, runner 异常时收尾仍执行).
+InterruptProcessingException, runner 异常时收尾仍执行);
+以及 max_gen_tokens -> max_tokens 的键映射.
 """
 
 import time

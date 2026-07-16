@@ -53,7 +53,7 @@ class TestBBoxesToBBox(unittest.TestCase):
             self._process(_GROUPS, 0, 3)
 
     def test_negative_index_below_lower_bound_raises(self):
-        # 负索引下界是 -len(group), widget 的 min: -998 只是 UI 上限,
+        # 负索引下界是 -len(group), widget 的 min: -998 只是 UI 下限,
         # 越过实际组长仍须报错而非绕回
         expected = re.escape(_ERRORS["bbox_index_out_of_range"].format(bbox_index=-4, image_index=0, count=3))
         with self.assertRaisesRegex(IndexError, expected):

@@ -1,13 +1,13 @@
-"""zh-CN 语言文案, UI 上用户可见全部文案 和 控制台日志 的中文来源.
+"""zh-CN 语言文案, UI 上用户可见全部文案和控制台日志的中文来源.
 
 结构约定:
 - display_names: 节点显示名 (NODE_DISPLAY_NAME_MAPPINGS).
 - common: 跨组共享文案 (多个分组的节点都会用到, 代码同源, 改一处全生效).
-- nodes: 按节点分组组织 (与 src/nodes/ 目录 的分组一致):
+- nodes: 按节点分组组织 (与 src/nodes/ 目录的分组一致):
   model (模型) / instruct (推理) / bbox (BBox 工具链) / util (工具).
   每组内: common 为组内共享文案 (仅本组节点用到),
   其余 key 为各节点专属文案, 按 description / tooltips / placeholders / errors 分组.
-- logs: 控制台日志, 按来源模块分组 (与代码文件一一对应).
+- logs: 控制台日志, 按来源模块分组 (多数与代码文件一一对应, bbox 组横跨多个文件, 见其注释).
 
 排版约定:
 - 含换行的文本用括号包裹的多字面量形态, 每个 UI 显示行对应一个源码行
@@ -24,10 +24,10 @@
 - {{ 与 }} 是转义后的字面花括号, 渲染为 { 与 }.
 - parameters 节点 tooltip 中的 {default} 由代码按 widget 默认值自动填充.
 
-不在本文件 (不随语言切换, 统一放 common_static.py):
-- 下拉框选项值: Per-Image/Batch, Auto (GPU First), chat handler 名单等 (会序列化进工作流的 widget 值).
-- 节点分类名 category (llama-cpp-vulkan), "======== Image N ========" 前缀行 (被正则匹配的协议串).
-- 任务预设与系统提示词预设 (名称与内容).
+不在本文件 (不随语言切换), 各自归属:
+- 下拉框选项值 (会序列化进工作流的 widget 值): Per-Image/Batch, Auto (GPU First) 等在 common_static.py; chat handler 名单即 core/handlers.py 注册表的 key.
+- 节点分类名 category (llama-cpp-vulkan) 与 "======== Image N ========" 前缀行 (被正则匹配的协议串): common_static.py.
+- 任务预设与系统提示词预设 (名称与内容): core/prompts.py 与 nodes/util/system_prompt_presets.py.
 """
 
 LANG = {
@@ -443,7 +443,7 @@ LANG = {
         },
     },
 
-    # ---- 控制台日志 (按来源模块分组, 与代码文件一一对应) ----
+    # ---- 控制台日志 (按来源模块分组, 多数与代码文件一一对应, bbox 组见其注释) ----
     # 固定前缀 "[llama-cpp-vulkan] " 是日志过滤标签, 不进模板, 由调用处添加;
     # 日志级别 (info/warning/debug) 属代码行为, 不在本文件, 特殊级别以注释标注
     "logs": {

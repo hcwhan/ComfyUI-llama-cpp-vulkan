@@ -21,7 +21,8 @@ app.registerExtension({
                 body: JSON.stringify({ locale }),
             });
         } catch {
-            // 网络/路由异常静默忽略
+            // 网络异常静默忽略; 路由失败 (非 2xx) 时 fetch 正常返回,
+            // 响应不做检查, 同样静默
         }
     },
 });

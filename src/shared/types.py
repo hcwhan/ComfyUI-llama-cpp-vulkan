@@ -2,7 +2,7 @@
 
 
 class AnyType(str):
-    """重载 __ne__ 恒等 False, 使任意类型都能连入声明为 "*" 的端口."""
+    """重载 __ne__ 恒等 False, 使 "*" 端口与任意类型双向放行 (任意类型可连入 "*" 输入, "*" 输出可连任意输入)."""
 
     def __ne__(self, __value: object) -> bool:
         return False

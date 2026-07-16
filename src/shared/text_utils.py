@@ -13,7 +13,8 @@ from ..i18n.lang import LANG
 # 也不能用 \w(默认匹配 Unicode 文字): "```中文" 形态的中文正文会被当标签剥掉
 _FENCE_OPEN_RE = re.compile(r"^```[ \t]*[A-Za-z0-9_+.-]*[ \t]*\r?\n?")
 _FENCE_CLOSE_RE = re.compile(r"\r?\n?```$")
-# 文本中部的完整围栏块(用于 "前导说明 + 围栏块" 形态的回退提取)
+# 文本中部的完整围栏块(用于 "前导说明 + 围栏块" 与 "围栏块 + 尾随说明"
+# 两种形态的回退提取)
 _FENCE_BLOCK_RE = re.compile(r"```[ \t]*[A-Za-z0-9_+.-]*[ \t]*\r?\n(.*?)\r?\n?```", re.DOTALL)
 
 

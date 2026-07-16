@@ -158,7 +158,8 @@ class TestImageInstructInferBatch(_ImageInstructTestBase):
 
     def test_multi_image_merged_into_single_message_and_scaled(self):
         # 多图并入单条 user 消息 (文本项 + N 个 image_url 项), 一次推理;
-        # 两张 8x16 图按 max_size=8 逐张缩放为 8x4
+        # 两张 H8xW16 图按 max_size=8 逐张缩放为 H4xW8
+        # (断言取 PIL (宽, 高) 即 (8, 4))
         llm = _FakeVlm(["批量结果"])
         self._install(llm)
         out = self._process(torch.zeros(2, 8, 16, 3), max_size=8)

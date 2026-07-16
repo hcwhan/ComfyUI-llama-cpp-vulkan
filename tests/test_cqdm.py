@@ -1,4 +1,4 @@
-"""src/core/cqdm.py 的单元测试: 构造即推 0/N 与迭代推进次序."""
+"""src/core/cqdm.py 的单元测试: 构造即推 0/N, 迭代推进次序与提前退出收尾."""
 
 import unittest
 from unittest import mock

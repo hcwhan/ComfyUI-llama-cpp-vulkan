@@ -1,5 +1,5 @@
 // web/locale_sync.js 的单元测试: setup 时上报一次 Comfy.Locale 当前生效值,
-// 值缺失/非字符串时不上报, 上报失败静默不抛出.
+// 值缺失/非字符串/为空时不上报, 上报失败静默不抛出.
 
 import assert from "node:assert/strict";
 import { beforeEach, test } from "node:test";

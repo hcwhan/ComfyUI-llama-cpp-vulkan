@@ -1,4 +1,4 @@
-"""src/nodes/bbox/bbox_utils.py 的单元测试: 坐标换算, 结构校验, 羽化 mask."""
+"""src/nodes/bbox/bbox_utils.py 的单元测试: 坐标换算, 结构校验, 羽化 mask, 画框容错与标签工具; 另含 node_bboxes_to_segs.py 的 SEG namedtuple 契约."""
 
 import unittest
 

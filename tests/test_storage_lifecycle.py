@@ -256,7 +256,7 @@ class TestLoadModelStateMachine(unittest.TestCase):
 
 
 class TestLoadModelMmprojBranches(unittest.TestCase):
-    """load_model 的 mmproj/chat_handler 分支 (resolve_config 打桩为 _FakeHandler)."""
+    """load_model 的 mmproj/chat_handler 分支 (resolve_config 打桩为返回 (model, mmproj, _FakeHandler) 的固定三元组)."""
 
     def setUp(self):
         fd, self.model_path = tempfile.mkstemp(suffix=".gguf")
