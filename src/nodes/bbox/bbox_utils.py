@@ -38,12 +38,17 @@ _EPS = 1e-6
 def qwen25_smart_resize(width, height):
     """复现 Qwen2.5-VL 预处理的 smart_resize, 返回 mtmd 实际送入模型的 (宽, 高).
 
-    与官方参考实现一致: 宽高先四舍五入到 28 倍数; 面积超上限时按 beta 缩小后
-    向下取整到 28 倍数; 低于下限时放大后向上取整到 28 倍数.
+    对齐目标是 mtmd 实现(mtmd-image.cpp 的 calc_size_preserved_ratio)而非
+    HF 官方 Python 实现(两者半值取整方向本就不同, 本插件消费方是 mtmd):
+    宽高先就近取整到 28 倍数(半值进位, 同 C++ std::round); 面积超上限时按
+    beta 缩小后向下取整到 28 倍数; 低于下限时放大后向上取整到 28 倍数.
     """
     f = _QWEN25_FACTOR
-    w_bar = max(f, round(width / f) * f)
-    h_bar = max(f, round(height / f) * f)
+    # floor(x + 0.5) 在正数域与 std::round 的半值远离零语义等价; 若用 Python
+    # round() (银行家舍入, 半值取偶), 边长 ≡ 14 (mod 56) 时会比 mtmd 少一个
+    # 28 档, 整图坐标换算系统性偏移
+    w_bar = max(f, math.floor(width / f + 0.5) * f)
+    h_bar = max(f, math.floor(height / f + 0.5) * f)
     if w_bar * h_bar > _QWEN25_MAX_PIXELS:
         beta = math.sqrt(width * height / _QWEN25_MAX_PIXELS)
         w_bar = max(f, math.floor(width / beta / f + _EPS) * f)
@@ -175,7 +180,7 @@ def draw_bbox(image, pixel_bboxes, labels):
 def valid_int_bbox(bbox):
     """校验 bbox 结构并取整为 (x1, y1, x2, y2), 非法时打 warning 返回 None.
 
-    Qwen 归一化坐标换算后是浮点数, 四舍五入比截断更贴近原框;
+    Qwen 归一化坐标换算后是浮点数, 就近取整(Python round, 半值取偶)比截断更贴近原框;
     坐标值来自 LLM 输出, 非数字时按无效项跳过.
     """
     if not isinstance(bbox, (list, tuple)) or len(bbox) < 4:

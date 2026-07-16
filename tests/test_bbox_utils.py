@@ -144,8 +144,8 @@ class TestFeatheredRectMask(unittest.TestCase):
 class TestQwen25SmartResize(unittest.TestCase):
     """回归: smart_resize 复现值须与 Qwen2.5-VL-3B GGUF 的 mtmd 实测一致.
 
-    以下期望值全部来自真实模型推理时 mtmd 日志反推(image chunk token 数),
-    并经模型输出坐标逐值印证.
+    期望值除注明源码推导者外, 全部来自真实模型推理时 mtmd 日志反推
+    (image chunk token 数), 并经模型输出坐标逐值印证.
     """
 
     def test_large_image_downscaled_to_token_cap(self):
@@ -158,6 +158,14 @@ class TestQwen25SmartResize(unittest.TestCase):
 
     def test_tiny_image_upscaled_to_min_pixels(self):
         self.assertEqual(qwen25_smart_resize(56, 56), (84, 84))  # 9 tok
+
+    def test_half_value_rounds_away_from_zero(self):
+        # 回归: 边长 ≡ 14 (mod 56) 时 边长/28 恰为 x.5 且整数商为偶数,
+        # mtmd (std::round, 半值远离零) 进位到 84/1932; 旧实现: Python round()
+        # 银行家舍入取偶得 56/1904, 整图坐标换算系统性偏移.
+        # 期望值按 mtmd-image.cpp round_by_factor 的 std::round 语义源码推导, 非实测.
+        self.assertEqual(qwen25_smart_resize(70, 600), (84, 588))
+        self.assertEqual(qwen25_smart_resize(1918, 1080), (1932, 1092))
 
 
 class TestQwen25ModeConversion(unittest.TestCase):
