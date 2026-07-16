@@ -1,8 +1,9 @@
-"""插件入口, 向 ComfyUI 导出节点注册表与前端扩展目录."""
+"""插件入口, 向 ComfyUI 导出节点注册表与前端扩展目录, 挂接前端语言上报路由."""
 
 import logging
 
 try:
+    from .src.core import locale_sync  # noqa: F401  (import 即注册路由)
     from .src.nodes import NODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS
 except Exception:
     # 依赖缺失 (未按 requirements.txt 安装), 平台不受支持 (如 macOS), 以及

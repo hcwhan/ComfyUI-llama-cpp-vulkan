@@ -15,7 +15,7 @@
 
 ```
 ComfyUI-llama-cpp-vulkan/
-  __init__.py                 # 入口: from .src.nodes 导出 NODE_CLASS_MAPPINGS, 声明 WEB_DIRECTORY
+  __init__.py                 # 入口: from .src.nodes 导出 NODE_CLASS_MAPPINGS, 声明 WEB_DIRECTORY, import locale_sync 注册路由
   pyproject.toml              # 项目元数据, 依赖声明
   requirements.txt            # pip 依赖(含平台条件 llama-cpp-python wheel URL)
   复核结论.md                 # 复核结论存档(见"文档维护原则")
@@ -27,13 +27,16 @@ ComfyUI-llama-cpp-vulkan/
     widget_utils.js           # 前端共用工具: widget 显隐切换(hidden 标志 + type/computeSize 双轨)
     vlm_loader.js             # VLM Loader widget 联动: thinking 三态置灰, image token 字段显隐(纯 UX 增强)
     image_instruct.js         # image Instruct widget 联动: increment_seed 仅 Per-Image 档 / max_size 仅 Batch 档显示(纯 UX 增强)
+    locale_sync.js            # 页面加载时上报前端实际显示语言(语言自动跟随的兜底数据源, 见"文案与 i18n")
   src/
     i18n/                     # 文案层: 全部用户可见文案与控制台日志的单一来源
-      lang.py                 #   语言加载器, LANGUAGE 常量切换语言, 导出 LANG 字典
+      lang.py                 #   语言加载器, LANGUAGE 默认 auto 时按三级优先解析(见"文案与 i18n"), 导出 LANG 字典
+      locale_settings.py      #   语言自动跟随的设置层: Comfy.Locale 实时读取+落盘, 插件根 settings.json 读写
       language_zh-CN.py       #   中文文案(结构/排版/占位符约定见其 docstring)
       language_en-US.py       #   英文文案(与 zh-CN 逐行一一对应)
       common_static.py        #   不随语言切换的常量(下拉选项值, 分类名, 协议串, 日志前缀)
     core/                     # 核心逻辑(非节点)
+      locale_sync.py          #   前端语言上报路由, 持久化 frontend_locale 供下次启动解析兜底
       storage.py              #   模型生命周期: 全局单例, resolve_config 校验, 显存折算, unload 钩子
       instruct.py             #   Instruct 基类(text 骨架)+ media 基类(VLM 校验)+ 中断/thinking/hybrid 工具
       prompts.py              #   任务预设模板池(@@@/### 占位符, use 字段声明适用模态)
@@ -78,9 +81,10 @@ ComfyUI-llama-cpp-vulkan/
   tools/
     check_devices.py          # 独立诊断脚本: 列出 GGML 后端检测到的所有设备
   tests/                      # 单元测试(标准库 unittest, 用 ComfyUI 嵌入式 Python 运行)
-    comfy_stubs.py            #   comfy/folder_paths 最小替身, 满足 import 期依赖
+    comfy_stubs.py            #   comfy/folder_paths/server 最小替身, 满足 import 期依赖
     web/                      # web/*.js 逻辑测试(Node 内置 test runner, 零 npm 依赖)
       comfy_app_stub.mjs      #   ComfyUI 前端 app 对象替身
+      comfy_api_stub.mjs      #   ComfyUI 前端 api 对象替身(fetchApi 调用收集)
       harness.mjs             #   import 重定向钩子 + widget/node 工厂
 ```
 
@@ -158,6 +162,7 @@ image 逐张模式的多图结果以 "======== Image N ========" 前缀行拼接
 - 全部用户可见文案(节点显示名, tooltip, placeholder, 报错)与控制台日志文本统一放 `src/i18n/` 语言文件, 代码经 `from ..i18n.lang import LANG` 取用; 不随语言切换的字符串(下拉框选项值, 分类名, `======== Image N ========` 前缀行模板, 日志前缀)放 `common_static.py`. 新增/修改文案必须同步更新 zh-CN 与 en-US 两份语言文件并保持逐行一一对应
 - 带运行时值的文案写成 `str.format` 具名占位符模板; 报错文案须单行; 语言文件排版规则(多字面量换行约定)由 `tests/test_i18n_format.py` 锁定, `pyproject.toml` 已对 `language_*.py` 豁免 ruff format(lint 仍生效)
 - 测试断言报错文案时引用 `LANG` 而非硬编码字符串, 使断言随语言文件自动跟随
+- 语言自动跟随: `lang.py` 的 `LANGUAGE` 默认 `"auto"`, 解析三级优先 - 实时读 ComfyUI 的 `Comfy.Locale` > 上次会话前端上报的实际显示语言(`frontend_locale`, 覆盖 Comfy.Locale 从未设置时前端按浏览器自动检测的空窗) > 默认英语; 设置读取与持久化统一走 `locale_settings.py`(状态存插件根 `settings.json`, 运行时产物, 已 gitignore), 上报链路 `web/locale_sync.js` -> `core/locale_sync.py` 路由, 仅页面加载时上报一次(改语言无需监听: ComfyUI 自己会写 Comfy.Locale, 优先级更高), 文案 import 期固化, 上报生效恒为下次启动; JS 失效只损失兜底级
 - 例外(不进 i18n): 任务预设与系统提示词预设(领域内容), chat handler 显示名(`handlers.py` 注册表 key, 功能性标识), video Instruct 注入的"连续视频"语义提示与 `MEDIA_WORD`(prompt 内容), `prompts.py` 的 import 期模态校验报错(开发期防御), 根入口 `__init__.py` 的 import 失败安装指引(i18n 层可能同在失败的导入链上, 硬编码英文), `lang.py` 的语言文件缺失警告与报错(加载器自身不能依赖语言文件, 回退行为见其 docstring)
 
 ### 文档维护原则

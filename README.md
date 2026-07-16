@@ -91,6 +91,7 @@ One wheel per platform covers all Python versions. Download from [Releases](http
 
 ## Notes
 
+- **UI language**: node texts (display names, tooltips, error messages) come in English and Chinese, following ComfyUI's language setting automatically. Texts are fixed at startup, so a language change takes effect after restarting ComfyUI.
 - **Audio input (ASR)**: connect a ComfyUI `AUDIO` output to the `audio Instruct` node and load the model with `VLM Model Loader` using an audio-capable handler (e.g. `(ASR) Qwen3-ASR`) with its matching mmproj. Audio is sent as 16-bit mono WAV; resampling is handled by llama.cpp.
 - **Stateless inference**: every run is an independent one-shot request (system prompt + current prompt). No conversation history is kept between runs.
 - **GPU not detected?** Run `python tools/check_devices.py` (with ComfyUI's Python) to list every device the GGML backend enumerates (CPU/GPU/IGPU/ACCEL) without starting ComfyUI - useful for diagnosing Vulkan driver issues.

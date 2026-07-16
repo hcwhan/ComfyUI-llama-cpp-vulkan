@@ -1,5 +1,6 @@
-// 测试引导: 把 web/*.js 对 "../../scripts/app.js" 的 import 重定向到替身
-// (module.registerHooks 同步钩子, Node >= 22.15), 并提供 widget/node 工厂.
+// 测试引导: 把 web/*.js 对 "../../scripts/app.js" 与 "../../scripts/api.js"
+// 的 import 重定向到替身 (module.registerHooks 同步钩子, Node >= 22.15),
+// 并提供 widget/node 工厂.
 // web 侧 JS 只操作鸭子类型的普通对象, 无 DOM 依赖, 可在 Node 进程直接驱动.
 
 import { registerHooks } from "node:module";
@@ -7,13 +8,17 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const _here = path.dirname(fileURLToPath(import.meta.url));
-const _stubUrl = pathToFileURL(path.join(_here, "comfy_app_stub.mjs")).href;
+const _appStubUrl = pathToFileURL(path.join(_here, "comfy_app_stub.mjs")).href;
+const _apiStubUrl = pathToFileURL(path.join(_here, "comfy_api_stub.mjs")).href;
 const _webDir = path.resolve(_here, "..", "..", "web");
 
 registerHooks({
     resolve(specifier, context, nextResolve) {
         if (specifier.endsWith("scripts/app.js")) {
-            return { url: _stubUrl, shortCircuit: true };
+            return { url: _appStubUrl, shortCircuit: true };
+        }
+        if (specifier.endsWith("scripts/api.js")) {
+            return { url: _apiStubUrl, shortCircuit: true };
         }
         return nextResolve(specifier, context);
     },
@@ -25,7 +30,8 @@ export const loadWebModule = async (name) => {
     return import(pathToFileURL(path.join(_webDir, name)).href);
 };
 
-export { extensions } from "./comfy_app_stub.mjs";
+export { extensions, settingValues } from "./comfy_app_stub.mjs";
+export { fetchApiCalls, setFetchApiError } from "./comfy_api_stub.mjs";
 
 // 与 ComfyUI 前端 widget 对象的最小对齐: name/value/type/computeSize/callback
 export const makeWidget = (name, value, type = "number") => ({

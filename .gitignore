@@ -8,3 +8,6 @@ __pycache__/
 
 # 本地生成的分析报告等产物
 TODO*.md
+
+# 运行时产物: 语言自动跟随的持久化状态 (src/i18n/locale_settings.py)
+/settings.json
