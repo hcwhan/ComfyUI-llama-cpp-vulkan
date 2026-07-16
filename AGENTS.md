@@ -181,6 +181,10 @@ image 逐张模式的多图结果以 "======== Image N ========" 前缀行拼接
 - 每次 git commit 前必须先修复全部 ruff 问题: 依次运行 `python -m ruff check src tests --fix` 与 `python -m ruff format src tests`(用 ComfyUI 嵌入式 Python, 即 `python_embeded/python.exe`), 两者均无报告后再提交
 - 改动 `web/*.js` 时必须运行 JS 测试并全部通过: `node --test "tests/web/*.test.mjs"`(需本机 Node >= 22.15, 零 npm 依赖; 测试只锁 JS 自身逻辑, 与 ComfyUI 前端渲染层的真实契约仍靠手动验证)
 
+### 终端命令注意事项
+
+- 终端用 rg 必须显式带路径参数(如 `rg <pattern> .`): Cursor 集成终端下 stdin 不是终端, 裸写 `rg <pattern>` 会转为等待管道输入而无限挂起(实测挂 80 秒无输出)
+
 ### Commit message 规范
 
 - 一律使用中文书写(标题与正文), 保留 conventional commits 类型前缀(`feat:` / `fix:` / `refactor:` / `docs:` / `chore:` / `ci:` / `test:`, 破坏性变更加 `!`)
