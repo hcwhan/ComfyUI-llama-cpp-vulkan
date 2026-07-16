@@ -209,7 +209,8 @@ class llama_cpp_instruct_base:
             LLAMA_CPP_STORAGE.load_model(llama_model)
 
         messages = []
-        if system_prompt.strip():
+        system_prompt = system_prompt.strip()
+        if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
         return messages
 
