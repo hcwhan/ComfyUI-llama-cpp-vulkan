@@ -85,6 +85,9 @@ def _parse_metadata(path):
 
     架构键通常排在 tokenizer 数组之前; 关键的 block_count 到手后一旦扫到
     tokenizer 区即停止, 不为可选字段解析几十万条 token 元数据(慢且占内存).
+    代价: 个别模型把可选键 (如 sliding_window) 排在 tokenizer 区之后时
+    (GGUF 格式不强制键序) 会被跳过, SWA 折算回退到全量 n_ctx 计 KV;
+    方向保守, 只会高估显存少上层, 不会爆显存.
     """
     found = {}
     with open(path, "rb") as f:
