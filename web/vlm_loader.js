@@ -41,8 +41,10 @@ app.registerExtension({
 
         // forced/none 档覆写 thinking 值前, 把用户在 toggle 档的设定缓存到
         // _userValue (仅在从 toggle 档切出的那一次记录), 切回 toggle 档时恢复;
-        // prevThinkingMode 起始为 null, 使 nodeCreated/onConfigure 的首次同步
-        // 不产生缓存, 载入工作流以序列化值为准
+        // prevThinkingMode 起始为 null, 使 nodeCreated 末尾的首次同步不产生缓存
+        // (该次同步以默认值运行, 把 prevThinkingMode 置为 toggle 档);
+        // onConfigure 恢复序列化值后再同步时, 载入 forced/none 档缓存的是
+        // 刚恢复的序列化值, 切回 toggle 档时恢复该值, 仍以序列化值为准
         let prevThinkingMode = null;
         const applyMode = () => {
             const label = handlerWidget.value;
