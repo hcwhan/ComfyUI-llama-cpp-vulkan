@@ -30,9 +30,11 @@ class TestWheelPrivateApiContract(unittest.TestCase):
 
     def test_instance_attributes_assigned_in_llama_source(self):
         # n_tokens/_ctx/_model/_hybrid_cache_mgr 是实例属性, 无法静态取到,
-        # 检查 Llama 类源码中的属性引用作为存在性的近似契约
+        # 检查 Llama 类源码中的属性引用作为存在性的近似契约;
+        # chat_format/metadata 供 instruct.think_open_preinjected 判定
+        # GGUF 内嵌模板路径并取模板原文
         source = inspect.getsource(Llama)
-        for attr in ("self.n_tokens", "self._ctx", "self._model", "self._hybrid_cache_mgr"):
+        for attr in ("self.n_tokens", "self._ctx", "self._model", "self._hybrid_cache_mgr", "self.chat_format", "self.metadata"):
             self.assertIn(attr, source)
 
     def test_mmproj_path_instance_attribute_in_handler_source(self):
@@ -124,12 +126,26 @@ class TestWheelPrivateApiContract(unittest.TestCase):
 
     def test_create_chat_completion_accepts_all_sampling_params(self):
         # Parameters 节点全部字段 + seed + text Instruct allow_thinking 开关折算的
-        # reasoning_budget 必须被 create_chat_completion 签名接受;
+        # reasoning_budget / reasoning_start_in_prompt (模板预注入 <think> 探测命中
+        # 时传 True) 必须被 create_chat_completion 签名接受;
         # UI 键 max_gen_tokens 按 instruct._run() 的映射折算为 max_tokens 后校验
         params = inspect.signature(Llama.create_chat_completion).parameters
         wheel_names = ["max_tokens" if name == "max_gen_tokens" else name for name in DEFAULT_SAMPLING_PARAMS]
-        for name in (*wheel_names, "seed", "reasoning_budget"):
+        for name in (*wheel_names, "seed", "reasoning_budget", "reasoning_start_in_prompt"):
             self.assertIn(name, params, f"create_chat_completion missing param: {name}")
+
+    def test_jinja2_chat_formatter_probe_contract(self):
+        # instruct._template_preinjects_think 以 (template, eos_token, bos_token)
+        # 构造 Jinja2ChatFormatter 并调 __call__(messages=...) 取 .prompt,
+        # 复用 wheel 渲染路径做 <think> 预注入探测
+        import llama_cpp.llama_chat_format as chat_format_module
+
+        init_params = inspect.signature(chat_format_module.Jinja2ChatFormatter.__init__).parameters
+        for name in ("template", "eos_token", "bos_token"):
+            self.assertIn(name, init_params, f"Jinja2ChatFormatter missing init param: {name}")
+        call_params = inspect.signature(chat_format_module.Jinja2ChatFormatter.__call__).parameters
+        self.assertIn("messages", call_params)
+        self.assertIn("prompt", chat_format_module.ChatFormatterResponse.__dataclass_fields__)
 
 
 if __name__ == "__main__":

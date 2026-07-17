@@ -151,7 +151,7 @@ image 逐张模式的多图结果以 "======== Image N ========" 前缀行拼接
 ### 推理输出与中断
 
 - 无会话状态: 每次执行都是全新的一次性请求(system prompt + 本次提问), 不保留任何跨执行的对话历史
-- text Instruct 的 `allow_thinking` 开关(默认关)放 Instruct 而非 LLM Loader: text 侧 wheel 无模板级开关, `reasoning_budget` 采样器是唯一通用机制(请求期参数, 切换零成本); 与 vlm 侧构造期 thinking 开关(切换需重载)的位置不对称是机制差异的忠实反映. 折算与失效边界见 text 节点内注释
+- text Instruct 的 `allow_thinking` 开关(默认关)放 Instruct 而非 LLM Loader: text 侧 wheel 无模板级开关, `reasoning_budget` 采样器是唯一通用机制(请求期参数, 切换零成本); 与 vlm 侧构造期 thinking 开关(切换需重载)的位置不对称是机制差异的忠实反映. 模板预注入 `<think>` 的形态(Qwen3.5 等, 采样器等不到生成的开标签)由 `instruct.py` 的 `think_open_preinjected()` 渲染 GGUF 内嵌模板探测识别, 命中时改传 `reasoning_start_in_prompt=True` 使采样器直接强制闭合. 折算与失效边界见 text 节点内注释
 - `strip_thinking` 开关(默认开)剥离三种思考形态(`<think>` 推理块, Gemma4 channel 格式, GLM-4.1V `<answer>` 包裹), 各形态成因与未闭合处理见 `instruct.py` 剥离函数 docstring
 - `InterruptWatcher`: 推理期间轮询 ComfyUI 中断标志, 命中后 `Llama.abort()` 立即停止生成, 抗竞态细节见类 docstring
 - 每次节点执行结束后按 `is_hybrid_arch()` 判断是否整体重置 KV cache: hybrid/recurrent 架构(Qwen3.5, LFM2 系等)的线性注意力状态无法跨请求前缀复用; 纯 SWA 模型(Gemma3)不受影响. 重置时机与逐张模式的例外见 `_run()` finally 处注释
@@ -212,7 +212,7 @@ image 逐张模式的多图结果以 "======== Image N ========" 前缀行拼接
 
 项目代码只对接 `requirements.txt` 中固定的依赖版本(特别是 llama-cpp-python 的 JamePeng Vulkan wheel), 不为历史版本或官方构建编写兼容/回退代码. mmproj 路径统一用 `mmproj_path` 键传入 handler.
 
-当前依赖的 wheel 对接面清单(升级 wheel 时按单复核, 与 `tests/test_wheel_contract.py` 一一对应, 各项的依赖缘由见测试注释): `llm.n_tokens`, `llm._ctx.memory_clear`, `llm._hybrid_cache_mgr`, `llm._model.is_hybrid()/is_recurrent()`, `llama_cpp._ggml`(设备枚举符号), chat handler 的 `mmproj_path` 实例属性与 `close()`, `Llama.close()/abort()`, `llama_cpp.llama_cpp.llama_split_mode` 枚举(NONE/LAYER), `create_chat_completion` 接受 Parameters 节点全部 12 个采样参数(UI 键 `max_gen_tokens` 经 `_run()` 映射为 `max_tokens`)与 `seed`, `reasoning_budget`, 无 tools 路径下 `message.content` 恒为 str(`_make_extract` 直接调 `str.removeprefix`), 返回值恒含 `usage` token 计数与 `Llama.tokenize` 的 `add_bos`/`special` 参数(两者供生成统计日志). 契约测试静态检查上述接口存在性(不加载模型), 升级 wheel 后运行即可发现断裂; 公开 handler 类的契约另由 `tests/test_handlers.py` 锁定. 另有一条无法静态锁定的行为性假设, 升级时人工复核: chat handler 渲染消息时不改写 messages 入参(image 逐张模式复用同一 messages 列表, 仅原位改写其中 image_url 项, handler 若就地规范化 messages 会使逐张结果串味).
+当前依赖的 wheel 对接面清单(升级 wheel 时按单复核, 与 `tests/test_wheel_contract.py` 一一对应, 各项的依赖缘由见测试注释): `llm.n_tokens`, `llm._ctx.memory_clear`, `llm._hybrid_cache_mgr`, `llm._model.is_hybrid()/is_recurrent()`, `llm.chat_format`/`llm.metadata`(`<think>` 预注入探测的模板路径判定与模板原文), `llama_cpp._ggml`(设备枚举符号), chat handler 的 `mmproj_path` 实例属性与 `close()`, `Llama.close()/abort()`, `llama_cpp.llama_cpp.llama_split_mode` 枚举(NONE/LAYER), `llama_chat_format.Jinja2ChatFormatter`(渲染探测复用: `template`/`eos_token`/`bos_token` 构造与 `__call__(messages=...).prompt`), `create_chat_completion` 接受 Parameters 节点全部 12 个采样参数(UI 键 `max_gen_tokens` 经 `_run()` 映射为 `max_tokens`)与 `seed`, `reasoning_budget`, `reasoning_start_in_prompt`, 无 tools 路径下 `message.content` 恒为 str(`_make_extract` 直接调 `str.removeprefix`), 返回值恒含 `usage` token 计数与 `Llama.tokenize` 的 `add_bos`/`special` 参数(两者供生成统计日志). 契约测试静态检查上述接口存在性(不加载模型), 升级 wheel 后运行即可发现断裂; 公开 handler 类的契约另由 `tests/test_handlers.py` 锁定. 另有一条无法静态锁定的行为性假设, 升级时人工复核: chat handler 渲染消息时不改写 messages 入参(image 逐张模式复用同一 messages 列表, 仅原位改写其中 image_url 项, handler 若就地规范化 messages 会使逐张结果串味).
 
 ### INPUT_TYPES 字段顺序
 

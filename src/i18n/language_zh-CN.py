@@ -503,6 +503,8 @@ LANG = {
             "generation_stats_thinking": "本次 prompt {prompt_tokens} tokens, 生成 {completion_tokens} tokens (思考约 {thinking_tokens} + 答案约 {answer_tokens}), 用时 {elapsed:.2f} 秒, 速度 {speed:.1f} tok/s",
             # debug 级, 默认不输出
             "hybrid_reset": "hybrid/recurrent 架构: 执行结束, 已整体重置 KV cache",
+            # debug 级, 默认不输出
+            "think_probe_failed": "GGUF 内嵌模板渲染探测失败, 按未预注入 <think> 处理: {e}",
         },
 
         # core/locale_sync.py
@@ -551,7 +553,7 @@ LANG = {
 
         # nodes/instruct/text/node_instruct.py
         "text_instruct": {
-            "allow_thinking": "allow_thinking={allow_thinking}, 折算 reasoning_budget={reasoning_budget}",
+            "allow_thinking": "allow_thinking={allow_thinking}, 折算 reasoning_budget={reasoning_budget}, reasoning_start_in_prompt={reasoning_start_in_prompt}",
         },
 
         # nodes/instruct/media/image/node_instruct.py

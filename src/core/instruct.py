@@ -8,11 +8,13 @@
 """
 
 import contextlib
+import functools
 import re
 import threading
 import time
 
 import comfy.model_management as mm
+from llama_cpp import llama_chat_format
 
 from ..i18n.common_static import CATEGORY as _CATEGORY
 from ..i18n.common_static import LOG_PREFIX
@@ -134,6 +136,40 @@ def _log_completion_stats(output, elapsed, log_prefix):
             speed=speed,
         )
     )
+
+
+@functools.lru_cache(maxsize=4)
+def _template_preinjects_think(template):
+    """渲染 GGUF 内嵌 chat template, 判断 generation prompt 尾部是否预注入 <think>.
+
+    复用 wheel 的 Jinja2ChatFormatter 保证与运行时同一渲染路径 (同款沙箱环境与
+    raise_exception/strftime_now 全局, add_generation_prompt 取构造默认 True);
+    bos/eos 传空串, 模板引用处渲染为空, 不影响尾部是否以 <think> 收尾的判定.
+    渲染失败 (模板对消息形态有本探测未满足的要求等) 按未预注入处理,
+    行为与不探测时一致; 结果按模板字符串缓存, 每个模板仅渲染一次.
+    """
+    try:
+        formatter = llama_chat_format.Jinja2ChatFormatter(template=template, eos_token="", bos_token="")
+        prompt = formatter(messages=[{"role": "user", "content": "probe"}]).prompt
+    except Exception as e:
+        logger.debug(LOG_PREFIX + _LOGS["think_probe_failed"].format(e=e))
+        return False
+    return prompt.rstrip().endswith("<think>")
+
+
+def think_open_preinjected(llm):
+    """判断已加载模型的文本路径 generation prompt 是否已预注入 <think> 开标签.
+
+    预注入形态 (Qwen3.5 等) 下 wheel 的 reasoning_budget 采样器等不到生成的
+    开标签, 需要调用方改传 reasoning_start_in_prompt=True; 本函数为 text
+    Instruct 提供该判定. 仅 chat_format 落在 "chat_template.default"
+    (GGUF 内嵌模板) 时渲染探测: 插件从不显式指定 chat_format, 文本路径
+    其余可达值只有 wheel 猜中的内置格式 (chatml/llama-3/mistral-instruct)
+    与 fallback (llama-2), 均不预注入 <think>, 直接判 False.
+    """
+    if llm.chat_format != "chat_template.default":
+        return False
+    return _template_preinjects_think(llm.metadata["tokenizer.chat_template"])
 
 
 def is_hybrid_arch(llm):

@@ -503,6 +503,8 @@ LANG = {
             "generation_stats_thinking": "Prompt {prompt_tokens} tokens, generated {completion_tokens} tokens (~{thinking_tokens} thinking + ~{answer_tokens} answer) in {elapsed:.2f}s, {speed:.1f} tok/s",
             # debug level, silent by default
             "hybrid_reset": "hybrid/recurrent arch: KV cache fully reset after execution",
+            # debug level, silent by default
+            "think_probe_failed": "GGUF chat template probe render failed, treating as no pre-injected <think>: {e}",
         },
 
         # core/locale_sync.py
@@ -551,7 +553,7 @@ LANG = {
 
         # nodes/instruct/text/node_instruct.py
         "text_instruct": {
-            "allow_thinking": "allow_thinking={allow_thinking}, mapped to reasoning_budget={reasoning_budget}",
+            "allow_thinking": "allow_thinking={allow_thinking}, mapped to reasoning_budget={reasoning_budget}, reasoning_start_in_prompt={reasoning_start_in_prompt}",
         },
 
         # nodes/instruct/media/image/node_instruct.py

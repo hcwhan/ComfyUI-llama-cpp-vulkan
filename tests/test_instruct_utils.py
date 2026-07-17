@@ -1,4 +1,4 @@
-"""instruct.py 工具函数与 prompts.py 预设的单元测试: thinking 块剥离, 预设/自定义提示词组装, 预设 use 配置一致性 (prompts.py + 节点类 MODALITY), FakeLlm 打桩的 content 扁平化 (_single_completion), 生成统计日志 (_completion_with_stats), 以及 text 节点的 allow_thinking 折算与 REQUIRE_USER_TEXT 守卫 (经 _run)."""
+"""instruct.py 工具函数与 prompts.py 预设的单元测试: thinking 块剥离, <think> 预注入探测 (think_open_preinjected), 预设/自定义提示词组装, 预设 use 配置一致性 (prompts.py + 节点类 MODALITY), FakeLlm 打桩的 content 扁平化 (_single_completion), 生成统计日志 (_completion_with_stats), 以及 text 节点的 allow_thinking 折算与 REQUIRE_USER_TEXT 守卫 (经 _run)."""
 
 import re
 import types
@@ -225,13 +225,58 @@ class TestCompletionStatsLogging(unittest.TestCase):
         self.assertEqual(self._log_message(llm), node_log_prefix(llama_cpp_instruct_base.LOG_NAME) + expected)
 
 
+class TestThinkOpenPreinjected(unittest.TestCase):
+    """GGUF 内嵌模板的 <think> 预注入探测 (think_open_preinjected)."""
+
+    # 复刻 Qwen3.5 模板的 generation prompt 分支: enable_thinking 未定义时
+    # 走 else 预注入 <think>\n (与 wheel 运行时不传 enable_thinking 一致)
+    _QWEN35_STYLE_TEMPLATE = (
+        "{% for message in messages %}{{ message.content }}{% endfor %}"
+        "{% if add_generation_prompt %}<|im_start|>assistant\n"
+        "{% if enable_thinking is defined and enable_thinking is false %}<think>\n\n</think>\n\n"
+        "{% else %}<think>\n{% endif %}{% endif %}"
+    )
+    _PLAIN_TEMPLATE = (
+        "{% for message in messages %}{{ message.content }}{% endfor %}{% if add_generation_prompt %}<|im_start|>assistant\n{% endif %}"
+    )
+
+    @staticmethod
+    def _fake_llm(chat_format, template=None):
+        metadata = {} if template is None else {"tokenizer.chat_template": template}
+        return types.SimpleNamespace(chat_format=chat_format, metadata=metadata)
+
+    def test_preinjecting_gguf_template_detected(self):
+        llm = self._fake_llm("chat_template.default", self._QWEN35_STYLE_TEMPLATE)
+        self.assertTrue(instruct.think_open_preinjected(llm))
+
+    def test_plain_gguf_template_not_detected(self):
+        llm = self._fake_llm("chat_template.default", self._PLAIN_TEMPLATE)
+        self.assertFalse(instruct.think_open_preinjected(llm))
+
+    def test_builtin_chat_format_skips_render(self):
+        # wheel 猜中内置格式 (chatml 等) 时不渲染 GGUF 模板;
+        # metadata 不带模板佐证未触发渲染路径 (否则 KeyError)
+        self.assertFalse(instruct.think_open_preinjected(self._fake_llm("chatml")))
+
+    def test_render_failure_treated_as_not_preinjected(self):
+        # 渲染失败按未预注入处理, 行为与不探测时一致
+        llm = self._fake_llm("chat_template.default", "{{ raise_exception('unsupported probe') }}")
+        self.assertFalse(instruct.think_open_preinjected(llm))
+
+
 class TestAllowThinkingMapping(unittest.TestCase):
-    """text Instruct 的 allow_thinking 开关折算为 wheel 的 reasoning_budget."""
+    """text Instruct 的 allow_thinking 开关折算为 wheel 的 reasoning_budget 与 reasoning_start_in_prompt."""
+
+    # 模拟 Qwen3.5 形态: generation prompt 尾部预注入 <think> 开标签
+    _PREINJECT_TEMPLATE = "{% for message in messages %}{{ message.content }}{% endfor %}<|im_start|>assistant\n<think>\n"
 
     class _FakeLlm:
         def __init__(self):
             self.captured_params = None
             self._model = types.SimpleNamespace(is_hybrid=lambda: False, is_recurrent=lambda: False)
+            # 默认模拟 wheel 猜中内置格式的路径 (不渲染 GGUF 模板)
+            self.chat_format = "chatml"
+            self.metadata = {}
 
         def abort(self):
             pass
@@ -273,6 +318,23 @@ class TestAllowThinkingMapping(unittest.TestCase):
 
     def test_allow_maps_to_minus_one(self):
         self.assertEqual(self._process(True)["reasoning_budget"], -1)
+
+    def test_disallow_without_preinjection_keeps_start_in_prompt_false(self):
+        # 内置格式路径 (chatml) 不预注入 <think>, 采样器保持等生成的开标签
+        self.assertFalse(self._process(False)["reasoning_start_in_prompt"])
+
+    def test_disallow_with_preinjecting_template_sets_start_in_prompt(self):
+        # 回归: Qwen3.5 等模板预注入 <think> 时, 旧实现只传 reasoning_budget=0,
+        # 采样器等不到生成的开标签而静默失效, 思考照常生成
+        self.fake.chat_format = "chat_template.default"
+        self.fake.metadata = {"tokenizer.chat_template": self._PREINJECT_TEMPLATE}
+        self.assertTrue(self._process(False)["reasoning_start_in_prompt"])
+
+    def test_allow_skips_probe_and_keeps_start_in_prompt_false(self):
+        # allow_thinking=True 时 budget=-1 采样器整体停用, 不做模板探测
+        self.fake.chat_format = "chat_template.default"
+        self.fake.metadata = {"tokenizer.chat_template": self._PREINJECT_TEMPLATE}
+        self.assertFalse(self._process(True)["reasoning_start_in_prompt"])
 
 
 class TestRequireUserText(unittest.TestCase):
