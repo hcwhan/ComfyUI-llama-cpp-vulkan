@@ -2,9 +2,12 @@
 
 from ...i18n.common_static import CATEGORY as _CATEGORY
 from ...i18n.lang import LANG
+from ...shared.logger import logger, node_log_prefix
 
 _TIPS = LANG["nodes"]["bbox"]["bboxes_to_bbox"]["tooltips"]
 _ERRORS = LANG["nodes"]["bbox"]["bboxes_to_bbox"]["errors"]
+_LOGS = LANG["logs"]["bbox"]
+_PREFIX = node_log_prefix("BBoxes to BBox")
 
 
 class bboxes_to_bbox:
@@ -43,7 +46,10 @@ class bboxes_to_bbox:
             raise IndexError(_ERRORS["image_index_out_of_range"].format(image_index=image_index, count=len(bboxes)))
         group = bboxes[image_index]
         if bbox_index == 999:
+            logger.info(_PREFIX + _LOGS["bbox_selected_all"].format(image_index=image_index, count=len(group)))
             return (group,)
         if not -len(group) <= bbox_index < len(group):
             raise IndexError(_ERRORS["bbox_index_out_of_range"].format(bbox_index=bbox_index, image_index=image_index, count=len(group)))
-        return ([group[bbox_index]],)
+        selected = group[bbox_index]
+        logger.info(_PREFIX + _LOGS["bbox_selected"].format(image_index=image_index, bbox_index=bbox_index, bbox=selected))
+        return ([selected],)

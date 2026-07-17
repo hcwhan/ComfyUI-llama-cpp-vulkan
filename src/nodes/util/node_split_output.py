@@ -6,7 +6,12 @@
 """
 
 from ...i18n.common_static import CATEGORY as _CATEGORY
+from ...i18n.lang import LANG
+from ...shared.logger import logger, node_log_prefix
 from ...shared.text_utils import split_image_results
+
+_LOGS = LANG["logs"]["util"]
+_PREFIX = node_log_prefix("Split Instruct Output")
 
 
 class split_instruct_output:
@@ -26,4 +31,6 @@ class split_instruct_output:
     RETURN_NAMES = ("list",)
 
     def process(self, text):
-        return (split_image_results(text),)
+        parts = split_image_results(text)
+        logger.info(_PREFIX + _LOGS["split_output"].format(count=len(parts)))
+        return (parts,)

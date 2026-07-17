@@ -10,17 +10,19 @@ import comfy.model_management as mm
 
 from .....core.cqdm import cqdm
 from .....core.instruct import llama_cpp_media_instruct_base
-from .....i18n.common_static import IMAGE_MODE_BATCH, IMAGE_MODE_EACH, IMAGE_RESULT_SEPARATOR_TEMPLATE, LOG_PREFIX
+from .....i18n.common_static import IMAGE_MODE_BATCH, IMAGE_MODE_EACH, IMAGE_RESULT_SEPARATOR_TEMPLATE
 from .....i18n.lang import LANG
 from .....shared.encoding import image_content_item, scale_image, tensor_to_uint8
-from .....shared.logger import logger
+from .....shared.logger import logger, node_log_prefix
 
 _TIPS = LANG["nodes"]["instruct"]["image"]["tooltips"]
+_LOGS = LANG["logs"]["image_instruct"]
 
 
 class llama_cpp_image_instruct(llama_cpp_media_instruct_base):
     MEDIA_WORD = "图像"
     MODALITY = "image"
+    LOG_NAME = "Image Instruct"
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -75,7 +77,7 @@ class llama_cpp_image_instruct(llama_cpp_media_instruct_base):
         image_content = {"type": "image_url", "image_url": {"url": ""}}
         user_content.append(image_content)
         messages.append({"role": "user", "content": user_content})
-        logger.info(LOG_PREFIX + LANG["logs"]["image_instruct"]["start_processing"].format(count=len(images)))
+        logger.info(node_log_prefix(self.LOG_NAME) + _LOGS["each_mode"].format(count=len(images), increment_seed=increment_seed))
 
         tmp_list = []
         for i, image in enumerate(cqdm(images)):
@@ -103,6 +105,7 @@ class llama_cpp_image_instruct(llama_cpp_media_instruct_base):
         params,
         extract_text,
     ):
+        logger.info(node_log_prefix(self.LOG_NAME) + _LOGS["batch_mode"].format(count=len(images), max_size=max_size))
         for image in images:
             if len(images) > 1:
                 user_content.append(image_content_item(scale_image(image, max_size)))

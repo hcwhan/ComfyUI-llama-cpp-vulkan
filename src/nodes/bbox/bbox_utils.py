@@ -14,6 +14,11 @@ from ...i18n.lang import LANG
 from ...shared.encoding import tensor_to_uint8
 from ...shared.logger import logger
 
+# 本文件的 warning 由多个 bbox 节点触发, 调用方经 log_prefix 参数传入自己的
+# 节点前缀 (node_log_prefix); 默认值 LOG_PREFIX 兜底独立使用场景.
+# 例外: _label_font 的 no_cjk_font 是环境级警告 (字体缺失与节点无关), 恒用
+# LOG_PREFIX, 也避免节点前缀进入 lru_cache 键
+
 _ERRORS = LANG["nodes"]["bbox"]["json_to_bboxes"]["errors"]
 _LOGS = LANG["logs"]["bbox"]
 
@@ -149,7 +154,7 @@ def _label_color(label):
     return tuple(80 + b % 101 for b in digest[:3])
 
 
-def draw_bbox(image, pixel_bboxes, labels):
+def draw_bbox(image, pixel_bboxes, labels, log_prefix=LOG_PREFIX):
     img = Image.fromarray(tensor_to_uint8(image))
     draw = ImageDraw.Draw(img)
 
@@ -173,25 +178,25 @@ def draw_bbox(image, pixel_bboxes, labels):
             # json_to_pixel_bboxes 归一, 不会到达此处); 逐框跳过,
             # 与 SEGS/MASK 路径的逐框容错粒度一致,
             # 单个坏框不放弃整张图的其余框
-            logger.warning(LOG_PREFIX + _LOGS["bbox_draw_failed"].format(label=label, x0=x0, y0=y0, x1=x1, y1=y1, e=e))
+            logger.warning(log_prefix + _LOGS["bbox_draw_failed"].format(label=label, x0=x0, y0=y0, x1=x1, y1=y1, e=e))
     return torch.from_numpy(np.array(img).astype(np.float32) / 255.0).unsqueeze(0)
 
 
-def valid_int_bbox(bbox):
+def valid_int_bbox(bbox, log_prefix=LOG_PREFIX):
     """校验 bbox 结构并取整为 (x1, y1, x2, y2), 非法时打 warning 返回 None.
 
     Qwen 归一化坐标换算后是浮点数, 就近取整(Python round, 半值取偶)比截断更贴近原框;
     坐标值来自 LLM 输出, 非数字时按无效项跳过.
     """
     if not isinstance(bbox, (list, tuple)) or len(bbox) < 4:
-        logger.warning(LOG_PREFIX + _LOGS["bbox_invalid_item"].format(bbox=bbox))
+        logger.warning(log_prefix + _LOGS["bbox_invalid_item"].format(bbox=bbox))
         return None
     try:
         # OverflowError: json.loads 接受 Infinity/1e999 字面量, inf 经上游换算
         # 原样到达此处, round(inf) 抛 OverflowError (NaN 抛 ValueError)
         return tuple(int(round(float(v))) for v in bbox[:4])
     except (TypeError, ValueError, OverflowError):
-        logger.warning(LOG_PREFIX + _LOGS["bbox_non_numeric"].format(bbox=bbox))
+        logger.warning(log_prefix + _LOGS["bbox_non_numeric"].format(bbox=bbox))
         return None
 
 

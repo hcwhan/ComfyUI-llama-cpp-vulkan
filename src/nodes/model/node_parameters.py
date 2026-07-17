@@ -3,8 +3,11 @@
 from ...core.instruct import DEFAULT_SAMPLING_PARAMS as _DEFAULTS
 from ...i18n.common_static import CATEGORY as _CATEGORY
 from ...i18n.lang import LANG
+from ...shared.logger import logger, node_log_prefix
 
 _TIPS = LANG["nodes"]["model"]["parameters"]["tooltips"]
+_LOGS = LANG["logs"]["parameters"]
+_PREFIX = node_log_prefix("Parameters")
 
 
 def _tooltip(name):
@@ -150,4 +153,6 @@ class llama_cpp_parameters:
     RETURN_NAMES = ("parameters",)
 
     def process(self, **kwargs):
+        # kwargs 键与 INPUT_TYPES 的 12 个字段一一对应, 模板占位符同名直填
+        logger.info(_PREFIX + _LOGS["sampling"].format(**kwargs))
         return (kwargs,)

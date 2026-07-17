@@ -10,8 +10,10 @@ import numpy as np
 from .....core.instruct import llama_cpp_media_instruct_base
 from .....i18n.lang import LANG
 from .....shared.encoding import image_content_item, scale_image, tensor_to_uint8
+from .....shared.logger import logger, node_log_prefix
 
 _TIPS = LANG["nodes"]["instruct"]["video"]["tooltips"]
+_LOGS = LANG["logs"]["video_instruct"]
 
 
 def sample_frame_indices(total_frames, max_frames):
@@ -23,6 +25,7 @@ def sample_frame_indices(total_frames, max_frames):
 class llama_cpp_video_instruct(llama_cpp_media_instruct_base):
     MEDIA_WORD = "视频"
     MODALITY = "video"
+    LOG_NAME = "Video Instruct"
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -72,6 +75,9 @@ class llama_cpp_video_instruct(llama_cpp_media_instruct_base):
         def runner(messages, user_content, seed, params, extract_text, watcher):
             self.require_mmproj("Video")
             sampled = [frames[i] for i in sample_frame_indices(len(frames), max_frames)]
+            logger.info(
+                node_log_prefix(self.LOG_NAME) + _LOGS["sampling"].format(total=len(frames), sampled=len(sampled), max_size=max_size)
+            )
 
             for frame in sampled:
                 if len(sampled) > 1:

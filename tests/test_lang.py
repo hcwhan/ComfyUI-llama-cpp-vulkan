@@ -1,4 +1,4 @@
-"""src/i18n/lang.py 的单元测试: _resolve_language 三级优先级, comfy_locale 落盘, 映射表与语言文件的一致性."""
+"""src/i18n/lang.py 的单元测试: _resolve_language 三级优先级与来源标识, comfy_locale 落盘, 映射表与语言文件的一致性."""
 
 import json
 import os
@@ -19,7 +19,8 @@ class TestResolveLanguage(unittest.TestCase):
         """在临时目录中解析语言, 返回 (解析结果, 解析后的项目 settings.json 内容).
 
         comfy_settings_text 为 default/comfy.settings.json 文本 (None 表示不建文件),
-        project_settings 为插件根 settings.json 初始 dict (None 表示不建文件).
+        project_settings 为插件根 settings.json 初始 dict (None 表示不建文件);
+        解析来源标识另存 self.last_source 供来源断言.
         """
         with tempfile.TemporaryDirectory() as tmp_dir:
             user_dir = Path(tmp_dir) / "user"
@@ -35,7 +36,7 @@ class TestResolveLanguage(unittest.TestCase):
                 patch.object(locale_settings.folder_paths, "get_user_directory", lambda: str(user_dir)),
                 patch.object(locale_settings, "_SETTINGS_PATH", project_path),
             ):
-                resolved = lang._resolve_language()
+                resolved, self.last_source = lang._resolve_language()
             stored = json.loads(project_path.read_text(encoding="utf-8")) if project_path.is_file() else None
             return resolved, stored
 
@@ -48,7 +49,7 @@ class TestResolveLanguage(unittest.TestCase):
             patch.object(lang, "LANGUAGE", "zh-CN"),
             patch.object(locale_settings.folder_paths, "get_user_directory", _fail),
         ):
-            self.assertEqual(lang._resolve_language(), "zh-CN")
+            self.assertEqual(lang._resolve_language(), ("zh-CN", "LANGUAGE"))
 
     # ---- 第 1 级: 实时 Comfy.Locale ----
 
@@ -112,6 +113,22 @@ class TestResolveLanguage(unittest.TestCase):
     def test_nothing_available_falls_back_to_default(self):
         resolved, _ = self._resolve(None)
         self.assertEqual(resolved, lang._DEFAULT_LANGUAGE)
+
+    # ---- 来源标识 (启动日志显示) ----
+
+    def test_source_reports_hit_level(self):
+        self._resolve(json.dumps({"Comfy.Locale": "zh"}))
+        self.assertEqual(self.last_source, "Comfy.Locale")
+        self._resolve(None, project_settings={"language": {"frontend_locale": "zh"}})
+        self.assertEqual(self.last_source, "frontend_locale")
+        self._resolve(None)
+        self.assertEqual(self.last_source, "default")
+
+    def test_source_keeps_hit_level_for_unmapped_locale(self):
+        # 短码无对应文案时语言落默认英语, 来源仍如实标注提供短码的层级
+        # (日志 "en-US (来源: Comfy.Locale)" 解释 "设了 ja 为何显示英语")
+        self._resolve(json.dumps({"Comfy.Locale": "ja"}))
+        self.assertEqual(self.last_source, "Comfy.Locale")
 
     def test_corrupted_comfy_settings_falls_back_to_default(self):
         resolved, _ = self._resolve("{not valid json")

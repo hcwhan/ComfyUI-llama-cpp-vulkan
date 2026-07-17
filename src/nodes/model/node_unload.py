@@ -9,10 +9,11 @@ force_offload 开关兜底.
 
 from ...core.storage import LLAMA_CPP_STORAGE
 from ...i18n.common_static import CATEGORY as _CATEGORY
-from ...i18n.common_static import LOG_PREFIX
 from ...i18n.lang import LANG
-from ...shared.logger import logger
+from ...shared.logger import logger, node_log_prefix
 from ...shared.types import any_type
+
+_PREFIX = node_log_prefix("Unload Model")
 
 
 class llama_cpp_unload_model:
@@ -36,6 +37,6 @@ class llama_cpp_unload_model:
     def process(self, any):
         # 空载时不打 "Unloading" 日志(避免误导排查); clean() 幂等, 仍无条件执行兜底
         if LLAMA_CPP_STORAGE.llm is not None:
-            logger.info(LOG_PREFIX + LANG["logs"]["unload"]["unloading"])
+            logger.info(_PREFIX + LANG["logs"]["unload"]["unloading"])
         LLAMA_CPP_STORAGE.clean()
         return (any,)

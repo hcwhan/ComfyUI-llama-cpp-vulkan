@@ -11,7 +11,12 @@ JS 失效只损失下次启动的兜底, 语言解析的第 1 级与默认回退
 from aiohttp import web
 from server import PromptServer
 
+from ..i18n.common_static import LOG_PREFIX
+from ..i18n.lang import LANG
 from ..i18n.locale_settings import set_language_setting
+from ..shared.logger import logger
+
+_LOGS = LANG["logs"]["locale_sync"]
 
 # 前端短码最长形如 zh-TW, 限长拦截异常提交, 不做短码名单校验
 # (未映射短码由 lang.py 读取时落默认英语, 名单只需一处)
@@ -28,4 +33,5 @@ async def _set_frontend_locale(request):
     if not isinstance(locale, str) or not locale or len(locale) > _MAX_LOCALE_LENGTH:
         return web.Response(status=400)
     set_language_setting("frontend_locale", locale)
+    logger.debug(LOG_PREFIX + _LOGS["frontend_locale_saved"].format(locale=locale))
     return web.Response(status=200)

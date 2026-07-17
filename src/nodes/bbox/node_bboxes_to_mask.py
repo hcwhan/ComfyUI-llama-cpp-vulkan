@@ -3,13 +3,13 @@
 import torch
 
 from ...i18n.common_static import CATEGORY as _CATEGORY
-from ...i18n.common_static import LOG_PREFIX
 from ...i18n.lang import LANG
-from ...shared.logger import logger
+from ...shared.logger import logger, node_log_prefix
 from .bbox_utils import feathered_rect_mask, valid_int_bbox
 
 _TIPS = LANG["nodes"]["bbox"]["bboxes_to_mask"]["tooltips"]
 _LOGS = LANG["logs"]["bbox"]
+_PREFIX = node_log_prefix("BBoxes to MASK")
 
 
 class bboxes_to_mask:
@@ -50,7 +50,7 @@ class bboxes_to_mask:
         margin = int(4 * feather) + 1 if feather > 0 else 0
 
         for bbox in bboxes:
-            coords = valid_int_bbox(bbox)
+            coords = valid_int_bbox(bbox, log_prefix=_PREFIX)
             if coords is None:
                 continue
             x1, y1, x2, y2 = coords
@@ -60,14 +60,14 @@ class bboxes_to_mask:
             y2_exp = y2 + dilation
 
             if x2_exp - x1_exp <= 0 or y2_exp - y1_exp <= 0:
-                logger.warning(LOG_PREFIX + _LOGS["bbox_empty_area"].format(bbox=bbox))
+                logger.warning(_PREFIX + _LOGS["bbox_empty_area"].format(bbox=bbox))
                 continue
 
             # 局部窗口(含羽化边界), 裁剪到图像范围
             wx1, wy1 = max(0, x1_exp - margin), max(0, y1_exp - margin)
             wx2, wy2 = min(width, x2_exp + margin), min(height, y2_exp + margin)
             if wx2 <= wx1 or wy2 <= wy1:
-                logger.warning(LOG_PREFIX + _LOGS["bbox_out_of_bounds"].format(bbox=bbox))
+                logger.warning(_PREFIX + _LOGS["bbox_out_of_bounds"].format(bbox=bbox))
                 continue
 
             # 扩张框(裁剪到图像内)在窗口坐标系中的位置
@@ -82,4 +82,13 @@ class bboxes_to_mask:
             region = combined_full_mask[wy1:wy2, wx1:wx2]
             combined_full_mask[wy1:wy2, wx1:wx2] = torch.maximum(region, local_mask_tensor)
 
+        logger.info(
+            _PREFIX
+            + _LOGS["mask_summary"].format(
+                bbox_count=len(bboxes),
+                coverage=combined_full_mask.gt(0.0).float().mean().item() * 100,
+                dilation=dilation,
+                feather=feather,
+            )
+        )
         return (combined_full_mask.unsqueeze(0),)

@@ -5,13 +5,13 @@ from collections import namedtuple
 import numpy as np
 
 from ...i18n.common_static import CATEGORY as _CATEGORY
-from ...i18n.common_static import LOG_PREFIX
 from ...i18n.lang import LANG
-from ...shared.logger import logger
+from ...shared.logger import logger, node_log_prefix
 from .bbox_utils import feathered_rect_mask, valid_int_bbox
 
 _TIPS = LANG["nodes"]["bbox"]["bboxes_to_segs"]["tooltips"]
 _LOGS = LANG["logs"]["bbox"]
+_PREFIX = node_log_prefix("BBoxes to SEGS")
 
 # 与 Impact Pack 的 SEG 保持同定义(modules/impact/core.py), 字段名与顺序不能改:
 # 其部分节点依赖 namedtuple 语义(如 SEGSLabelAssign 调用 seg._replace)
@@ -75,7 +75,7 @@ class bboxes_to_segs:
 
         seg_list = []
         if batch_size > 1:
-            logger.warning(LOG_PREFIX + _LOGS["segs_batch_first_frame"].format(batch_size=batch_size))
+            logger.warning(_PREFIX + _LOGS["segs_batch_first_frame"].format(batch_size=batch_size))
         image_for_cropping = image[0]
 
         # gaussian_filter 默认 truncate=4.0, 窗口向外留 4 sigma 即可覆盖全部有效衰减
@@ -83,7 +83,7 @@ class bboxes_to_segs:
         margin = int(4 * feather) + 1 if feather > 0 else 0
 
         for bbox in bboxes:
-            coords = valid_int_bbox(bbox)
+            coords = valid_int_bbox(bbox, log_prefix=_PREFIX)
             if coords is None:
                 continue
             x1, y1, x2, y2 = coords
@@ -96,7 +96,7 @@ class bboxes_to_segs:
             x2_exp = x2 + dilation
             y2_exp = y2 + dilation
             if x2_exp - x1_exp <= 0 or y2_exp - y1_exp <= 0:
-                logger.warning(LOG_PREFIX + _LOGS["bbox_empty_area"].format(bbox=bbox))
+                logger.warning(_PREFIX + _LOGS["bbox_empty_area"].format(bbox=bbox))
                 continue
 
             # LLM 输出的坐标不可信, 扩张框裁剪到图像内,
@@ -106,7 +106,7 @@ class bboxes_to_segs:
             mx2 = min(width, x2_exp)
             my2 = min(height, y2_exp)
             if mx2 <= mx1 or my2 <= my1:
-                logger.warning(LOG_PREFIX + _LOGS["bbox_out_of_bounds"].format(bbox=bbox))
+                logger.warning(_PREFIX + _LOGS["bbox_out_of_bounds"].format(bbox=bbox))
                 continue
 
             # crop_region 以掩码矩形为中心按 crop_factor 放大(Impact Pack 惯例),
@@ -156,6 +156,12 @@ class bboxes_to_segs:
 
             seg_list.append(seg)
 
+        logger.info(
+            _PREFIX
+            + _LOGS["segs_summary"].format(
+                bbox_count=len(bboxes), seg_count=len(seg_list), dilation=dilation, feather=feather, crop_factor=crop_factor
+            )
+        )
         segs = (mask_shape, seg_list)
 
         return (segs,)

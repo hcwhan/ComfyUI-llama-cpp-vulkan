@@ -1,7 +1,12 @@
 """Unpack Code Block 节点, 去除 LLM 输出首尾的代码围栏标记."""
 
 from ...i18n.common_static import CATEGORY as _CATEGORY
+from ...i18n.lang import LANG
+from ...shared.logger import logger, node_log_prefix
 from ...shared.text_utils import strip_code_fence
+
+_LOGS = LANG["logs"]["util"]
+_PREFIX = node_log_prefix("Unpack Code Block")
 
 
 class remove_code_block:
@@ -20,4 +25,6 @@ class remove_code_block:
     RETURN_NAMES = ("output",)
 
     def process(self, input):
-        return (strip_code_fence(input),)
+        output = strip_code_fence(input)
+        logger.info(_PREFIX + _LOGS["remove_code_block"].format(before=len(input), after=len(output)))
+        return (output,)

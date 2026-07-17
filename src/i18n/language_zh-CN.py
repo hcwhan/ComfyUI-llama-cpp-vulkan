@@ -446,6 +446,8 @@ LANG = {
 
     # ---- 控制台日志 (按来源模块分组, 多数与代码文件一一对应, bbox 组见其注释) ----
     # 固定前缀 "[llama-cpp-vulkan] " 是日志过滤标签, 不进模板, 由调用处添加;
+    # 节点执行日志再叠加 "[节点名] " 前缀 (shared/logger.py 的 node_log_prefix,
+    # 节点名为功能性标识不随语言切换), 模板文案不再重复节点名;
     # 日志级别 (info/warning/debug) 属代码行为, 不在本文件, 特殊级别以注释标注
     "logs": {
         # core/devices.py
@@ -476,23 +478,37 @@ LANG = {
             # 以下两条为 debug 级, 默认不输出
             "llm_close_failed": "llm 关闭失败: {e}",
             "handler_close_failed": "chat_handler 关闭失败: {e}",
+            "free_vram_request": "请求 ComfyUI 腾挪 {gb:.1f} GB torch 显存供模型加载",
             "free_vram_failed": "加载前释放 torch 显存失败: {e}",
             "preparing_mmproj": "正在准备 mmproj: {mmproj}",
             "loading_model": "正在加载模型: {model}",
             "load_params": "n_gpu_layers = {n_gpu_layers}, n_layer = {n_layer}, main_gpu = {main_gpu}, split_mode = {split_mode}",
             "load_failed_retry": "模型加载失败 ({e}), 释放 torch 显存后重试一次",
             "free_vram_retry_failed": "重试前释放 torch 显存失败: {free_err}",
+            "load_finished": "模型加载完成, 用时 {elapsed:.1f} 秒",
             "cpu_only": "纯 CPU 推理: 模型层与 mmproj 均未上 GPU",
             "mmproj_only_gpu": "主模型全部层留在 CPU, 仅 mmproj (视觉编码器) 进显存 (落点由 mtmd 自选)",
+            "unloaded": "模型资源已卸载",
             "cleanup_hook_applied": "模型清理钩子已挂载!",
         },
 
         # core/instruct.py
         "instruct": {
+            "request": '请求: seed={seed}, preset="{preset}", custom_prompt {custom_chars} 字符, system_prompt {system_chars} 字符, strip_thinking={strip_thinking}, force_offload={force_offload}',
+            "model_reused": "复用已加载模型 (配置未变)",
+            "interrupted": "检测到中断, 已请求中止生成",
             # 思考/答案两个数值是对答案文本重新 tokenize 的估算 (文案带 "约"),
             # prompt tokens 与 总生成 tokens 取 wheel 的 usage 真实计数; 用时含 prompt 预填充
             "generation_stats": "本次 prompt {prompt_tokens} tokens, 生成 {completion_tokens} tokens, 用时 {elapsed:.2f} 秒, 速度 {speed:.1f} tok/s",
             "generation_stats_thinking": "本次 prompt {prompt_tokens} tokens, 生成 {completion_tokens} tokens (思考约 {thinking_tokens} + 答案约 {answer_tokens}), 用时 {elapsed:.2f} 秒, 速度 {speed:.1f} tok/s",
+            # debug 级, 默认不输出
+            "hybrid_reset": "hybrid/recurrent 架构: 执行结束, 已整体重置 KV cache",
+        },
+
+        # core/locale_sync.py
+        "locale_sync": {
+            # debug 级, 默认不输出
+            "frontend_locale_saved": "前端语言已记录: {locale} (下次启动生效)",
         },
 
         # core/gguf_layers.py
@@ -511,14 +527,42 @@ LANG = {
             "audio_batch_first_only": "收到含 {count} 段音频的 AUDIO 批次; 仅处理第一段",
         },
 
+        # nodes/model/node_loaders.py
+        "loaders": {
+            "llm_config": '配置: model="{model}", ctx_size={n_ctx}, vram_limit={vram_limit}, gpu_device="{gpu_device}"',
+            # thinking 为 clamp_thinking 钳制后的实际生效值
+            "vlm_config": '配置: model="{model}", mmproj="{mmproj}", chat_handler="{chat_handler}", thinking={thinking}, ctx_size={n_ctx}, vram_limit={vram_limit}, gpu_device="{gpu_device}", image_min/max_tokens={image_min_tokens}/{image_max_tokens}',
+        },
+
+        # nodes/model/node_parameters.py
+        "parameters": {
+            "sampling": "max_gen_tokens={max_gen_tokens}, top_k={top_k}, top_p={top_p}, min_p={min_p}, typical_p={typical_p}, temperature={temperature}, repeat_penalty={repeat_penalty}, frequency_penalty={frequency_penalty}, present_penalty={present_penalty}, mirostat_mode={mirostat_mode}, mirostat_eta={mirostat_eta}, mirostat_tau={mirostat_tau}",
+        },
+
         # nodes/model/node_unload.py
         "unload": {
             "unloading": "正在卸载 llama 模型...",
         },
 
+        # nodes/instruct/text/node_instruct.py
+        "text_instruct": {
+            "allow_thinking": "allow_thinking={allow_thinking}, 折算 reasoning_budget={reasoning_budget}",
+        },
+
         # nodes/instruct/media/image/node_instruct.py
         "image_instruct": {
-            "start_processing": "开始处理 {count} 张图片",
+            "each_mode": "逐张模式: {count} 张图片逐张推理, increment_seed={increment_seed}",
+            "batch_mode": "批量模式: {count} 张图片并入单条消息一次推理, max_size={max_size}",
+        },
+
+        # nodes/instruct/media/video/node_instruct.py
+        "video_instruct": {
+            "sampling": "帧采样: 输入 {total} 帧, 采样 {sampled} 帧, max_size={max_size}",
+        },
+
+        # nodes/instruct/media/audio/node_instruct.py
+        "audio_instruct": {
+            "input": "音频时长 {duration:.1f} 秒, 采样率 {sample_rate} Hz",
         },
 
         # nodes/bbox/ 各节点文件 + bbox_utils.py
@@ -528,7 +572,7 @@ LANG = {
             "detail_extra_json": "多出的 JSON 条目复用最后一帧, 以单帧批次追加到 image_list",
             "detail_extra_frames": "未配对的末尾帧不画框, 原样透传",
             "draw_failed_json": "为 JSON #{i} 画框时出错: {e}",
-            "segs_batch_first_frame": "BBoxes to SEGS 收到含 {batch_size} 张图像的批次; 裁剪图仅取自第一帧",
+            "segs_batch_first_frame": "收到含 {batch_size} 张图像的批次; 裁剪图仅取自第一帧",
             # SEGS 与 MASK 两处同文
             "bbox_out_of_bounds": "跳过超出图像边界的 bbox: {bbox}",
             "bbox_empty_area": "跳过面积为空的 bbox: {bbox}",
@@ -536,6 +580,20 @@ LANG = {
             "bbox_draw_failed": "跳过绘制失败的 bbox ({label!r}: ({x0}, {y0}, {x1}, {y1})): {e}",
             "bbox_invalid_item": "跳过无效的 bbox 项: {bbox}",
             "bbox_non_numeric": "跳过坐标非数字的 bbox: {bbox}",
+            # 各节点的结果摘要
+            "json_to_bboxes_summary": '{json_count} 段 JSON 解析出 {bbox_count} 个 bbox (mode={mode}, label 过滤="{label}")',
+            "segs_summary": "{bbox_count} 个 bbox 生成 {seg_count} 个 SEG (dilation={dilation}, feather={feather}, crop_factor={crop_factor})",
+            "mask_summary": "{bbox_count} 个 bbox 合成单张 mask, 覆盖 {coverage:.1f}% 像素 (dilation={dilation}, feather={feather})",
+            "bbox_selected": "选取 image_index={image_index}, bbox_index={bbox_index} -> {bbox}",
+            "bbox_selected_all": "整组选取 image_index={image_index}, 共 {count} 个 bbox",
+        },
+
+        # nodes/util/ 各节点文件
+        "util": {
+            "parse_json": 'key="{key}" -> {type_name}, string 输出 {chars} 字符',
+            "remove_code_block": "输入 {before} 字符 -> 输出 {after} 字符",
+            "split_output": "拆分出 {count} 段",
+            "system_prompt": '选用 "{preset}", {chars} 字符',
         },
     },
 }

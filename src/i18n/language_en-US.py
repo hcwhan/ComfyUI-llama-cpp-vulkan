@@ -446,6 +446,8 @@ LANG = {
 
     # ---- Console logs (grouped by source module, mostly one-to-one with code files, see the bbox group comment) ----
     # The fixed prefix "[llama-cpp-vulkan] " is a log filter tag, added at call sites, not in templates;
+    # node execution logs carry an extra "[node name] " prefix (node_log_prefix in shared/logger.py,
+    # node names are functional identifiers, not localized), so templates do not repeat the node name;
     # log levels (info/warning/debug) are code behavior, not in this file, special levels are noted in comments
     "logs": {
         # core/devices.py
@@ -476,23 +478,37 @@ LANG = {
             # The next two are debug level, silent by default
             "llm_close_failed": "llm close failed: {e}",
             "handler_close_failed": "chat_handler close failed: {e}",
+            "free_vram_request": "Asking ComfyUI to free {gb:.1f} GB of torch VRAM for model loading",
             "free_vram_failed": "failed to free torch VRAM before load: {e}",
             "preparing_mmproj": "Preparing mmproj: {mmproj}",
             "loading_model": "Loading model: {model}",
             "load_params": "n_gpu_layers = {n_gpu_layers}, n_layer = {n_layer}, main_gpu = {main_gpu}, split_mode = {split_mode}",
             "load_failed_retry": "model load failed ({e}), freeing torch VRAM and retrying once",
             "free_vram_retry_failed": "failed to free torch VRAM before retry: {free_err}",
+            "load_finished": "Model loaded in {elapsed:.1f}s",
             "cpu_only": "CPU-only inference: no layers or mmproj offloaded to GPU",
             "mmproj_only_gpu": "all main model layers stay on CPU; only the mmproj (vision encoder) goes to VRAM (device picked by mtmd)",
+            "unloaded": "Model resources unloaded",
             "cleanup_hook_applied": "Model cleanup hook applied!",
         },
 
         # core/instruct.py
         "instruct": {
+            "request": 'Request: seed={seed}, preset="{preset}", custom_prompt {custom_chars} chars, system_prompt {system_chars} chars, strip_thinking={strip_thinking}, force_offload={force_offload}',
+            "model_reused": "Reusing loaded model (config unchanged)",
+            "interrupted": "Interrupt detected, aborting generation",
             # thinking/answer counts are estimates from re-tokenizing the answer text (wording carries "~"),
             # prompt tokens and total generated tokens come from the wheel's usage field; elapsed includes prompt prefill
             "generation_stats": "Prompt {prompt_tokens} tokens, generated {completion_tokens} tokens in {elapsed:.2f}s, {speed:.1f} tok/s",
             "generation_stats_thinking": "Prompt {prompt_tokens} tokens, generated {completion_tokens} tokens (~{thinking_tokens} thinking + ~{answer_tokens} answer) in {elapsed:.2f}s, {speed:.1f} tok/s",
+            # debug level, silent by default
+            "hybrid_reset": "hybrid/recurrent arch: KV cache fully reset after execution",
+        },
+
+        # core/locale_sync.py
+        "locale_sync": {
+            # debug level, silent by default
+            "frontend_locale_saved": "Frontend locale recorded: {locale} (effective next startup)",
         },
 
         # core/gguf_layers.py
@@ -511,14 +527,42 @@ LANG = {
             "audio_batch_first_only": "AUDIO batch of {count} clips received; only the first clip is processed",
         },
 
+        # nodes/model/node_loaders.py
+        "loaders": {
+            "llm_config": 'Config: model="{model}", ctx_size={n_ctx}, vram_limit={vram_limit}, gpu_device="{gpu_device}"',
+            # thinking is the effective value after clamp_thinking
+            "vlm_config": 'Config: model="{model}", mmproj="{mmproj}", chat_handler="{chat_handler}", thinking={thinking}, ctx_size={n_ctx}, vram_limit={vram_limit}, gpu_device="{gpu_device}", image_min/max_tokens={image_min_tokens}/{image_max_tokens}',
+        },
+
+        # nodes/model/node_parameters.py
+        "parameters": {
+            "sampling": "max_gen_tokens={max_gen_tokens}, top_k={top_k}, top_p={top_p}, min_p={min_p}, typical_p={typical_p}, temperature={temperature}, repeat_penalty={repeat_penalty}, frequency_penalty={frequency_penalty}, present_penalty={present_penalty}, mirostat_mode={mirostat_mode}, mirostat_eta={mirostat_eta}, mirostat_tau={mirostat_tau}",
+        },
+
         # nodes/model/node_unload.py
         "unload": {
             "unloading": "Unloading llama model...",
         },
 
+        # nodes/instruct/text/node_instruct.py
+        "text_instruct": {
+            "allow_thinking": "allow_thinking={allow_thinking}, mapped to reasoning_budget={reasoning_budget}",
+        },
+
         # nodes/instruct/media/image/node_instruct.py
         "image_instruct": {
-            "start_processing": "Start processing {count} images",
+            "each_mode": "Per-Image mode: {count} image(s), one request each, increment_seed={increment_seed}",
+            "batch_mode": "Batch mode: {count} image(s) merged into a single message, one request, max_size={max_size}",
+        },
+
+        # nodes/instruct/media/video/node_instruct.py
+        "video_instruct": {
+            "sampling": "Frame sampling: {total} input frames, {sampled} sampled, max_size={max_size}",
+        },
+
+        # nodes/instruct/media/audio/node_instruct.py
+        "audio_instruct": {
+            "input": "Audio duration {duration:.1f}s, sample rate {sample_rate} Hz",
         },
 
         # the node files under nodes/bbox/ + bbox_utils.py
@@ -528,7 +572,7 @@ LANG = {
             "detail_extra_json": "extra JSON entries reuse the last frame, appended to image_list as single-frame batches",
             "detail_extra_frames": "unpaired trailing frames are passed through without boxes",
             "draw_failed_json": "Error drawing bboxes for JSON #{i}: {e}",
-            "segs_batch_first_frame": "BBoxes to SEGS received a batch of {batch_size} images; cropped images are taken from the first frame only",
+            "segs_batch_first_frame": "Received a batch of {batch_size} images; cropped images are taken from the first frame only",
             # Same text in both the SEGS and MASK paths
             "bbox_out_of_bounds": "Skipping bbox outside image bounds: {bbox}",
             "bbox_empty_area": "Skipping bbox with empty area: {bbox}",
@@ -536,6 +580,20 @@ LANG = {
             "bbox_draw_failed": "Skipping bbox that failed to draw ({label!r}: ({x0}, {y0}, {x1}, {y1})): {e}",
             "bbox_invalid_item": "Skipping invalid bbox item: {bbox}",
             "bbox_non_numeric": "Skipping bbox with non-numeric coordinates: {bbox}",
+            # per-node result summaries
+            "json_to_bboxes_summary": '{json_count} JSON segment(s) parsed into {bbox_count} bbox(es) (mode={mode}, label filter="{label}")',
+            "segs_summary": "{bbox_count} bbox(es) produced {seg_count} SEG(s) (dilation={dilation}, feather={feather}, crop_factor={crop_factor})",
+            "mask_summary": "{bbox_count} bbox(es) merged into one mask covering {coverage:.1f}% of pixels (dilation={dilation}, feather={feather})",
+            "bbox_selected": "Selected image_index={image_index}, bbox_index={bbox_index} -> {bbox}",
+            "bbox_selected_all": "Whole group selected at image_index={image_index}, {count} bbox(es)",
+        },
+
+        # the node files under nodes/util/
+        "util": {
+            "parse_json": 'key="{key}" -> {type_name}, string output {chars} chars',
+            "remove_code_block": "{before} chars in -> {after} chars out",
+            "split_output": "Split into {count} segment(s)",
+            "system_prompt": 'Using "{preset}", {chars} chars',
         },
     },
 }

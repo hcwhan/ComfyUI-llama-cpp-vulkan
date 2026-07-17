@@ -17,12 +17,16 @@ from ...core.storage import resolve_config
 from ...i18n.common_static import AUTO_LABEL, NONE_OPTION
 from ...i18n.common_static import CATEGORY as _CATEGORY
 from ...i18n.lang import LANG
+from ...shared.logger import logger, node_log_prefix
 
 _COMMON_TIPS = LANG["nodes"]["model"]["common"]["tooltips"]
 _COMMON_ERRORS = LANG["nodes"]["model"]["common"]["errors"]
 _LLM_TIPS = LANG["nodes"]["model"]["llm_loader"]["tooltips"]
 _VLM_TIPS = LANG["nodes"]["model"]["vlm_loader"]["tooltips"]
 _VLM_ERRORS = LANG["nodes"]["model"]["vlm_loader"]["errors"]
+_LOGS = LANG["logs"]["loaders"]
+_LLM_PREFIX = node_log_prefix("LLM Loader")
+_VLM_PREFIX = node_log_prefix("VLM Loader")
 
 _GPU_DEVICE_FIELD = (
     gpu_device_choices,
@@ -114,6 +118,7 @@ class llama_cpp_llm_model_loader:
             "image_max_tokens": 0,
         }
         resolve_config(config)
+        logger.info(_LLM_PREFIX + _LOGS["llm_config"].format(model=model, n_ctx=ctx_size, vram_limit=vram_limit, gpu_device=gpu_device))
         return (config,)
 
 
@@ -203,4 +208,18 @@ class llama_cpp_vlm_model_loader:
         # 校验通过后钳制并落盘实际生效值(warning 离配置点近), 也避免不可切换档
         # 的开关值变化引起无意义的 current_config 失配重载
         config["thinking"] = clamp_thinking(chat_handler, thinking)
+        logger.info(
+            _VLM_PREFIX
+            + _LOGS["vlm_config"].format(
+                model=model,
+                mmproj=mmproj,
+                chat_handler=chat_handler,
+                thinking=config["thinking"],
+                n_ctx=ctx_size,
+                vram_limit=vram_limit,
+                gpu_device=gpu_device,
+                image_min_tokens=image_min_tokens,
+                image_max_tokens=image_max_tokens,
+            )
+        )
         return (config,)

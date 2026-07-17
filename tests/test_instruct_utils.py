@@ -13,12 +13,12 @@ from src.core import instruct  # noqa: E402
 from src.core.instruct import llama_cpp_instruct_base, strip_thinking_blocks  # noqa: E402
 from src.core.prompts import instruct_presets, preset_content  # noqa: E402
 from src.core.storage import LLAMA_CPP_STORAGE  # noqa: E402
-from src.i18n.common_static import LOG_PREFIX  # noqa: E402
 from src.i18n.lang import LANG  # noqa: E402
 from src.nodes.instruct.media.audio.node_instruct import llama_cpp_audio_instruct  # noqa: E402
 from src.nodes.instruct.media.image.node_instruct import llama_cpp_image_instruct  # noqa: E402
 from src.nodes.instruct.media.video.node_instruct import llama_cpp_video_instruct  # noqa: E402
 from src.nodes.instruct.text.node_instruct import llama_cpp_text_instruct  # noqa: E402
+from src.shared.logger import node_log_prefix  # noqa: E402
 
 _INSTRUCT_NODES = (
     llama_cpp_text_instruct,
@@ -205,14 +205,14 @@ class TestCompletionStatsLogging(unittest.TestCase):
     def test_plain_output_logs_totals_without_split(self):
         message = self._log_message(self._FakeLlm("plain answer"))
         expected = LANG["logs"]["instruct"]["generation_stats"].format(prompt_tokens=20, completion_tokens=100, elapsed=2.0, speed=50.0)
-        self.assertEqual(message, LOG_PREFIX + expected)
+        self.assertEqual(message, node_log_prefix(llama_cpp_instruct_base.LOG_NAME) + expected)
 
     def test_thinking_output_logs_split_from_retokenized_answer(self):
         llm = self._FakeLlm("<think>推理过程</think>答案文本", answer_token_count=30)
         expected = LANG["logs"]["instruct"]["generation_stats_thinking"].format(
             prompt_tokens=20, completion_tokens=100, thinking_tokens=70, answer_tokens=30, elapsed=2.0, speed=50.0
         )
-        self.assertEqual(self._log_message(llm), LOG_PREFIX + expected)
+        self.assertEqual(self._log_message(llm), node_log_prefix(llama_cpp_instruct_base.LOG_NAME) + expected)
         # 重新 tokenize 的对象是剥离后的答案文本, 不含 BOS 与特殊 token
         self.assertEqual(llm.tokenize_args, ("答案文本".encode(), False, False))
 
@@ -222,7 +222,7 @@ class TestCompletionStatsLogging(unittest.TestCase):
         expected = LANG["logs"]["instruct"]["generation_stats_thinking"].format(
             prompt_tokens=20, completion_tokens=100, thinking_tokens=0, answer_tokens=150, elapsed=2.0, speed=50.0
         )
-        self.assertEqual(self._log_message(llm), LOG_PREFIX + expected)
+        self.assertEqual(self._log_message(llm), node_log_prefix(llama_cpp_instruct_base.LOG_NAME) + expected)
 
 
 class TestAllowThinkingMapping(unittest.TestCase):

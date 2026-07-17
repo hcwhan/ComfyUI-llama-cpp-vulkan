@@ -228,6 +228,7 @@ class LLAMA_CPP_STORAGE:
         cls.current_config = None
 
         gc.collect()
+        logger.info(LOG_PREFIX + _LOGS["unloaded"])
 
     @classmethod
     def load_model(cls, config):
@@ -252,11 +253,10 @@ class LLAMA_CPP_STORAGE:
         # 天然成立); 多卡下显式选择其他 Vulkan 卡时, 该卡与 torch 分配器无关,
         # 腾挪主设备无效但也无害
         if n_gpu_layers != 0 or mmproj_on_gpu:
+            needed_bytes = _estimate_vram_bytes(model_path, meta, mmproj_path if mmproj_on_gpu else None, n_gpu_layers, config["n_ctx"])
+            logger.info(LOG_PREFIX + _LOGS["free_vram_request"].format(gb=needed_bytes / (1024**3)))
             try:
-                mm.free_memory(
-                    _estimate_vram_bytes(model_path, meta, mmproj_path if mmproj_on_gpu else None, n_gpu_layers, config["n_ctx"]),
-                    mm.get_torch_device(),
-                )
+                mm.free_memory(needed_bytes, mm.get_torch_device())
             except Exception as e:
                 logger.warning(LOG_PREFIX + _LOGS["free_vram_failed"].format(e=e))
 
@@ -311,6 +311,7 @@ class LLAMA_CPP_STORAGE:
                 verbose=False,
             )
 
+        load_start = time.perf_counter()
         try:
             try:
                 cls.llm = _create_llama()
@@ -343,6 +344,8 @@ class LLAMA_CPP_STORAGE:
             # KeyboardInterrupt 等非 Exception 路径, 清理后原样 raise
             cls.clean()
             raise
+        # 耗时含失败重试的一轮腾挪与等待, 反映本次加载的真实墙钟时间
+        logger.info(LOG_PREFIX + _LOGS["load_finished"].format(elapsed=time.perf_counter() - load_start))
         # 加载成功后才记录配置, 避免加载失败时残留新配置导致后续误判"无需重载"
         cls.current_config = config.copy()
         if n_gpu_layers == 0 and not mmproj_on_gpu:

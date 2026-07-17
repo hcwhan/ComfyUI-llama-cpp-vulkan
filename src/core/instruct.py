@@ -17,7 +17,7 @@ import comfy.model_management as mm
 from ..i18n.common_static import CATEGORY as _CATEGORY
 from ..i18n.common_static import LOG_PREFIX
 from ..i18n.lang import LANG
-from ..shared.logger import logger
+from ..shared.logger import logger, node_log_prefix
 from ..shared.types import any_type
 from .prompts import instruct_presets, preset_content
 from .storage import LLAMA_CPP_STORAGE
@@ -93,7 +93,7 @@ def strip_thinking_blocks(text):
     return _unwrap_answer(text)
 
 
-def _log_completion_stats(output, elapsed):
+def _log_completion_stats(output, elapsed, log_prefix):
     """记录单次 completion 的生成统计: 生成 token 数, 用时, 速度, 思考/答案占比.
 
     prompt_tokens/completion_tokens 取 wheel 统计的 usage 字段 (真实计数,
@@ -105,6 +105,8 @@ def _log_completion_stats(output, elapsed):
     可能有个位数 token 出入, 两个数值均为估算 (日志文案带 "约"); 未检出
     思考形态 (剥离前后文本相同) 时不打印拆分. 拆分不受 strip_thinking
     开关影响: 统计的是本次生成实际花在思考上的量, 与输出后处理无关.
+
+    log_prefix 由调用方按节点名构造 (node_log_prefix), 统计行随所属节点标识.
     """
     usage = output["usage"]
     prompt_tokens = usage["prompt_tokens"]
@@ -114,7 +116,7 @@ def _log_completion_stats(output, elapsed):
     answer = strip_thinking_blocks(content)
     if answer == content:
         logger.info(
-            LOG_PREFIX
+            log_prefix
             + _LOGS["generation_stats"].format(
                 prompt_tokens=prompt_tokens, completion_tokens=completion_tokens, elapsed=elapsed, speed=speed
             )
@@ -122,7 +124,7 @@ def _log_completion_stats(output, elapsed):
         return
     answer_tokens = len(LLAMA_CPP_STORAGE.llm.tokenize(answer.encode("utf-8"), add_bos=False, special=False))
     logger.info(
-        LOG_PREFIX
+        log_prefix
         + _LOGS["generation_stats_thinking"].format(
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
@@ -147,12 +149,15 @@ class InterruptWatcher:
     """推理期间轮询 ComfyUI 的中断标志, 命中时触发 llama 的 abort_event.
 
     create_completion 在每次请求开始时会 clear abort_event,
-    因此命中后持续重复 set 而不是设置一次就退出, 避免竞态丢失中断.
+    因此命中后持续重复 set 而不是设置一次就退出, 避免竞态丢失中断;
+    命中日志只在首次置位时打一条. log_prefix 由调用方按节点名传入
+    (node_log_prefix), 默认纯插件前缀.
     """
 
-    def __init__(self, llm, poll_interval=0.2):
+    def __init__(self, llm, poll_interval=0.2, log_prefix=LOG_PREFIX):
         self.llm = llm
         self.poll_interval = poll_interval
+        self.log_prefix = log_prefix
         self.interrupted = False
         self._stop = threading.Event()
         self._thread = None
@@ -160,7 +165,9 @@ class InterruptWatcher:
     def _watch(self):
         while not self._stop.wait(self.poll_interval):
             if mm.processing_interrupted():
-                self.interrupted = True
+                if not self.interrupted:
+                    self.interrupted = True
+                    logger.info(self.log_prefix + _LOGS["interrupted"])
                 with contextlib.suppress(Exception):
                     self.llm.abort()
 
@@ -183,10 +190,12 @@ class llama_cpp_instruct_base:
     RETURN_NAMES = ("output",)
 
     # 子类覆盖: 模型端口类型(llm_model/vlm_model) / 预设模板 @@@ 占位符替换词 /
-    # 模态标识(按预设的 use 字段过滤下拉框名单, 列表第一项即默认预设)
+    # 模态标识(按预设的 use 字段过滤下拉框名单, 列表第一项即默认预设) /
+    # 日志前缀节点名(功能性标识, 不随语言切换)
     MODEL_TYPE = "LLAMACPPLLM"
     MEDIA_WORD = "图像"
     MODALITY = "text"
+    LOG_NAME = "Text Instruct"
     # 纯文本路径无媒体载荷, 最终 user 文本为空的请求只会让模型自由发挥,
     # 在 _run 中直接拦截; media 基类关闭(空文本 + 媒体内容是有意设计,
     # 适合 chat 模板自带默认指令的模型)
@@ -252,6 +261,8 @@ class llama_cpp_instruct_base:
         """
         if LLAMA_CPP_STORAGE.llm is None or LLAMA_CPP_STORAGE.current_config != llama_model:
             LLAMA_CPP_STORAGE.load_model(llama_model)
+        else:
+            logger.info(node_log_prefix(self.LOG_NAME) + _LOGS["model_reused"])
 
         messages = []
         system_prompt = system_prompt.strip()
@@ -296,7 +307,7 @@ class llama_cpp_instruct_base:
         """
         start = time.perf_counter()
         output = LLAMA_CPP_STORAGE.llm.create_chat_completion(messages=messages, seed=seed, **params)
-        _log_completion_stats(output, time.perf_counter() - start)
+        _log_completion_stats(output, time.perf_counter() - start, node_log_prefix(self.LOG_NAME))
         return output
 
     def _single_completion(self, messages, user_content, seed, params, extract_text):
@@ -325,6 +336,19 @@ class llama_cpp_instruct_base:
         user_content = [self._build_user_prompt(preset_prompt, custom_prompt)]
         if self.REQUIRE_USER_TEXT and not user_content[0]["text"].strip():
             raise ValueError(_ERRORS["user_prompt_empty"])
+        # 请求摘要在触发模型加载前打印, 与后续的加载/统计日志衔接成完整链路;
+        # 字符数按 strip 后计 (与实际注入的内容一致)
+        logger.info(
+            node_log_prefix(self.LOG_NAME)
+            + _LOGS["request"].format(
+                seed=seed,
+                preset=preset_prompt,
+                custom_chars=len(custom_prompt.strip()),
+                system_chars=len(system_prompt.strip()),
+                strip_thinking=strip_thinking,
+                force_offload=force_offload,
+            )
+        )
         messages = self._prepare_messages(llama_model, system_prompt)
         # 合并生成新 dict 兼作防御性复制(parameters 是 ComfyUI 缓存的共享 dict,
         # 防止 runner 修改时污染); 未连接 parameters 端口时整体落到统一默认值
@@ -335,7 +359,7 @@ class llama_cpp_instruct_base:
         # 监视线程让长时间生成也能响应 ComfyUI 的取消操作;
         # 收尾放 finally: 中断/异常路径同样需要 force_offload 释放显存与 hybrid 重置
         try:
-            with InterruptWatcher(LLAMA_CPP_STORAGE.llm) as watcher:
+            with InterruptWatcher(LLAMA_CPP_STORAGE.llm, log_prefix=node_log_prefix(self.LOG_NAME)) as watcher:
                 out = runner(messages, user_content, seed, params, extract_text, watcher)
             if watcher.interrupted:
                 # abort_event 使生成提前返回了截断结果, 丢弃并走标准中断流程
@@ -354,6 +378,7 @@ class llama_cpp_instruct_base:
                 llm._ctx.memory_clear(True)
                 if llm._hybrid_cache_mgr is not None:
                     llm._hybrid_cache_mgr.clear()
+                logger.debug(node_log_prefix(self.LOG_NAME) + _LOGS["hybrid_reset"])
 
         return (out,)
 

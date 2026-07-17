@@ -31,10 +31,11 @@ comfy_stubs.install()
 
 from src.core import instruct as core_instruct  # noqa: E402
 from src.core.storage import LLAMA_CPP_STORAGE  # noqa: E402
-from src.i18n.common_static import IMAGE_MODE_BATCH, IMAGE_MODE_EACH, LOG_PREFIX  # noqa: E402
+from src.i18n.common_static import IMAGE_MODE_BATCH, IMAGE_MODE_EACH  # noqa: E402
 from src.i18n.lang import LANG  # noqa: E402
 from src.nodes.instruct.media.image import node_instruct  # noqa: E402
 from src.nodes.instruct.media.image.node_instruct import llama_cpp_image_instruct  # noqa: E402
+from src.shared.logger import node_log_prefix  # noqa: E402
 from src.shared.text_utils import split_image_results  # noqa: E402
 
 
@@ -151,7 +152,7 @@ class TestImageInstructInferEach(_ImageInstructTestBase):
         llm = _FakeVlm(["第一张结果", "第二张结果"])
         self._install(llm)
         ticks = itertools.count()
-        expected = LOG_PREFIX + LANG["logs"]["instruct"]["generation_stats"].format(
+        expected = node_log_prefix(llama_cpp_image_instruct.LOG_NAME) + LANG["logs"]["instruct"]["generation_stats"].format(
             prompt_tokens=20, completion_tokens=100, elapsed=1.0, speed=100.0
         )
         with (

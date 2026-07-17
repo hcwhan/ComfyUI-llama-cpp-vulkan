@@ -6,12 +6,16 @@
 
 from ....core.instruct import llama_cpp_instruct_base
 from ....i18n.lang import LANG
+from ....shared.logger import logger, node_log_prefix
+
+_LOGS = LANG["logs"]["text_instruct"]
 
 
 class llama_cpp_text_instruct(llama_cpp_instruct_base):
     MODEL_TYPE = "LLAMACPPLLM"
     MEDIA_WORD = "图像"
     MODALITY = "text"
+    LOG_NAME = "Text Instruct"
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -56,6 +60,10 @@ class llama_cpp_text_instruct(llama_cpp_instruct_base):
             # (如 <thought>, <seed:think>) 同样经安全窗静默失效, 且其思考块不属
             # strip_thinking 的剥离形态, 按不支持处理 (params 是 _run 的防御性副本, 可安全写入)
             params["reasoning_budget"] = -1 if allow_thinking else 0
+            logger.info(
+                node_log_prefix(self.LOG_NAME)
+                + _LOGS["allow_thinking"].format(allow_thinking=allow_thinking, reasoning_budget=params["reasoning_budget"])
+            )
             return self._single_completion(messages, user_content, seed, params, extract_text)
 
         return self._run(llm_model, seed, preset_prompt, custom_prompt, system_prompt, strip_thinking, force_offload, parameters, runner)

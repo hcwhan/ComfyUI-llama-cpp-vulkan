@@ -47,7 +47,7 @@ ComfyUI-llama-cpp-vulkan/
       gguf_layers.py          #   GGUF 文件解析: 读取显存折算所需元数据(层数与注意力 KV 参数)
       cqdm.py                 #   进度条封装: 同时驱动 ComfyUI ProgressBar 和 tqdm
     shared/                   # 跨领域纯工具(非节点)
-      logger.py               #   插件统一 logging logger(沿用 ComfyUI 的日志配置)
+      logger.py               #   插件统一 logging logger(沿用 ComfyUI 的日志配置)+ node_log_prefix 节点日志前缀
       text_utils.py           #   代码围栏剥离, 逐张结果拆分, JSON 解析, 嵌套取值
       encoding.py             #   媒体编码: 张量/音频转 uint8/base64, 缩放
       types.py                #   AnyType 万能透传类型

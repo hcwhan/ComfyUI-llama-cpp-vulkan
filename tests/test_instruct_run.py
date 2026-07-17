@@ -1,9 +1,9 @@
 """src/core/instruct.py 执行骨架的单元测试: InterruptWatcher 中断链路与 _run 收尾分支.
 
-覆盖: watcher 命中后置位并持续 abort, 无中断时干净收线; _run 的 finally
-收尾 (force_offload 卸载, hybrid 三件套重置, 中断丢弃截断结果抛
-InterruptProcessingException, runner 异常时收尾仍执行);
-以及 max_gen_tokens -> max_tokens 的键映射.
+覆盖: watcher 命中后置位并持续 abort (命中日志只打一条), 无中断时干净收线;
+_run 的 finally 收尾 (force_offload 卸载, hybrid 三件套重置 + debug 日志,
+中断丢弃截断结果抛 InterruptProcessingException, runner 异常时收尾仍执行);
+模型复用日志; 以及 max_gen_tokens -> max_tokens 的键映射.
 """
 
 import time
@@ -18,6 +18,7 @@ comfy_stubs.install()
 from src.core import instruct  # noqa: E402
 from src.core.instruct import InterruptWatcher, llama_cpp_instruct_base  # noqa: E402
 from src.core.storage import LLAMA_CPP_STORAGE  # noqa: E402
+from src.i18n.lang import LANG  # noqa: E402
 
 
 class _AbortRecorder:
@@ -54,6 +55,21 @@ class TestInterruptWatcher(unittest.TestCase):
                 time.sleep(0.005)
         self.assertGreaterEqual(llm.abort_calls, 3)
         self.assertTrue(watcher.interrupted)
+
+    def test_interrupt_logs_once_despite_repeated_hits(self):
+        # 命中后持续重复 set 对抗竞态, 但中断日志只在首次置位时打一条
+        llm = _AbortRecorder()
+        with (
+            mock.patch.object(instruct.mm, "processing_interrupted", lambda: True),
+            self.assertLogs("llama-cpp-vulkan", level="INFO") as logs,
+            InterruptWatcher(llm, poll_interval=0.01) as watcher,
+        ):
+            deadline = time.time() + 2.0
+            while llm.abort_calls < 3 and time.time() < deadline:
+                time.sleep(0.005)
+        self.assertTrue(watcher.interrupted)
+        hits = [m for m in logs.output if LANG["logs"]["instruct"]["interrupted"] in m]
+        self.assertEqual(len(hits), 1)
 
     def test_no_interrupt_exits_cleanly(self):
         llm = _AbortRecorder()
@@ -133,13 +149,23 @@ class TestRunFinalization(unittest.TestCase):
         self.assertIsNone(LLAMA_CPP_STORAGE.llm)
         self.assertIsNone(LLAMA_CPP_STORAGE.current_config)
 
+    def test_matching_config_logs_reuse(self):
+        # current_config 与 llama_model 相同: 不触发加载, 打复用日志
+        self._install(_FakeRunLlm())
+        with self.assertLogs("llama-cpp-vulkan", level="INFO") as logs:
+            self._run(lambda *args: "ok")
+        self.assertTrue(any(LANG["logs"]["instruct"]["model_reused"] in m for m in logs.output))
+
     def test_hybrid_arch_reset_after_success(self):
         llm = _FakeRunLlm(hybrid=True)
         self._install(llm)
-        self._run(lambda *args: "ok")
+        with self.assertLogs("llama-cpp-vulkan", level="DEBUG") as logs:
+            self._run(lambda *args: "ok")
         self.assertEqual(llm.n_tokens, 0)
         llm._ctx.memory_clear.assert_called_once_with(True)
         llm._hybrid_cache_mgr.clear.assert_called_once()
+        # 重置动作附 debug 日志
+        self.assertTrue(any(LANG["logs"]["instruct"]["hybrid_reset"] in m for m in logs.output))
 
     def test_non_hybrid_keeps_kv_cache(self):
         llm = _FakeRunLlm(hybrid=False)

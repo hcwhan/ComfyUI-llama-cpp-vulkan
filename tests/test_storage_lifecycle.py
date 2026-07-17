@@ -218,6 +218,24 @@ class TestLoadModelStateMachine(unittest.TestCase):
             LLAMA_CPP_STORAGE.load_model(self._config())
         summary.assert_called_once()
 
+    def test_load_logs_vram_request_and_finish_time(self):
+        # GPU 路径: 加载前打腾挪请求日志, 成功后打耗时日志 (模板含运行时值,
+        # 断言取首个占位符前的静态前缀, 仍引用 LANG 单一真源)
+        with self.assertLogs("llama-cpp-vulkan", level="INFO") as logs:
+            LLAMA_CPP_STORAGE.load_model(self._config())
+        for key in ("free_vram_request", "load_finished"):
+            prefix = LANG["logs"]["storage"][key].split("{")[0]
+            self.assertTrue(any(prefix in m for m in logs.output), key)
+
+    def test_clean_logs_unloaded_only_when_loaded(self):
+        # 实际卸载时打卸载日志; 空载清场静默 (避免误导排查)
+        LLAMA_CPP_STORAGE.load_model(self._config())
+        with self.assertLogs("llama-cpp-vulkan", level="INFO") as logs:
+            LLAMA_CPP_STORAGE.clean()
+        self.assertTrue(any(LANG["logs"]["storage"]["unloaded"] in m for m in logs.output))
+        with self.assertNoLogs("llama-cpp-vulkan", level="INFO"):
+            LLAMA_CPP_STORAGE.clean()
+
     def test_clean_closes_and_is_idempotent(self):
         LLAMA_CPP_STORAGE.load_model(self._config())
         loaded = LLAMA_CPP_STORAGE.llm

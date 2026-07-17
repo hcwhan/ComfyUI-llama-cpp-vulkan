@@ -7,11 +7,15 @@ mtmd 解码端完成. 音频是否被 mmproj 支持由 llama-cpp-python 侧校�
 from .....core.instruct import llama_cpp_media_instruct_base
 from .....i18n.lang import LANG
 from .....shared.encoding import audio2base64
+from .....shared.logger import logger, node_log_prefix
+
+_LOGS = LANG["logs"]["audio_instruct"]
 
 
 class llama_cpp_audio_instruct(llama_cpp_media_instruct_base):
     MEDIA_WORD = "音频"
     MODALITY = "audio"
+    LOG_NAME = "Audio Instruct"
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -44,6 +48,12 @@ class llama_cpp_audio_instruct(llama_cpp_media_instruct_base):
 
         def runner(messages, user_content, seed, params, extract_text, watcher):
             self.require_mmproj("Audio")
+            # 时长按原始波形计, 重采样在 llama.cpp 的 mtmd 解码端, 不改变时长
+            sample_rate = int(audio["sample_rate"])
+            logger.info(
+                node_log_prefix(self.LOG_NAME)
+                + _LOGS["input"].format(duration=audio["waveform"].shape[-1] / sample_rate, sample_rate=sample_rate)
+            )
             user_content.append(
                 {
                     "type": "input_audio",

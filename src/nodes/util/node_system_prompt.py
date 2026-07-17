@@ -3,7 +3,11 @@
 from ...i18n.common_static import CATEGORY as _CATEGORY
 from ...i18n.common_static import NONE_OPTION
 from ...i18n.lang import LANG
+from ...shared.logger import logger, node_log_prefix
 from .system_prompt_presets import PRESETS
+
+_LOGS = LANG["logs"]["util"]
+_PREFIX = node_log_prefix("System Prompt Preset")
 
 
 class system_prompt_preset:
@@ -29,6 +33,8 @@ class system_prompt_preset:
             return ("",)
         # 经连线传入的失配预设名不暴露裸 KeyError (widget 常量有 combo 前置校验)
         try:
-            return (PRESETS[preset],)
+            text = PRESETS[preset]
         except KeyError:
             raise ValueError(LANG["nodes"]["util"]["system_prompt_preset"]["errors"]["unknown_preset"].format(preset=preset)) from None
+        logger.info(_PREFIX + _LOGS["system_prompt"].format(preset=preset, chars=len(text)))
+        return (text,)

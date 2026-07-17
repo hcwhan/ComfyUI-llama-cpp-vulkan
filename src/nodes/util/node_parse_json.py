@@ -4,10 +4,13 @@ import json
 
 from ...i18n.common_static import CATEGORY as _CATEGORY
 from ...i18n.lang import LANG
+from ...shared.logger import logger, node_log_prefix
 from ...shared.text_utils import get_nested_value, parse_json
 from ...shared.types import any_type
 
 _NODE = LANG["nodes"]["util"]["parse_json"]
+_LOGS = LANG["logs"]["util"]
+_PREFIX = node_log_prefix("Parse JSON")
 
 
 # from: https://github.com/crystian/ComfyUI-Crystools
@@ -81,4 +84,6 @@ class parse_json_node:
         else:
             string = str(val)
 
+        # key 未命中且未连 default 时 val 为 None, type_name 显示 NoneType
+        logger.info(_PREFIX + _LOGS["parse_json"].format(key=key, type_name=type(val).__name__, chars=len(string)))
         return (val, string, integer, number, boolean)

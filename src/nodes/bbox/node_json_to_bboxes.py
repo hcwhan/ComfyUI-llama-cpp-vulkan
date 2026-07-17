@@ -2,16 +2,17 @@
 
 import torch
 
-from ...i18n.common_static import BBOX_MODE_QWEN3, BBOX_MODE_QWEN25_VL, BBOX_MODE_SIMPLE, LOG_PREFIX
+from ...i18n.common_static import BBOX_MODE_QWEN3, BBOX_MODE_QWEN25_VL, BBOX_MODE_SIMPLE
 from ...i18n.common_static import CATEGORY as _CATEGORY
 from ...i18n.lang import LANG
-from ...shared.logger import logger
+from ...shared.logger import logger, node_log_prefix
 from ...shared.text_utils import parse_json, split_image_results
 from .bbox_utils import QWEN_BBOX_MODES, bbox_label, draw_bbox, json_to_pixel_bboxes
 
 _TIPS = LANG["nodes"]["bbox"]["json_to_bboxes"]["tooltips"]
 _ERRORS = LANG["nodes"]["bbox"]["json_to_bboxes"]["errors"]
 _LOGS = LANG["logs"]["bbox"]
+_PREFIX = node_log_prefix("JSON to BBoxes")
 
 
 def _normalized_label(value):
@@ -79,9 +80,7 @@ class json_to_bboxes:
             raise ValueError(_ERRORS["image_required"])
         if flat_images and len(json) != len(flat_images):
             detail = _LOGS["detail_extra_json"] if len(json) > len(flat_images) else _LOGS["detail_extra_frames"]
-            logger.warning(
-                LOG_PREFIX + _LOGS["json_frame_mismatch"].format(json_count=len(json), frame_count=len(flat_images), detail=detail)
-            )
+            logger.warning(_PREFIX + _LOGS["json_frame_mismatch"].format(json_count=len(json), frame_count=len(flat_images), detail=detail))
 
         output_bboxes = []
         drawn_images = []
@@ -122,9 +121,9 @@ class json_to_bboxes:
                 pixel_bboxes = json_to_pixel_bboxes(items, mode, width, height)
                 try:
                     # draw_bbox 返回 [1,H,W,C]
-                    drawn_images.append(draw_bbox(curr_img[0], pixel_bboxes, [bbox_label(b) for b in items]))
+                    drawn_images.append(draw_bbox(curr_img[0], pixel_bboxes, [bbox_label(b) for b in items], log_prefix=_PREFIX))
                 except Exception as e:
-                    logger.warning(LOG_PREFIX + _LOGS["draw_failed_json"].format(i=i + 1, e=e))
+                    logger.warning(_PREFIX + _LOGS["draw_failed_json"].format(i=i + 1, e=e))
                     # draw_bbox 经 numpy 往返恒输出 CPU 张量, 回退帧统一 .cpu(),
                     # 避免 --gpu-only 下与画框帧 torch.cat 混拼报 device mismatch
                     drawn_images.append(curr_img.cpu())
@@ -148,4 +147,13 @@ class json_to_bboxes:
         # image_list 总帧数与 bboxes 组数保持对齐
         restructured_images.extend(drawn_images[cursor:])
 
+        logger.info(
+            _PREFIX
+            + _LOGS["json_to_bboxes_summary"].format(
+                json_count=len(json),
+                bbox_count=sum(len(group) for group in output_bboxes),
+                mode=mode,
+                label=label[0].strip(),
+            )
+        )
         return (output_bboxes, restructured_images)
