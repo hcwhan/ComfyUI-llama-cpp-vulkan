@@ -1,7 +1,8 @@
 """llama.cpp text Instruct 节点, 纯文本推理.
 
-只接受 LLM Model Loader 的 LLAMACPPLLM 配置,
-预设模板的 @@@ 占位符按文生图语境替换为 "图像"(如 prompt 改写预设).
+只接受 LLM Model Loader 的 LLAMACPPLLM 配置.
+MEDIA_WORD 为空串: text 可见的预设模板不使用 @@@ 占位符
+(需要提及创作模态的文案直接写死在模板里, 如 prompt 改写预设的 "文生图").
 """
 
 from ....core.instruct import llama_cpp_instruct_base, think_open_preinjected
@@ -14,9 +15,9 @@ _LOGS = LANG["logs"]["text_instruct"]
 
 class llama_cpp_text_instruct(llama_cpp_instruct_base):
     MODEL_TYPE = "LLAMACPPLLM"
-    MEDIA_WORD = "图像"
     MODALITY = "text"
     LOG_NAME = "Text Instruct"
+    MEDIA_WORD = ""
 
     @classmethod
     def INPUT_TYPES(cls):

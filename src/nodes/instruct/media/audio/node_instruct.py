@@ -13,9 +13,9 @@ _LOGS = LANG["logs"]["audio_instruct"]
 
 
 class llama_cpp_audio_instruct(llama_cpp_media_instruct_base):
-    MEDIA_WORD = "音频"
     MODALITY = "audio"
     LOG_NAME = "Audio Instruct"
+    MEDIA_WORD = "音频"
 
     @classmethod
     def INPUT_TYPES(cls):

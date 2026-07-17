@@ -20,9 +20,9 @@ _LOGS = LANG["logs"]["image_instruct"]
 
 
 class llama_cpp_image_instruct(llama_cpp_media_instruct_base):
-    MEDIA_WORD = "图像"
     MODALITY = "image"
     LOG_NAME = "Image Instruct"
+    MEDIA_WORD = "图像"
 
     @classmethod
     def INPUT_TYPES(cls):

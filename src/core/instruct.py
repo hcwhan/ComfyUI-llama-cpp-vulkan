@@ -1,6 +1,6 @@
 """Instruct 节点共享基类: 消息组装, 推理执行, 生成统计日志, 中断监视, thinking 剥离, hybrid 重置.
 
-- llama_cpp_instruct_base        文本推理骨架(MODEL_TYPE = LLAMACPPLLM)
+- llama_cpp_instruct_base        通用推理骨架(类属性为占位值, 由具体节点类覆盖)
 - llama_cpp_media_instruct_base  多模态推理骨架(MODEL_TYPE = LLAMACPPVLM, 附 mmproj 校验)
 
 子类(各 node_instruct.py)负责: 声明 INPUT_TYPES(用本类提供的字段组装块 +
@@ -225,13 +225,13 @@ class llama_cpp_instruct_base:
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("output",)
 
-    # 子类覆盖: 模型端口类型(llm_model/vlm_model) / 预设模板 @@@ 占位符替换词 /
+    # 以下均为占位值, 具体节点类必须覆盖: 模型端口类型(llm_model/vlm_model) /
     # 模态标识(按预设的 use 字段过滤下拉框名单, 列表第一项即默认预设) /
-    # 日志前缀节点名(功能性标识, 不随语言切换)
-    MODEL_TYPE = "LLAMACPPLLM"
-    MEDIA_WORD = "图像"
-    MODALITY = "text"
-    LOG_NAME = "Text Instruct"
+    # 日志前缀节点名(功能性标识, 不随语言切换) / 预设模板 @@@ 占位符替换词
+    MODEL_TYPE = "LLAMACPP"
+    MODALITY = "xxxx"
+    LOG_NAME = "Xxxx Instruct"
+    MEDIA_WORD = ""
     # 纯文本路径无媒体载荷, 最终 user 文本为空的请求只会让模型自由发挥,
     # 在 _run 中直接拦截; media 基类关闭(空文本 + 媒体内容是有意设计,
     # 适合 chat 模板自带默认指令的模型)

@@ -16,9 +16,10 @@ from tests import comfy_stubs
 comfy_stubs.install()
 
 from src.core import instruct  # noqa: E402
-from src.core.instruct import InterruptWatcher, llama_cpp_instruct_base  # noqa: E402
+from src.core.instruct import InterruptWatcher  # noqa: E402
 from src.core.storage import LLAMA_CPP_STORAGE  # noqa: E402
 from src.i18n.lang import LANG  # noqa: E402
+from src.nodes.instruct.text.node_instruct import llama_cpp_text_instruct  # noqa: E402
 
 
 class _AbortRecorder:
@@ -97,8 +98,9 @@ class _FakeRunLlm:
 
 
 class TestRunFinalization(unittest.TestCase):
+    # 基类属性为占位值, 用 text 节点类实例化 (骨架 _run 是基类方法, 行为不变)
     def setUp(self):
-        self.node = llama_cpp_instruct_base()
+        self.node = llama_cpp_text_instruct()
         self.config = {"model": "m.gguf"}
         self._orig_state = (LLAMA_CPP_STORAGE.llm, LLAMA_CPP_STORAGE.chat_handler, LLAMA_CPP_STORAGE.current_config)
         self.addCleanup(self._restore_state)

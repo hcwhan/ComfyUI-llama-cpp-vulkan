@@ -23,9 +23,9 @@ def sample_frame_indices(total_frames, max_frames):
 
 
 class llama_cpp_video_instruct(llama_cpp_media_instruct_base):
-    MEDIA_WORD = "视频"
     MODALITY = "video"
     LOG_NAME = "Video Instruct"
+    MEDIA_WORD = "视频"
 
     @classmethod
     def INPUT_TYPES(cls):
