@@ -1,6 +1,7 @@
 // web/image_instruct.js 的单元测试: increment_seed 仅在 Per-Image 档显示,
 // max_size 仅在 Batch 档显示, 显隐切换保留值, 自定义 key (each_mode_value /
-// batch_mode_value) 任一缺失时不联动, onConfigure 再同步.
+// batch_mode_value) 任一缺失时不联动, onConfigure 再同步且不重排尺寸,
+// 交互切档重排只增不减.
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -106,14 +107,29 @@ test("其他 comfyClass 的节点不被处理", () => {
     assert.equal(findWidget(node, "increment_seed").type, "toggle");
 });
 
-test("onConfigure 恢复序列化值后再同步", () => {
+test("onConfigure 恢复序列化值后再同步, 不重排尺寸", () => {
     registerDef();
     const node = createNode(MODE_BATCH);
-    // 模拟载入工作流: configure 把 widget 值恢复为序列化内容后触发 onConfigure
+    // 模拟载入工作流: configure 先恢复序列化尺寸与 widget 值, 再触发 onConfigure
+    const callsAfterCreate = node.setSizeCalls;
+    node.size = [321, 456];
     findWidget(node, "mode").value = MODE_EACH;
     node.onConfigure();
     assert.equal(findWidget(node, "max_size").type, "hidden");
     assert.equal(findWidget(node, "increment_seed").type, "toggle");
+    // 回归: 旧实现在 onConfigure 内 setSize(computeSize()),
+    // 把刚恢复的序列化尺寸压回最小计算值
+    assert.equal(node.setSizeCalls, callsAfterCreate);
+    assert.deepEqual(node.size, [321, 456]);
+});
+
+test("交互切档重排只增不减: 用户拉大的尺寸不被缩小", () => {
+    registerDef();
+    const node = createNode(MODE_BATCH);
+    node.size = [300, 400];
+    switchMode(node, MODE_EACH);
+    assert.equal(findWidget(node, "max_size").type, "hidden");
+    assert.deepEqual(node.size, [300, 400]);
 });
 
 test("原有 widget callback 仍被调用", () => {

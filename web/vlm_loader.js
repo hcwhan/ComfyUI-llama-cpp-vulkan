@@ -12,7 +12,7 @@
 // image_token_handlers (/object_info 原样返回), 与 Python 注册表单一真源.
 // 联动只原位改值/置灰/改类型, 不增删 widget (widgets_values 按声明序序列化).
 import { app } from "../../scripts/app.js";
-import { toggleWidget } from "./widget_utils.js";
+import { REFLOW_GROW, REFLOW_NONE, REFLOW_SNAP, reflowNode, toggleWidget } from "./widget_utils.js";
 
 const NODE_NAME = "llama_cpp_vlm_model_loader";
 
@@ -47,7 +47,7 @@ app.registerExtension({
         // onConfigure 恢复序列化值后再同步时, 载入 forced/none 档缓存的是
         // 刚恢复的序列化值, 切回 toggle 档时恢复该值, 仍以序列化值为准
         let prevThinkingMode = null;
-        const applyMode = () => {
+        const applyMode = (reflowMode) => {
             const label = handlerWidget.value;
             if (thinkingWidget && thinkingModes) {
                 // 未知 label (含 "None" 占位与 wheel 缺类) 归一为 toggle 档:
@@ -81,9 +81,10 @@ app.registerExtension({
                 for (const widget of imageTokenWidgets) {
                     changed = toggleWidget(widget, show) || changed;
                 }
-                // 仅在显隐实际变化时重排节点尺寸, 避免覆盖用户手动调整的大小
+                // 仅在显隐实际变化时按调用路径的模式重排 (各模式语义见
+                // widget_utils.js): 交互切档只增不减, 载入路径不重排
                 if (changed) {
-                    node.setSize(node.computeSize());
+                    reflowNode(node, reflowMode);
                 }
             }
         };
@@ -91,7 +92,7 @@ app.registerExtension({
         const originalCallback = handlerWidget.callback;
         handlerWidget.callback = function (...args) {
             const result = originalCallback?.apply(this, args);
-            applyMode();
+            applyMode(REFLOW_GROW);
             return result;
         };
 
@@ -120,12 +121,14 @@ app.registerExtension({
             });
         }
 
-        // 新建节点立即同步; 载入工作流时 configure 恢复 widget 值后再同步
-        applyMode();
+        // 新建节点立即同步 (贴合重排收紧默认尺寸; 载入路径此次也会执行,
+        // 但发生在 configure 恢复尺寸之前, 无害); 载入工作流时 configure
+        // 恢复 widget 值后再同步, 此时序列化尺寸已恢复, 不重排以免覆盖
+        applyMode(REFLOW_SNAP);
         const originalOnConfigure = node.onConfigure;
         node.onConfigure = function (...args) {
             const result = originalOnConfigure?.apply(this, args);
-            applyMode();
+            applyMode(REFLOW_NONE);
             return result;
         };
     },

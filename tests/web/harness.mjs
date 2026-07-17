@@ -42,13 +42,16 @@ export const makeWidget = (name, value, type = "number") => ({
     callback: undefined,
 });
 
-// setSize 计数用于断言 "仅在显隐实际变化时重排" 的行为
+// setSize 计数用于断言 "仅在显隐实际变化时重排" 的行为;
+// size 随 setSize 同步更新 (对齐 LGraphNode), 供重排模式断言尺寸结果
 export const makeNode = (comfyClass, widgets) => ({
     comfyClass,
     widgets,
+    size: [200, 100],
     setSizeCalls: 0,
-    setSize() {
+    setSize(size) {
         this.setSizeCalls += 1;
+        this.size = size;
     },
     computeSize: () => [200, 100],
 });

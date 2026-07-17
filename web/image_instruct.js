@@ -6,7 +6,7 @@
 // batch_mode_value (/object_info 原样透传, 与 common_static.py 的常量单一真源),
 // 每个 widget 各自与对应档位值显式比对 (枚举分支规范).
 import { app } from "../../scripts/app.js";
-import { toggleWidget } from "./widget_utils.js";
+import { REFLOW_GROW, REFLOW_NONE, REFLOW_SNAP, reflowNode, toggleWidget } from "./widget_utils.js";
 
 const NODE_NAME = "llama_cpp_image_instruct";
 
@@ -34,29 +34,32 @@ app.registerExtension({
             return;
         }
 
-        const applyMode = () => {
-            // 两个 toggle 都要执行 (勿短路), 仅在显隐实际变化时重排节点尺寸,
-            // 避免覆盖用户手动调整的大小
+        const applyMode = (reflowMode) => {
+            // 两个 toggle 都要执行 (勿短路), 仅在显隐实际变化时按调用路径的
+            // 模式重排 (各模式语义见 widget_utils.js): 交互切档只增不减,
+            // 载入路径不重排
             const incrementSeedChanged = toggleWidget(incrementSeedWidget, modeWidget.value === eachModeValue);
             const maxSizeChanged = toggleWidget(maxSizeWidget, modeWidget.value === batchModeValue);
             if (incrementSeedChanged || maxSizeChanged) {
-                node.setSize(node.computeSize());
+                reflowNode(node, reflowMode);
             }
         };
 
         const originalCallback = modeWidget.callback;
         modeWidget.callback = function (...args) {
             const result = originalCallback?.apply(this, args);
-            applyMode();
+            applyMode(REFLOW_GROW);
             return result;
         };
 
-        // 新建节点立即同步; 载入工作流时 configure 恢复 widget 值后再同步
-        applyMode();
+        // 新建节点立即同步 (贴合重排收紧默认尺寸; 载入路径此次也会执行,
+        // 但发生在 configure 恢复尺寸之前, 无害); 载入工作流时 configure
+        // 恢复 widget 值后再同步, 此时序列化尺寸已恢复, 不重排以免覆盖
+        applyMode(REFLOW_SNAP);
         const originalOnConfigure = node.onConfigure;
         node.onConfigure = function (...args) {
             const result = originalOnConfigure?.apply(this, args);
-            applyMode();
+            applyMode(REFLOW_NONE);
             return result;
         };
     },

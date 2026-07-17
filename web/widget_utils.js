@@ -17,3 +17,28 @@ export const toggleWidget = (widget, show) => {
     widget.computeSize = show ? widget.__origComputeSize : () => [0, -4];
     return true;
 };
+
+// 显隐变化后的节点尺寸重排模式, 按调用路径选择:
+// - SNAP: 贴合到最小计算尺寸 (新建节点初次同步, 收紧默认尺寸)
+// - GROW: 只增不减, 仅在装不下新显示的 widget 时放大 (交互切档,
+//   保留用户手动拉大的尺寸, 代价是切回少 widget 档位时底部留白不回收)
+// - NONE: 不动尺寸 (configure 载入路径: LGraphNode.configure 先恢复序列化
+//   尺寸再调 onConfigure, 且保存时的显隐状态与恢复后一致, 此处重排反而会
+//   把刚恢复的用户尺寸压回最小计算尺寸; undo/redo 重新 configure 同理)
+export const REFLOW_SNAP = "snap";
+export const REFLOW_GROW = "grow";
+export const REFLOW_NONE = "none";
+
+export const reflowNode = (node, mode) => {
+    if (mode === REFLOW_SNAP) {
+        node.setSize(node.computeSize());
+    } else if (mode === REFLOW_GROW) {
+        const computed = node.computeSize();
+        node.setSize([
+            Math.max(node.size[0], computed[0]),
+            Math.max(node.size[1], computed[1]),
+        ]);
+    } else if (mode === REFLOW_NONE) {
+        // 显式空分支: 该模式明确不动尺寸
+    }
+};

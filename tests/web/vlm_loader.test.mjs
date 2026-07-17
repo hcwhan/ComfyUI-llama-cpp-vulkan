@@ -1,5 +1,6 @@
 // web/vlm_loader.js 的单元测试: thinking 开关三态置灰与用户值缓存/恢复,
-// image_min/max_tokens 按 handler 名单显隐与区间互钳, onConfigure 再同步.
+// image_min/max_tokens 按 handler 名单显隐与区间互钳, onConfigure 再同步
+// 且不重排尺寸, 交互切档重排只增不减.
 // 能力名单经 nodeData 的 chat_handler widget options 注入 (模拟 /object_info 透传).
 
 import assert from "node:assert/strict";
@@ -174,6 +175,31 @@ test("onConfigure 恢复序列化值后再同步", () => {
     node.onConfigure();
     assert.equal(findWidget(node, "thinking").value, true);
     assert.equal(findWidget(node, "thinking").disabled, true);
+});
+
+test("onConfigure 显隐变化时不重排尺寸", () => {
+    registerDef();
+    // 保存为视觉 handler 的工作流: nodeCreated 首次同步以默认档隐藏
+    // image token 字段, onConfigure 按恢复值重新显示 (显隐必然变化)
+    const node = createNode("AudioNone");
+    const callsAfterCreate = node.setSizeCalls;
+    node.size = [321, 456];
+    findWidget(node, "chat_handler").value = "VisionToggle";
+    node.onConfigure();
+    assert.equal(findWidget(node, "image_min_tokens").type, "number");
+    // 回归: 旧实现在 onConfigure 内 setSize(computeSize()),
+    // 把刚恢复的序列化尺寸压回最小计算值
+    assert.equal(node.setSizeCalls, callsAfterCreate);
+    assert.deepEqual(node.size, [321, 456]);
+});
+
+test("交互切档重排只增不减: 用户拉大的尺寸不被缩小", () => {
+    registerDef();
+    const node = createNode("VisionToggle");
+    node.size = [300, 400];
+    switchHandler(node, "AudioNone");
+    assert.equal(findWidget(node, "image_min_tokens").type, "hidden");
+    assert.deepEqual(node.size, [300, 400]);
 });
 
 test("原有 widget callback 仍被调用", () => {
