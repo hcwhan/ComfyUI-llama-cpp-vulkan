@@ -517,6 +517,11 @@ LANG = {
             "block_count_missing": "block_count not found in GGUF metadata",
         },
 
+        # core/model_paths.py
+        "model_paths": {
+            "search_dirs": "GGUF model search directories: {dirs}",
+        },
+
         # core/cqdm.py (description text of the tqdm terminal progress bar, not logger output)
         "cqdm": {
             "progress_desc": "Processing",

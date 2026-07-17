@@ -4,6 +4,12 @@ import os
 
 import folder_paths
 
+from ..i18n.common_static import LOG_PREFIX
+from ..i18n.lang import LANG
+from ..shared.logger import logger
+
+_LOGS = LANG["logs"]["model_paths"]
+
 llm_extensions = {".gguf"}
 _LLM_FOLDER_KEYS = ("llm", "LLM")
 for _key in _LLM_FOLDER_KEYS:
@@ -15,6 +21,16 @@ for _key in _LLM_FOLDER_KEYS:
     # 内置下拉框. set(_exts) 同时兼容第三方以 list/tuple 形态注册的键;
     # _paths 沿用原列表引用, extra_model_paths.yaml 的后续注册不受影响
     folder_paths.folder_names_and_paths[_key] = (_paths, set(_exts) | llm_extensions)
+
+# import 期打一条搜索目录清单 ("下拉框里没有模型" 的排查起点):
+# extra_model_paths.yaml 由 ComfyUI 在加载自定义节点之前处理, 此时已并入;
+# 两键跨目录去重 (保持注册顺序), Windows 下 llm/LLM 指向同一目录
+_search_dirs = []
+for _key in _LLM_FOLDER_KEYS:
+    for _dir in folder_paths.folder_names_and_paths[_key][0]:
+        if _dir not in _search_dirs:
+            _search_dirs.append(_dir)
+logger.info(LOG_PREFIX + _LOGS["search_dirs"].format(dirs=", ".join(_search_dirs)))
 
 
 def get_llm_filename_list():

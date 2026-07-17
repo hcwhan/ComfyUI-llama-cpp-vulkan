@@ -63,9 +63,14 @@ class TestLocaleSettings(unittest.TestCase):
         locale_settings.set_language_setting("frontend_locale", "zh")
         self.assertEqual(self._stored(), {"language": {"frontend_locale": "zh"}})
 
-    def test_write_failure_is_silent(self):
-        with patch.object(locale_settings, "_SETTINGS_PATH", Path(self._tmp.name) / "no_such_dir" / "settings.json"):
+    def test_write_failure_warns_without_raising(self):
+        # 写盘失败不阻断 (兜底丢失可容忍), 但留 warning 供排查语言兜底失效
+        with (
+            patch.object(locale_settings, "_SETTINGS_PATH", Path(self._tmp.name) / "no_such_dir" / "settings.json"),
+            self.assertLogs("llama-cpp-vulkan", level="WARNING") as logs,
+        ):
             locale_settings.set_language_setting("frontend_locale", "zh")
+        self.assertTrue(any("failed to write" in m for m in logs.output))
 
 
 if __name__ == "__main__":

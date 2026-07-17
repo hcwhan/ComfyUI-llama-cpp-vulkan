@@ -517,6 +517,11 @@ LANG = {
             "block_count_missing": "GGUF 元数据中找不到 block_count",
         },
 
+        # core/model_paths.py
+        "model_paths": {
+            "search_dirs": "GGUF 模型搜索目录: {dirs}",
+        },
+
         # core/cqdm.py (tqdm 终端进度条的描述文字, 非 logger 输出)
         "cqdm": {
             "progress_desc": "处理中",

@@ -4,11 +4,12 @@ settings.json 为运行时产物 (已 .gitignore), 结构: {"language": {"comfy_
 - comfy_locale: 每次启动实时读到的 Comfy.Locale 原始短码 (忠实记录, 不参与解析, 键缺失时移除);
 - frontend_locale: 前端页面加载时上报的实际显示语言 (Comfy.Locale 缺失时的解析兜底).
 两键均存前端原始短码 (zh / en / ja 等), 短码到语言文件的映射统一在 lang.py 读取时做.
-读写失败静默容忍 (文件缺失/损坏按空字典处理), 持久化状态丢失只损失兜底, 不阻断插件加载.
+读失败按空字典容忍 (文件缺失/损坏是常态路径, 不打日志); 写失败打 warning 后
+继续 (持久化状态丢失只损失兜底, 不阻断插件加载).
 """
 
-import contextlib
 import json
+import logging
 from pathlib import Path
 
 import folder_paths
@@ -61,5 +62,11 @@ def set_language_setting(key, value):
         if language.get(key) == value:
             return
         new_language = {**language, key: value}
-    with contextlib.suppress(OSError):
+    try:
         _SETTINGS_PATH.write_text(json.dumps({**settings, "language": new_language}, indent=4) + "\n", encoding="utf-8")
+    except OSError as e:
+        # i18n 最底层不能依赖语言文件, 警告例外地硬编码英文; 取与
+        # shared/logger.py 同名的 logger, 不 import 项目内模块 (同 lang.py 惯例)
+        logging.getLogger("llama-cpp-vulkan").warning(
+            f"[llama-cpp-vulkan] failed to write {_SETTINGS_PATH}: {e}; language auto-follow fallback will not persist"
+        )

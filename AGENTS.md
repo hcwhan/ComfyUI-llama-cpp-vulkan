@@ -164,7 +164,7 @@ image 逐张模式的多图结果以 "======== Image N ========" 前缀行拼接
 - 带运行时值的文案写成 `str.format` 具名占位符模板; 报错文案须单行; 语言文件排版规则(多字面量换行约定)由 `tests/test_i18n_format.py` 锁定, `pyproject.toml` 已对 `language_*.py` 豁免 ruff format(lint 仍生效)
 - 测试断言报错文案时引用 `LANG` 而非硬编码字符串, 使断言随语言文件自动跟随
 - 语言自动跟随: `lang.py` 的 `LANGUAGE` 默认 `"auto"`, 解析三级优先 - 实时读 ComfyUI 的 `Comfy.Locale` > 上次会话前端上报的实际显示语言(`frontend_locale`, 覆盖 Comfy.Locale 从未设置时前端按浏览器自动检测的空窗) > 默认英语; 设置读取与持久化统一走 `locale_settings.py`(状态存插件根 `settings.json`, 运行时产物, 已 gitignore), 上报链路 `web/locale_sync.js` -> `core/locale_sync.py` 路由, 仅页面加载时上报一次(改语言无需监听: ComfyUI 自己会写 Comfy.Locale, 优先级更高), 文案 import 期固化, 上报生效恒为下次启动; JS 失效只损失兜底级
-- 例外(不进 i18n): 任务预设与系统提示词预设(领域内容), chat handler 显示名(`handlers.py` 注册表 key, 功能性标识), video Instruct 注入的"连续视频"语义提示与 `MEDIA_WORD`(prompt 内容), `prompts.py` 的 import 期模态校验报错(开发期防御), 根入口 `__init__.py` 的 import 失败安装指引(i18n 层可能同在失败的导入链上, 硬编码英文), `lang.py` 的语言文件缺失警告与报错(加载器自身不能依赖语言文件, 回退行为见其 docstring)
+- 例外(不进 i18n): 任务预设与系统提示词预设(领域内容), chat handler 显示名(`handlers.py` 注册表 key, 功能性标识), video Instruct 注入的"连续视频"语义提示与 `MEDIA_WORD`(prompt 内容), `prompts.py` 的 import 期模态校验报错(开发期防御), 根入口 `__init__.py` 的 import 失败安装指引(i18n 层可能同在失败的导入链上, 硬编码英文), `lang.py` 的语言文件缺失警告与报错和 `locale_settings.py` 的写盘失败警告(两者是 i18n 加载链自身, 不能依赖语言文件, 回退行为见各自 docstring)
 
 ### 文档维护原则
 
