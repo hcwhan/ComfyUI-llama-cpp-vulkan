@@ -1,15 +1,20 @@
 // web/widget_utils.js 的单元测试: toggleWidget 双轨隐藏语义
 // (hidden 标志 + type/computeSize), 原始值缓存与无变化时的短路返回;
-// reflowNode 三种重排模式 (贴合 / 只增不减 / 不动).
+// reflowNode 三种重排模式 (SNAP / 只增不减 / 不动) 与提示词输入框补高.
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { makeNode, makeWidget } from "./harness.mjs";
 
-const { toggleWidget, reflowNode, REFLOW_SNAP, REFLOW_GROW, REFLOW_NONE } = await import(
-    "../../web/widget_utils.js"
-);
+const { toggleWidget, reflowNode, promptHeightBump, PROMPT_WIDGET_DEFAULT_HEIGHT, REFLOW_SNAP, REFLOW_GROW, REFLOW_NONE } = await import("../../web/widget_utils.js");
+
+// 与前端 customtext DOM widget 的最小对齐: type + computeLayoutSize
+const makePromptWidget = (minHeight = 50) => ({
+    name: "custom_prompt",
+    type: "customtext",
+    computeLayoutSize: () => ({ minHeight }),
+});
 
 test("隐藏: hidden 标志与 type/computeSize 双轨同时生效", () => {
     const widget = makeWidget("max_size", 256, "number");
@@ -56,12 +61,26 @@ test("隐藏不触碰 value (序列化值保持)", () => {
     assert.equal(widget.value, 1280);
 });
 
-test("reflowNode SNAP: 尺寸贴合到最小计算值 (含缩小)", () => {
+test("reflowNode SNAP: 高度贴合计算值, 宽度只增不减", () => {
     const node = makeNode("any", []);
     node.size = [300, 400];
     reflowNode(node, REFLOW_SNAP);
     assert.equal(node.setSizeCalls, 1);
+    assert.deepEqual(node.size, [300, 100]);
+    node.size = [150, 400];
+    reflowNode(node, REFLOW_SNAP);
     assert.deepEqual(node.size, [200, 100]);
+});
+
+test("reflowNode SNAP: 提示词输入框按默认高度补进节点总高", () => {
+    const node = makeNode("any", [makePromptWidget(), makePromptWidget(), makeWidget("mode", "x", "combo")]);
+    reflowNode(node, REFLOW_SNAP);
+    assert.deepEqual(node.size, [200, 100 + 2 * (PROMPT_WIDGET_DEFAULT_HEIGHT - 50)]);
+});
+
+test("promptHeightBump: 非 customtext 不参与, 最小高不低于默认高时不补", () => {
+    const node = makeNode("any", [makeWidget("seed", 0, "number"), makePromptWidget(PROMPT_WIDGET_DEFAULT_HEIGHT + 20)]);
+    assert.equal(promptHeightBump(node), 0);
 });
 
 test("reflowNode GROW: 已放大的尺寸不被缩小", () => {

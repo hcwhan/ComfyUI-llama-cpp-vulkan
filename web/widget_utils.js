@@ -18,8 +18,28 @@ export const toggleWidget = (widget, show) => {
     return true;
 };
 
+// 提示词输入框 (customtext 多行文本 widget) 的默认显示高度: 新建节点时把
+// 与各输入框最小高 (前端 fallback 50) 的差额补进节点总高, 前端的弹性空间
+// 分配会把富余高度分给弹性 widget, 使输入框呈现为该默认高. 只影响默认值:
+// computeSize 不动, 手动拖拽仍可缩到自然下限, 载入工作流恢复保存尺寸
+export const PROMPT_WIDGET_DEFAULT_HEIGHT = 120;
+
+export const promptHeightBump = (node) => {
+    let extra = 0;
+    for (const widget of node.widgets ?? []) {
+        if (widget.type !== "customtext") {
+            continue;
+        }
+        const minHeight = widget.computeLayoutSize?.(node)?.minHeight ?? 0;
+        extra += Math.max(0, PROMPT_WIDGET_DEFAULT_HEIGHT - minHeight);
+    }
+    return extra;
+};
+
 // 显隐变化后的节点尺寸重排模式, 按调用路径选择:
-// - SNAP: 贴合到最小计算尺寸 (新建节点初次同步, 收紧默认尺寸)
+// - SNAP: 高度贴合到默认高度 (最小计算高 + 提示词输入框补高), 宽度只增
+//   不减 (新建节点初次同步; 宽度不缩使其与 node_size.js 的默认宽度设置
+//   在任意扩展执行顺序下收敛到同一结果)
 // - GROW: 只增不减, 仅在装不下新显示的 widget 时放大 (交互切档,
 //   保留用户手动拉大的尺寸, 代价是切回少 widget 档位时底部留白不回收)
 // - NONE: 不动尺寸 (configure 载入路径: LGraphNode.configure 先恢复序列化
@@ -31,7 +51,11 @@ export const REFLOW_NONE = "none";
 
 export const reflowNode = (node, mode) => {
     if (mode === REFLOW_SNAP) {
-        node.setSize(node.computeSize());
+        const computed = node.computeSize();
+        node.setSize([
+            Math.max(node.size[0], computed[0]),
+            computed[1] + promptHeightBump(node),
+        ]);
     } else if (mode === REFLOW_GROW) {
         const computed = node.computeSize();
         node.setSize([

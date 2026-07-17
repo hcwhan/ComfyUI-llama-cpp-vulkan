@@ -24,9 +24,10 @@ ComfyUI-llama-cpp-vulkan/
   docs/
     项目分析.html             # 历史快照(页头已注明生成 commit, 仅供历史参考)
   web/
-    widget_utils.js           # 前端共用工具: widget 显隐切换(hidden 标志 + type/computeSize 双轨), 节点尺寸重排(贴合/只增不减/不动三模式)
+    widget_utils.js           # 前端共用工具: widget 显隐切换(hidden 标志 + type/computeSize 双轨), 节点尺寸重排(SNAP/只增不减/不动三模式)与提示词输入框补高
     vlm_loader.js             # VLM Loader widget 联动: thinking 三态置灰, image token 字段显隐(纯 UX 增强)
     image_instruct.js         # image Instruct widget 联动: increment_seed 仅 Per-Image 档 / max_size 仅 Batch 档显示(纯 UX 增强)
+    node_size.js              # 插件节点默认尺寸: 分组默认宽度(loader/Instruct 420, 透传/拆分类 240, 其余 300)+ 提示词输入框默认高(纯 UX 增强, 仅创建时刻)
     locale_sync.js            # 页面加载时上报前端实际显示语言(语言自动跟随的兜底数据源, 见"文案与 i18n")
   src/
     i18n/                     # 文案层: 全部用户可见文案与控制台日志的单一来源

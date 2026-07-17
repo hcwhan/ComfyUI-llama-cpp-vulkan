@@ -121,9 +121,10 @@ app.registerExtension({
             });
         }
 
-        // 新建节点立即同步 (贴合重排收紧默认尺寸; 载入路径此次也会执行,
-        // 但发生在 configure 恢复尺寸之前, 无害); 载入工作流时 configure
-        // 恢复 widget 值后再同步, 此时序列化尺寸已恢复, 不重排以免覆盖
+        // 新建节点立即同步 (SNAP 收紧隐藏字段占用的高度, 宽度与
+        // node_size.js 的默认宽度设置收敛; 载入路径此次也会执行, 但发生在
+        // configure 恢复尺寸之前, 无害); 载入工作流时 configure 恢复
+        // widget 值后再同步, 此时序列化尺寸已恢复, 不重排以免覆盖
         applyMode(REFLOW_SNAP);
         const originalOnConfigure = node.onConfigure;
         node.onConfigure = function (...args) {
