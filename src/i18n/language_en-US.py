@@ -487,6 +487,14 @@ LANG = {
             "cleanup_hook_applied": "Model cleanup hook applied!",
         },
 
+        # core/instruct.py
+        "instruct": {
+            # thinking/answer counts are estimates from re-tokenizing the answer text (wording carries "~"),
+            # prompt tokens and total generated tokens come from the wheel's usage field; elapsed includes prompt prefill
+            "generation_stats": "Prompt {prompt_tokens} tokens, generated {completion_tokens} tokens in {elapsed:.2f}s, {speed:.1f} tok/s",
+            "generation_stats_thinking": "Prompt {prompt_tokens} tokens, generated {completion_tokens} tokens (~{thinking_tokens} thinking + ~{answer_tokens} answer) in {elapsed:.2f}s, {speed:.1f} tok/s",
+        },
+
         # core/gguf_layers.py
         "gguf": {
             "parse_failed": "GGUF parse failed: {e}",

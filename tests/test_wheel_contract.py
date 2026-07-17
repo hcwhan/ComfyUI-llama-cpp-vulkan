@@ -105,6 +105,23 @@ class TestWheelPrivateApiContract(unittest.TestCase):
         ):
             self.assertIn("_convert_completion_to_chat(", inspect.getsource(func))
 
+    def test_usage_passthrough_in_no_tools_path(self):
+        # instruct._log_completion_stats 直接取 output["usage"] 的 token 计数
+        # (生成统计日志); 无 tools 路径收敛的 _convert_text_completion_to_chat
+        # (收敛链见 test_message_content_is_str_in_no_tools_path) 必须原样
+        # 透传 completion 的 usage 字段
+        import llama_cpp.llama_chat_format as chat_format_module
+
+        source = inspect.getsource(chat_format_module._convert_text_completion_to_chat)
+        self.assertIn('"usage": completion["usage"]', source)
+
+    def test_llama_tokenize_signature(self):
+        # instruct._log_completion_stats 重新 tokenize 答案文本以估算思考/答案
+        # 占比, 依赖 add_bos/special 两个关键字参数
+        params = inspect.signature(Llama.tokenize).parameters
+        for name in ("add_bos", "special"):
+            self.assertIn(name, params, f"Llama.tokenize missing param: {name}")
+
     def test_create_chat_completion_accepts_all_sampling_params(self):
         # Parameters 节点全部字段 + seed + text Instruct allow_thinking 开关折算的
         # reasoning_budget 必须被 create_chat_completion 签名接受;

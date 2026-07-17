@@ -487,6 +487,14 @@ LANG = {
             "cleanup_hook_applied": "模型清理钩子已挂载!",
         },
 
+        # core/instruct.py
+        "instruct": {
+            # 思考/答案两个数值是对答案文本重新 tokenize 的估算 (文案带 "约"),
+            # prompt tokens 与 总生成 tokens 取 wheel 的 usage 真实计数; 用时含 prompt 预填充
+            "generation_stats": "本次 prompt {prompt_tokens} tokens, 生成 {completion_tokens} tokens, 用时 {elapsed:.2f} 秒, 速度 {speed:.1f} tok/s",
+            "generation_stats_thinking": "本次 prompt {prompt_tokens} tokens, 生成 {completion_tokens} tokens (思考约 {thinking_tokens} + 答案约 {answer_tokens}), 用时 {elapsed:.2f} 秒, 速度 {speed:.1f} tok/s",
+        },
+
         # core/gguf_layers.py
         "gguf": {
             "parse_failed": "GGUF 解析失败: {e}",

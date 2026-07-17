@@ -10,7 +10,6 @@ import comfy.model_management as mm
 
 from .....core.cqdm import cqdm
 from .....core.instruct import llama_cpp_media_instruct_base
-from .....core.storage import LLAMA_CPP_STORAGE
 from .....i18n.common_static import IMAGE_MODE_BATCH, IMAGE_MODE_EACH, IMAGE_RESULT_SEPARATOR_TEMPLATE, LOG_PREFIX
 from .....i18n.lang import LANG
 from .....shared.encoding import image_content_item, scale_image, tensor_to_uint8
@@ -86,7 +85,7 @@ class llama_cpp_image_instruct(llama_cpp_media_instruct_base):
             # 取模 0xFFFFFFFF 使派生值回绕到 [0, 0xFFFFFFFE], 避开 llama.cpp
             # 的随机种子哨兵值 0xFFFFFFFF (语义见 seed_input 的注释)
             request_seed = (seed + i) % 0xFFFFFFFF if increment_seed else seed
-            output = LLAMA_CPP_STORAGE.llm.create_chat_completion(messages=messages, seed=request_seed, **params)
+            output = self._completion_with_stats(messages, request_seed, params)
             # 前缀行模板与 shared/text_utils 的拆分正则同源 (common_static)
             if len(images) > 1:
                 tmp_list.append(IMAGE_RESULT_SEPARATOR_TEMPLATE.format(n=i + 1))

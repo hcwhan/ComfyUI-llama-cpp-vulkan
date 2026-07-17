@@ -45,7 +45,10 @@ class _FakeVlm:
     def create_chat_completion(self, messages, seed, **params):
         self.last_messages = messages
         self.calls += 1
-        return {"choices": [{"message": {"content": self._output}}]}
+        return {
+            "usage": {"prompt_tokens": 20, "completion_tokens": 100},
+            "choices": [{"message": {"content": self._output}}],
+        }
 
 
 def _png_size(content_item):

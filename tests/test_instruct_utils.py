@@ -1,16 +1,19 @@
-"""instruct.py 工具函数与 prompts.py 预设的单元测试: thinking 块剥离, 预设/自定义提示词组装, 预设 use 配置一致性 (prompts.py + 节点类 MODALITY), FakeLlm 打桩的 content 扁平化 (_single_completion), 以及 text 节点的 allow_thinking 折算与 REQUIRE_USER_TEXT 守卫 (经 _run)."""
+"""instruct.py 工具函数与 prompts.py 预设的单元测试: thinking 块剥离, 预设/自定义提示词组装, 预设 use 配置一致性 (prompts.py + 节点类 MODALITY), FakeLlm 打桩的 content 扁平化 (_single_completion), 生成统计日志 (_completion_with_stats), 以及 text 节点的 allow_thinking 折算与 REQUIRE_USER_TEXT 守卫 (经 _run)."""
 
 import re
 import types
 import unittest
+from unittest import mock
 
 from tests import comfy_stubs
 
 comfy_stubs.install()
 
+from src.core import instruct  # noqa: E402
 from src.core.instruct import llama_cpp_instruct_base, strip_thinking_blocks  # noqa: E402
 from src.core.prompts import instruct_presets, preset_content  # noqa: E402
 from src.core.storage import LLAMA_CPP_STORAGE  # noqa: E402
+from src.i18n.common_static import LOG_PREFIX  # noqa: E402
 from src.i18n.lang import LANG  # noqa: E402
 from src.nodes.instruct.media.audio.node_instruct import llama_cpp_audio_instruct  # noqa: E402
 from src.nodes.instruct.media.image.node_instruct import llama_cpp_image_instruct  # noqa: E402
@@ -135,7 +138,10 @@ class TestSingleCompletionContentFlattening(unittest.TestCase):
 
         def create_chat_completion(self, messages, seed, **params):
             self.captured_messages = messages
-            return {"choices": [{"message": {"content": "ok"}}]}
+            return {
+                "usage": {"prompt_tokens": 20, "completion_tokens": 100},
+                "choices": [{"message": {"content": "ok"}}],
+            }
 
     def setUp(self):
         self.node = llama_cpp_instruct_base()
@@ -161,6 +167,64 @@ class TestSingleCompletionContentFlattening(unittest.TestCase):
         self.assertIs(self.fake.captured_messages[-1]["content"], content)
 
 
+class TestCompletionStatsLogging(unittest.TestCase):
+    """_completion_with_stats 的生成统计日志: 计数取 usage 字段, 思考/答案拆分按重新 tokenize 的答案文本估算."""
+
+    class _FakeLlm:
+        def __init__(self, content, answer_token_count=0):
+            self._content = content
+            self._answer_token_count = answer_token_count
+            self.tokenize_args = None
+
+        def create_chat_completion(self, messages, seed, **params):
+            return {
+                "usage": {"prompt_tokens": 20, "completion_tokens": 100},
+                "choices": [{"message": {"content": self._content}}],
+            }
+
+        def tokenize(self, text, add_bos=True, special=False):
+            self.tokenize_args = (text, add_bos, special)
+            return [0] * self._answer_token_count
+
+    def setUp(self):
+        self.node = llama_cpp_instruct_base()
+        self._orig_llm = LLAMA_CPP_STORAGE.llm
+        self.addCleanup(setattr, LLAMA_CPP_STORAGE, "llm", self._orig_llm)
+
+    def _log_message(self, llm):
+        LLAMA_CPP_STORAGE.llm = llm
+        # perf_counter 打桩为固定差值 2 秒: completion 100 tokens -> 速度 50.0 tok/s
+        with (
+            mock.patch.object(instruct.time, "perf_counter", side_effect=[10.0, 12.0]),
+            self.assertLogs("llama-cpp-vulkan", level="INFO") as captured,
+        ):
+            self.node._completion_with_stats([], 0, {})
+        (record,) = captured.records
+        return record.getMessage()
+
+    def test_plain_output_logs_totals_without_split(self):
+        message = self._log_message(self._FakeLlm("plain answer"))
+        expected = LANG["logs"]["instruct"]["generation_stats"].format(prompt_tokens=20, completion_tokens=100, elapsed=2.0, speed=50.0)
+        self.assertEqual(message, LOG_PREFIX + expected)
+
+    def test_thinking_output_logs_split_from_retokenized_answer(self):
+        llm = self._FakeLlm("<think>推理过程</think>答案文本", answer_token_count=30)
+        expected = LANG["logs"]["instruct"]["generation_stats_thinking"].format(
+            prompt_tokens=20, completion_tokens=100, thinking_tokens=70, answer_tokens=30, elapsed=2.0, speed=50.0
+        )
+        self.assertEqual(self._log_message(llm), LOG_PREFIX + expected)
+        # 重新 tokenize 的对象是剥离后的答案文本, 不含 BOS 与特殊 token
+        self.assertEqual(llm.tokenize_args, ("答案文本".encode(), False, False))
+
+    def test_thinking_tokens_clamped_at_zero(self):
+        # 独立 tokenize 的估算可能略高于 usage 计数, 思考部分不打印负值
+        llm = self._FakeLlm("r</think>答案文本", answer_token_count=150)
+        expected = LANG["logs"]["instruct"]["generation_stats_thinking"].format(
+            prompt_tokens=20, completion_tokens=100, thinking_tokens=0, answer_tokens=150, elapsed=2.0, speed=50.0
+        )
+        self.assertEqual(self._log_message(llm), LOG_PREFIX + expected)
+
+
 class TestAllowThinkingMapping(unittest.TestCase):
     """text Instruct 的 allow_thinking 开关折算为 wheel 的 reasoning_budget."""
 
@@ -174,7 +238,10 @@ class TestAllowThinkingMapping(unittest.TestCase):
 
         def create_chat_completion(self, messages, seed, **params):
             self.captured_params = params
-            return {"choices": [{"message": {"content": "ok"}}]}
+            return {
+                "usage": {"prompt_tokens": 20, "completion_tokens": 100},
+                "choices": [{"message": {"content": "ok"}}],
+            }
 
     def setUp(self):
         self.config = {"model": "m.gguf"}

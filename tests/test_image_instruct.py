@@ -9,6 +9,7 @@
 - 逐张模式: 中断置位时循环立即抛 InterruptProcessingException, 不再发起请求
 - 逐张模式: increment_seed 关闭 (默认) 时各请求复用同一 seed, 开启时第 i 张
   用 seed+i 派生, 且回绕避开 llama.cpp 的随机种子哨兵值 0xFFFFFFFF
+- 逐张模式: 每次请求各产生一条生成统计日志 (经 _completion_with_stats)
 - 批量模式: 全部图片并入单条 user 消息 (文本项 + N 个 image_url 项),
   多图逐张缩放到 max_size, 单图保持原分辨率 (tooltip 承诺 "仅在发送
   多张图片时生效")
@@ -16,6 +17,7 @@
 
 import base64
 import io
+import itertools
 import types
 import unittest
 from unittest import mock
@@ -27,8 +29,10 @@ from tests import comfy_stubs
 
 comfy_stubs.install()
 
+from src.core import instruct as core_instruct  # noqa: E402
 from src.core.storage import LLAMA_CPP_STORAGE  # noqa: E402
-from src.i18n.common_static import IMAGE_MODE_BATCH, IMAGE_MODE_EACH  # noqa: E402
+from src.i18n.common_static import IMAGE_MODE_BATCH, IMAGE_MODE_EACH, LOG_PREFIX  # noqa: E402
+from src.i18n.lang import LANG  # noqa: E402
 from src.nodes.instruct.media.image import node_instruct  # noqa: E402
 from src.nodes.instruct.media.image.node_instruct import llama_cpp_image_instruct  # noqa: E402
 from src.shared.text_utils import split_image_results  # noqa: E402
@@ -55,7 +59,10 @@ class _FakeVlm:
         self.seeds.append(seed)
         text = self._outputs[self.calls]
         self.calls += 1
-        return {"choices": [{"message": {"content": text}}]}
+        return {
+            "usage": {"prompt_tokens": 20, "completion_tokens": 100},
+            "choices": [{"message": {"content": text}}],
+        }
 
 
 def _png_size(content_item):
@@ -137,8 +144,26 @@ class TestImageInstructInferEach(_ImageInstructTestBase):
         self._process(torch.zeros(2, 4, 4, 3), seed=0xFFFFFFFE, increment_seed=True)
         self.assertEqual(llm.seeds, [0xFFFFFFFE, 0])
 
+    def test_each_mode_logs_stats_per_image(self):
+        # 逐张模式每次请求各产生一条生成统计日志 (经 _completion_with_stats);
+        # perf_counter 打桩为每调一次 +1 秒, 单次 completion 首尾相邻两次调用差
+        # 恒为 1 秒: completion 100 tokens -> 速度 100.0 tok/s
+        llm = _FakeVlm(["第一张结果", "第二张结果"])
+        self._install(llm)
+        ticks = itertools.count()
+        expected = LOG_PREFIX + LANG["logs"]["instruct"]["generation_stats"].format(
+            prompt_tokens=20, completion_tokens=100, elapsed=1.0, speed=100.0
+        )
+        with (
+            mock.patch.object(core_instruct.time, "perf_counter", side_effect=lambda: float(next(ticks))),
+            self.assertLogs("llama-cpp-vulkan", level="INFO") as captured,
+        ):
+            self._process(torch.zeros(2, 4, 4, 3))
+        stats_messages = [r.getMessage() for r in captured.records if r.getMessage() == expected]
+        self.assertEqual(len(stats_messages), 2)
+
     def test_interrupt_raises_before_request(self):
-        # 循环起点检查中断标志, 命中即抛且不再发起补全请求
+        # 循环起点检查中断标志, 命中即抛且不再发起 completion 请求
         llm = _FakeVlm(["不应产生"])
         self._install(llm)
         with (

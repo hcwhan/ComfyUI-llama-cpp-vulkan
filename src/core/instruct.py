@@ -1,4 +1,4 @@
-"""Instruct 节点共享基类: 消息组装, 推理执行, 中断监视, thinking 剥离, hybrid 重置.
+"""Instruct 节点共享基类: 消息组装, 推理执行, 生成统计日志, 中断监视, thinking 剥离, hybrid 重置.
 
 - llama_cpp_instruct_base        文本推理骨架(MODEL_TYPE = LLAMACPPLLM)
 - llama_cpp_media_instruct_base  多模态推理骨架(MODEL_TYPE = LLAMACPPVLM, 附 mmproj 校验)
@@ -10,11 +10,14 @@
 import contextlib
 import re
 import threading
+import time
 
 import comfy.model_management as mm
 
 from ..i18n.common_static import CATEGORY as _CATEGORY
+from ..i18n.common_static import LOG_PREFIX
 from ..i18n.lang import LANG
+from ..shared.logger import logger
 from ..shared.types import any_type
 from .prompts import instruct_presets, preset_content
 from .storage import LLAMA_CPP_STORAGE
@@ -23,6 +26,7 @@ _COMMON = LANG["nodes"]["instruct"]["common"]
 _TIPS = _COMMON["tooltips"]
 _PLACEHOLDERS = _COMMON["placeholders"]
 _ERRORS = _COMMON["errors"]
+_LOGS = LANG["logs"]["instruct"]
 
 # 采样参数的统一默认值: Parameters 节点的 widget 默认值与 Instruct 未连接
 # parameters 端口时的生效值均取自此表, 保证连不连默认参数节点行为一致
@@ -87,6 +91,47 @@ def strip_thinking_blocks(text):
     if _GEMMA4_CHANNEL_CLOSE in text:
         text = text.rsplit(_GEMMA4_CHANNEL_CLOSE, 1)[-1].lstrip()
     return _unwrap_answer(text)
+
+
+def _log_completion_stats(output, elapsed):
+    """记录单次 completion 的生成统计: 生成 token 数, 用时, 速度, 思考/答案占比.
+
+    prompt_tokens/completion_tokens 取 wheel 统计的 usage 字段 (真实计数,
+    对接面见 AGENTS.md 依赖版本对接原则); elapsed 是整次请求的墙钟时间,
+    含 prompt 预填充, prompt 很长时速度会低于纯解码速度.
+
+    思考/答案拆分: 把剥离思考块后的答案文本重新 tokenize 计数, 思考部分取
+    与 completion_tokens 的差值. 独立 tokenize 与生成时在上下文中的切分
+    可能有个位数 token 出入, 两个数值均为估算 (日志文案带 "约"); 未检出
+    思考形态 (剥离前后文本相同) 时不打印拆分. 拆分不受 strip_thinking
+    开关影响: 统计的是本次生成实际花在思考上的量, 与输出后处理无关.
+    """
+    usage = output["usage"]
+    prompt_tokens = usage["prompt_tokens"]
+    completion_tokens = usage["completion_tokens"]
+    speed = completion_tokens / elapsed if elapsed > 0 else 0.0
+    content = output["choices"][0]["message"]["content"]
+    answer = strip_thinking_blocks(content)
+    if answer == content:
+        logger.info(
+            LOG_PREFIX
+            + _LOGS["generation_stats"].format(
+                prompt_tokens=prompt_tokens, completion_tokens=completion_tokens, elapsed=elapsed, speed=speed
+            )
+        )
+        return
+    answer_tokens = len(LLAMA_CPP_STORAGE.llm.tokenize(answer.encode("utf-8"), add_bos=False, special=False))
+    logger.info(
+        LOG_PREFIX
+        + _LOGS["generation_stats_thinking"].format(
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            thinking_tokens=max(completion_tokens - answer_tokens, 0),
+            answer_tokens=answer_tokens,
+            elapsed=elapsed,
+            speed=speed,
+        )
+    )
 
 
 def is_hybrid_arch(llm):
@@ -243,8 +288,19 @@ class llama_cpp_instruct_base:
 
         return extract_text
 
+    def _completion_with_stats(self, messages, seed, params):
+        """发起一次 completion 并记录生成统计日志, 返回原始 output dict.
+
+        全部 create_chat_completion 调用点(_single_completion 与 image
+        逐张模式)统一经此包装, 保证每次请求都有一条统计日志.
+        """
+        start = time.perf_counter()
+        output = LLAMA_CPP_STORAGE.llm.create_chat_completion(messages=messages, seed=seed, **params)
+        _log_completion_stats(output, time.perf_counter() - start)
+        return output
+
     def _single_completion(self, messages, user_content, seed, params, extract_text):
-        """把 user_content 作为单条 user 消息发起一次补全, 返回生成文本.
+        """把 user_content 作为单条 user 消息发起一次 completion, 返回生成文本.
 
         content 只含单个 text 项时扁平化为纯字符串: 无 chat handler 的纯文本路径
         由 GGUF 内嵌 chat template 渲染消息, 旧式模板(ChatML/Llama-3/Mistral 等)
@@ -254,7 +310,7 @@ class llama_cpp_instruct_base:
         if len(user_content) == 1 and user_content[0].get("type") == "text":
             user_content = user_content[0]["text"]
         messages.append({"role": "user", "content": user_content})
-        output = LLAMA_CPP_STORAGE.llm.create_chat_completion(messages=messages, seed=seed, **params)
+        output = self._completion_with_stats(messages, seed, params)
         return extract_text(output)
 
     def _run(self, llama_model, seed, preset_prompt, custom_prompt, system_prompt, strip_thinking, force_offload, parameters, runner):
