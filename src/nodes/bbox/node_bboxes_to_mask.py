@@ -63,20 +63,23 @@ class bboxes_to_mask:
                 logger.warning(_PREFIX + _LOGS["bbox_empty_area"].format(bbox=bbox))
                 continue
 
-            # 局部窗口(含羽化边界), 裁剪到图像范围
-            wx1, wy1 = max(0, x1_exp - margin), max(0, y1_exp - margin)
-            wx2, wy2 = min(width, x2_exp + margin), min(height, y2_exp + margin)
-            if wx2 <= wx1 or wy2 <= wy1:
+            # 出界判定作用在不含 margin 的扩张框上, 与 bboxes_to_segs 口径一致:
+            # 修复前判定作用在扩了 margin 的窗口上, feather > 0 且扩张框完全
+            # 出界但距图缘不足 margin 时窗口被撑成非空, 无效框静默跳过且白跑
+            # 一次高斯滤波
+            mx1, my1 = max(0, x1_exp), max(0, y1_exp)
+            mx2, my2 = min(width, x2_exp), min(height, y2_exp)
+            if mx2 <= mx1 or my2 <= my1:
                 logger.warning(_PREFIX + _LOGS["bbox_out_of_bounds"].format(bbox=bbox))
                 continue
 
+            # 局部窗口(含羽化边界), 裁剪到图像范围;
+            # margin 只用于撑羽化窗口, 扩张框非空时窗口必非空
+            wx1, wy1 = max(0, x1_exp - margin), max(0, y1_exp - margin)
+            wx2, wy2 = min(width, x2_exp + margin), min(height, y2_exp + margin)
+
             # 扩张框(裁剪到图像内)在窗口坐标系中的位置
-            inner_rect = (
-                max(0, x1_exp) - wx1,
-                max(0, y1_exp) - wy1,
-                min(width, x2_exp) - wx1,
-                min(height, y2_exp) - wy1,
-            )
+            inner_rect = (mx1 - wx1, my1 - wy1, mx2 - wx1, my2 - wy1)
             local_mask_np = feathered_rect_mask(wy2 - wy1, wx2 - wx1, inner_rect, feather)
             local_mask_tensor = torch.from_numpy(local_mask_np)
             region = combined_full_mask[wy1:wy2, wx1:wx2]

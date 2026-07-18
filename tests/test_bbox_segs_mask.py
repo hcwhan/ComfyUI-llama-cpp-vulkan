@@ -2,7 +2,8 @@
 
 覆盖: 坐标裁剪, dilation/crop_factor 几何, SEG 字段组装 (Impact Pack 兼容),
 无效框逐个跳过, 零面积框 + dilation 两节点行为一致, 多帧取首帧,
-mask 的羽化衰减与多框 maximum 合成, segs 羽化与 mask 节点衰减一致, 恒 CPU 输出.
+mask 的羽化衰减与多框 maximum 合成, segs 羽化与 mask 节点衰减一致, 恒 CPU 输出,
+mask 的出界告警不被羽化 margin 绕过 (与 segs 口径一致).
 """
 
 import unittest
@@ -14,6 +15,7 @@ from tests import comfy_stubs
 
 comfy_stubs.install()
 
+from src.i18n.lang import LANG  # noqa: E402
 from src.nodes.bbox.node_bboxes_to_mask import bboxes_to_mask  # noqa: E402
 from src.nodes.bbox.node_bboxes_to_segs import bboxes_to_segs  # noqa: E402
 
@@ -144,6 +146,18 @@ class TestBBoxesToMask(unittest.TestCase):
 
     def test_invalid_and_outside_boxes_skipped(self):
         mask = self._process([(1, 2, 3), (40, 40, 50, 50)])
+        self.assertEqual(mask.sum().item(), 0.0)
+
+    def test_outside_box_near_edge_warns_with_feather(self):
+        # 回归: 修复前出界判定作用在扩了羽化 margin (= 4*feather+1) 的窗口上,
+        # feather > 0 且 bbox 完全出界但距图缘不足 margin 时窗口被撑成非空,
+        # 无效框静默跳过 (无告警且白跑一次高斯滤波); 修复后判定作用在不含
+        # margin 的扩张框上, 与 bboxes_to_segs 口径一致, 恒告警
+        bbox = (517, 10, 527, 20)
+        with self.assertLogs("llama-cpp-vulkan", level="WARNING") as logs:
+            mask = self._process([bbox], feather=3, w=512)
+        expected = LANG["logs"]["bbox"]["bbox_out_of_bounds"].format(bbox=bbox)
+        self.assertTrue(any(expected in m for m in logs.output))
         self.assertEqual(mask.sum().item(), 0.0)
 
     def test_overlapping_boxes_max_combined(self):
