@@ -19,12 +19,20 @@ from src.nodes.model.node_loaders import (  # noqa: E402
 
 # 报错文案以语言文件为单一真源, 断言随语言文件自动跟随
 _MODEL_NOT_SELECTED = re.escape(LANG["nodes"]["model"]["common"]["errors"]["model_not_selected"])
+_MODEL_NOT_FOUND = re.escape(LANG["common"]["storage_errors"]["model_not_found"].format(model="m.gguf"))
 
 
 class TestLlmLoaderValidation(unittest.TestCase):
     def test_model_none_rejected(self):
         with self.assertRaisesRegex(ValueError, _MODEL_NOT_SELECTED):
             llama_cpp_llm_model_loader().loadmodel(_AUTO, "None", 8192, -1)
+
+    def test_missing_model_file_rejected(self):
+        # resolve_config 接线的回归保护: 不 mock get_llm_full_path (替身的
+        # 路径查找恒为 None), model_not_found 只能由 loadmodel 内的
+        # resolve_config(config) 调用抛出; 若删除该调用, 本用例失败
+        with self.assertRaisesRegex(FileNotFoundError, _MODEL_NOT_FOUND):
+            llama_cpp_llm_model_loader().loadmodel(_AUTO, "m.gguf", 8192, -1)
 
     def test_valid_config_returned(self):
         with mock.patch.object(storage, "get_llm_full_path", lambda name: f"/fake/{name}"):
@@ -55,6 +63,12 @@ class TestVlmLoaderValidation(unittest.TestCase):
     def test_max_tokens_below_min_rejected(self):
         with self.assertRaisesRegex(ValueError, "image_max_tokens"):
             self._load(min_t=64, max_t=32)
+
+    def test_missing_model_file_rejected(self):
+        # resolve_config 接线的回归保护, 同 LLM 侧用例: 不 mock
+        # get_llm_full_path, model_not_found 只能经 resolve_config 抛出
+        with self.assertRaisesRegex(FileNotFoundError, _MODEL_NOT_FOUND):
+            self._load()
 
     def test_zero_max_tokens_means_unset(self):
         # max=0 视为未设置, 不与 min 做区间比较 (与 handler 侧同一条件)
