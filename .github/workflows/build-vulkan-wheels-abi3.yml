@@ -157,7 +157,8 @@ jobs:
             Write-Error "Wheel filename missing +vulkan local version: $($wheelFile.Name)"
             exit 1
           }
-          # Linux 侧由 cibuildwheel/auditwheel 天然校验平台 tag, Windows 侧手动核对
+          # abi3 tag 两平台均须显式校验 (auditwheel 只校验 manylinux 平台 tag,
+          # 不覆盖 python/abi tag 维度); Linux 侧同口径校验见 Verify wheels 步骤
           if ($wheelFile.Name -notmatch "$($env:ABI3_MIN_CPYTHON)-abi3-win_amd64") {
             Write-Error "Wheel filename missing abi3 platform tag ($($env:ABI3_MIN_CPYTHON)-abi3-win_amd64): $($wheelFile.Name)"
             exit 1
@@ -261,6 +262,10 @@ jobs:
         run: |
           ls -la wheelhouse/
           ls wheelhouse/*+vulkan*.whl
+          # 显式校验 abi3 tag, 与 Windows 侧校验口径对齐: auditwheel 只校验
+          # manylinux 平台 tag, 若 SKBUILD_WHEEL_PY_API 因上游变化失效 (产出
+          # cp312-cp312 wheel) 无法拦截; glob 无命中时 ls 非零退出使本步失败
+          ls wheelhouse/*${{ env.ABI3_MIN_CPYTHON }}-abi3-manylinux*.whl
 
       # Smoke test: install the repaired wheel and import it, catching
       # packaging breakage (auditwheel over-stripping, bad RECORD) before
