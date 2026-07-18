@@ -6,6 +6,7 @@
   模板常量, 拆分正则与生成模板同源 (common_static), 同改共错时唯有
   字面量断言能报出
 - 逐张模式: 单图输出不加前缀行
+- 逐张模式: 第 i 次请求的 messages 携带第 i 张图 (image_url 逐张原位注入)
 - 逐张模式: 中断置位时循环立即抛 InterruptProcessingException, 不再发起请求
 - 逐张模式: increment_seed 关闭 (默认) 时各请求复用同一 seed, 开启时第 i 张
   用 seed+i 派生, 且回绕避开 llama.cpp 的随机种子哨兵值 0xFFFFFFFF
@@ -40,13 +41,14 @@ from src.shared.text_utils import split_image_results  # noqa: E402
 
 
 class _FakeVlm:
-    """process() 全链路所需的最小 llm 替身: 逐次返回预置文本, 附 _run 收尾判定属性."""
+    """process() 全链路所需的最小 llm 替身: 逐次返回预置文本, 记录每次请求的 seed 与 image_url 快照, 附 _run 收尾判定属性."""
 
     def __init__(self, outputs):
         self._outputs = list(outputs)
         self.calls = 0
         self.seeds = []
         self.last_messages = None
+        self.image_urls = []
         self.n_tokens = 0
         self._model = types.SimpleNamespace(is_hybrid=lambda: False, is_recurrent=lambda: False)
         self._ctx = mock.Mock()
@@ -57,6 +59,11 @@ class _FakeVlm:
 
     def create_chat_completion(self, messages, seed, **params):
         self.last_messages = messages
+        # 逐张模式跨请求原位改写同一 messages 列表, image_url 必须在请求
+        # 时刻提取字符串快照, 事后读 last_messages 只能看到最后一张的 url
+        self.image_urls.append(
+            [item["image_url"]["url"] for m in messages if m["role"] == "user" for item in m["content"] if item["type"] == "image_url"]
+        )
         self.seeds.append(seed)
         text = self._outputs[self.calls]
         self.calls += 1
@@ -70,6 +77,12 @@ def _png_size(content_item):
     """image_url 内容项的 data URL -> PNG 实际 (宽, 高), 用于断言缩放行为."""
     b64 = content_item["image_url"]["url"].split(",", 1)[1]
     return Image.open(io.BytesIO(base64.b64decode(b64))).size
+
+
+def _png_pixel(url):
+    """image_url 的 data URL -> PNG (0, 0) 像素 R 通道值, 用于区分请求携带的是哪张图."""
+    b64 = url.split(",", 1)[1]
+    return Image.open(io.BytesIO(base64.b64decode(b64))).getpixel((0, 0))[0]
 
 
 class _ImageInstructTestBase(unittest.TestCase):
@@ -125,6 +138,17 @@ class TestImageInstructInferEach(_ImageInstructTestBase):
         self.assertEqual(llm.calls, 1)
         self.assertEqual(out, "唯一结果")
         self.assertEqual(split_image_results(out), ["唯一结果"])
+
+    def test_each_request_carries_matching_image(self):
+        # 三张图分别灌入 0.0/0.5/1.0 (uint8 0/127/255), 断言第 i 次请求恰携带
+        # 1 个 image_url 且解码像素对应第 i 张图; 若逐张注入行失效 (image_url
+        # 恒为空串或恒为第一张), 解码报错或像素序列不符, 本断言即报出
+        llm = _FakeVlm(["a", "b", "c"])
+        self._install(llm)
+        images = torch.stack([torch.full((4, 4, 3), i / 2.0) for i in range(3)])
+        self._process(images)
+        self.assertEqual([len(urls) for urls in llm.image_urls], [1, 1, 1])
+        self.assertEqual([_png_pixel(urls[0]) for urls in llm.image_urls], [0, 127, 255])
 
     def test_same_seed_reused_by_default(self):
         llm = _FakeVlm(["a", "b"])
