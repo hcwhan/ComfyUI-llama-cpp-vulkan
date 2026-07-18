@@ -1,4 +1,4 @@
-"""Unpack Code Block 节点, 去除 LLM 输出首尾的代码围栏标记."""
+"""Unpack Code Block 节点, 去除 LLM 输出首尾的代码围栏标记; 围栏块外有前导/尾随说明时, 回退为提取文本中第一个完整围栏块的内容."""
 
 from ...i18n.common_static import CATEGORY as _CATEGORY
 from ...i18n.lang import LANG

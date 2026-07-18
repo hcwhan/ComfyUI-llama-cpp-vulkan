@@ -1,7 +1,7 @@
 """测试专用: 在导入 src 包之前注入 comfy/folder_paths/server 的最小替身模块.
 
 src 的部分模块在 import 时就访问 ComfyUI 运行时(注册模型目录, monkey-patch
-卸载钩子, 取 ProgressBar 类), 测试进程没有 ComfyUI, 用替身满足 import 期依赖.
+卸载钩子, import comfy.utils), 测试进程没有 ComfyUI, 用替身满足 import 期依赖.
 另将 i18n 的插件根 settings.json 路径重定向出仓库根, 隔离语言解析的持久化
 状态(理由见 install 内注释). llama_cpp 使用真实安装(纯函数测试不触发推理).
 """

@@ -44,7 +44,7 @@ select = [
 ignore = [
     # 中文文案与模板字符串天然超长, 行宽只约束代码行, 长字符串不折行
     "E501",
-    # ComfyUI 节点类的 INPUT_TYPES/IS_CHANGED 等钩子由框架调用, 复杂度阈值不适用
+    # ComfyUI 节点类的 process/loadmodel 等入口由框架调用, 复杂度阈值不适用
     "PLR0913", # 参数过多: Instruct 节点入口需铺开全部采样参数
     "PLR0912", # 分支过多
     "PLR0915", # 语句过多

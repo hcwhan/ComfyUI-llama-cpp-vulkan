@@ -75,8 +75,8 @@ class parse_json_node:
             boolean = str(val).strip().lower() == "true"
 
         # dict/list 输出合法 JSON 文本而非 Python repr, 下游可再接 Parse JSON;
-        # key 未命中且未连 default 时 val 为 None, string 输出回退空串,
-        # 避免字面 "None" 被下游当作有效文本拼进 prompt
+        # val 为 None (key 未命中且未连 default, 或 key 命中的 JSON 值为字面 null)
+        # 时 string 输出回退空串, 避免字面 "None" 被下游当作有效文本拼进 prompt
         if isinstance(val, (dict, list)):
             string = json.dumps(val, ensure_ascii=False)
         elif val is None:
@@ -84,6 +84,6 @@ class parse_json_node:
         else:
             string = str(val)
 
-        # key 未命中且未连 default 时 val 为 None, type_name 显示 NoneType
+        # val 为 None (key 未命中且未连 default, 或 JSON 值为字面 null) 时 type_name 显示 NoneType
         logger.info(_PREFIX + _LOGS["parse_json"].format(key=key, type_name=type(val).__name__, chars=len(string)))
         return (val, string, integer, number, boolean)

@@ -163,7 +163,8 @@ class TestResolveLanguage(unittest.TestCase):
 
 class TestLocaleMappingContract(unittest.TestCase):
     def test_mapping_targets_have_language_files(self):
-        # 映射表指向的语言文件必须真实存在, 否则运行期会打回退 warning
+        # 映射表指向的语言文件必须真实存在: 非默认语言缺失运行期打回退
+        # warning, 默认语言 (en-US) 缺失直接抛 FileNotFoundError
         for lang_code in set(lang._LOCALE_TO_LANGUAGE.values()):
             with self.subTest(language=lang_code):
                 self.assertTrue((lang._I18N_DIR / f"language_{lang_code}.py").is_file())

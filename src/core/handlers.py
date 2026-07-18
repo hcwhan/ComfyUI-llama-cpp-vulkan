@@ -20,7 +20,7 @@ _LOGS = LANG["logs"]["handlers"]
 # 哨兵消费点统一按相等比较(==/in/dict-get), 勿用 is(字符串同一性依赖
 # CPython 驻留实现细节)
 THINK_UNSUPPORTED = "unsupported"  # 不支持思考: thinking 恒按关处理
-THINK_FORCED = "forced"  # 强制思考(模板固定输出思考块): thinking 恒按开处理
+THINK_FORCED = "forced"  # 强制思考(模型恒输出思考块, 模板无开关): thinking 恒按开处理
 
 # 显示名 -> (类名, 构造 kwargs, thinking 三态). kwargs 为构造 handler 时固定
 # 注入的参数(Generic 的 chat_format 等), None 表示不注入任何参数;
@@ -41,7 +41,7 @@ _HANDLER_SPECS = {
     "Qwen2.5-VL": ("Qwen25VLChatHandler", None, THINK_UNSUPPORTED),
     # ---- GLM ----
     "GLM-4.6V": ("GLM46VChatHandler", None, "enable_thinking"),
-    # GLM41VChatHandler 不接受思考开关参数 (模板固定输出 thinking 块),
+    # GLM41VChatHandler 不接受思考开关参数 (模型恒输出思考块, 模板无开关),
     # "-Thinking" 后缀描述模型本身
     "GLM-4.1V-Thinking": ("GLM41VChatHandler", None, THINK_FORCED),
     # ---- Gemma ----
@@ -128,7 +128,7 @@ def handler_constructor(label, thinking):
     """返回按三态绑定 thinking 后的 handler 构造器 (label 不在 HANDLERS 时抛 KeyError, 含未知名字与注册过但 wheel 缺类两种情形).
 
     可切换档把开关值绑到声明的参数名上; 不支持/强制档的类没有开关参数,
-    原样返回构造器 (强制档的思考由模板固化, 无需传参).
+    原样返回构造器 (强制档的模型恒输出思考块, 无需传参).
     """
     ctor = HANDLERS[label]
     think = _HANDLER_SPECS[label][2]

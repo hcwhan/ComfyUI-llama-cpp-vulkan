@@ -112,7 +112,9 @@ image 逐张模式的多图结果以 "======== Image N ========" 前缀行拼接
                           +--> bboxes_to_segs / bboxes_to_mask  (下游图像处理)
 ```
 
-`llama_cpp_unload_model` 为 any 透传节点, 可串接在任意连线上, 不参与上图数据流.
+`json_to_bboxes` 另有第二输出端口 `image_list`(IMAGE, 画框预览图), 上图未画.
+
+`llama_cpp_unload_model` 为 any 透传节点, 可串接在任意连线上, 不参与上图数据流. 全部 Instruct 另有 optional 输入 `queue_handler`(any 类型), 仅以连线强制本节点在所连上游完成后执行, 值不参与推理, 亦不参与上图数据流.
 
 `LLAMACPPLLM`(LLM Loader 输出)与 `LLAMACPPVLM`(VLM Loader 输出)完全独立: llm 配置只能连 text Instruct, vlm 配置只能连 image/video/audio Instruct, 连错在连线阶段即被 ComfyUI 类型系统拦截. 两种配置 dict 结构相同(llm 侧 mmproj/chat_handler 固定为 "None", thinking 固定 False), 底层共用 `core/storage.py` 的加载路径.
 
@@ -154,7 +156,7 @@ image 逐张模式的多图结果以 "======== Image N ========" 前缀行拼接
 - text Instruct 的 `allow_thinking` 开关(默认关)放 Instruct 而非 LLM Loader: text 侧 wheel 无模板级开关, `reasoning_budget` 采样器是唯一通用机制(请求期参数, 切换零成本); 与 vlm 侧构造期 thinking 开关(切换需重载)的位置不对称是机制差异的忠实反映. 模板预注入 `<think>` 的形态(Qwen3.5 等, 采样器等不到生成的开标签)由 `instruct.py` 的 `think_open_preinjected()` 渲染 GGUF 内嵌模板探测识别, 命中时改传 `reasoning_start_in_prompt=True` 使采样器直接强制闭合. 折算与失效边界见 text 节点内注释
 - `strip_thinking` 开关(默认开)剥离三种思考形态(`<think>` 推理块, Gemma4 channel 格式, GLM-4.1V `<answer>` 包裹), 各形态成因与未闭合处理见 `instruct.py` 剥离函数 docstring
 - `InterruptWatcher`: 推理期间轮询 ComfyUI 中断标志, 命中后 `Llama.abort()` 立即停止生成, 抗竞态细节见类 docstring
-- 每次节点执行结束后按 `is_hybrid_arch()` 判断是否整体重置 KV cache: hybrid/recurrent 架构(Qwen3.5, LFM2 系等)的线性注意力状态无法跨请求前缀复用; 纯 SWA 模型(Gemma3)不受影响. 重置时机与逐张模式的例外见 `_run()` finally 处注释
+- 每次节点执行结束后, `force_offload` 关闭时按 `is_hybrid_arch()` 判断是否整体重置 KV cache(开启时直接整体卸载模型, 不做该判断): hybrid/recurrent 架构(Qwen3.5, LFM2 系等)的线性注意力状态无法跨请求前缀复用; 纯 SWA 模型(Gemma3)不受影响. 重置时机与逐张模式的例外见 `_run()` finally 处注释
 
 ## 修改代码须知
 

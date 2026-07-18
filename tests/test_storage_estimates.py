@@ -60,7 +60,7 @@ class TestEstimateNGpuLayers(unittest.TestCase):
         return self._write_temp(data)
 
     def _write_sparse(self, size):
-        """稀疏文件: 估算函数只用 os.path.getsize, 无需真实写入 size 字节."""
+        """按 size 截断的占位文件: 估算函数只用 os.path.getsize, 无需真实写入 size 字节."""
         fd, path = tempfile.mkstemp(suffix=".gguf")
         with os.fdopen(fd, "wb") as f:
             f.seek(size - 1)
@@ -69,7 +69,7 @@ class TestEstimateNGpuLayers(unittest.TestCase):
         return path
 
     def _sparse_model(self, block_count, size):
-        """带 GGUF 头的稀疏大模型文件: 层数可控, 体积由 getsize 决定."""
+        """带 GGUF 头的按 size 截断的大体积占位模型文件: 层数可控, 体积由 getsize 决定."""
         data = _minimal_gguf_bytes(block_count)
         fd, path = tempfile.mkstemp(suffix=".gguf")
         with os.fdopen(fd, "wb") as f:
@@ -86,7 +86,7 @@ class TestEstimateNGpuLayers(unittest.TestCase):
         self.assertEqual(_n_gpu_layers(self._model_path(), None, 0, 8192), (0, False))
 
     def test_budget_fits_all_layers_capped_by_estimate(self):
-        # 32 层 x 32MB 文件, 预算远大于折算体积, 折算层数应超过实际层数(由 llama.cpp 截断)
+        # 32 层 x 32MB 文件, 预算远大于折算体积, 折算层数应不低于实际层数(超出部分由 llama.cpp 截断)
         path = self._model_path(block_count=32, pad_to_bytes=32 * 1024 * 1024)
         n_layers, _mmproj_on_gpu = _n_gpu_layers(path, None, 8, 8192)
         self.assertGreaterEqual(n_layers, 32)

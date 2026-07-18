@@ -19,7 +19,8 @@ for _key in _LLM_FOLDER_KEYS:
     # 已被其他插件注册, 其集合可能与 checkpoints/loras 等约 20 个内置键共享
     # 同一 set 实例 (supported_pt_extensions), 原位写入会把 .gguf 泄漏进全部
     # 内置下拉框. set(_exts) 同时兼容第三方以 list/tuple 形态注册的键;
-    # _paths 沿用原列表引用, extra_model_paths.yaml 的后续注册不受影响
+    # _paths 沿用原列表引用, 之后加载的其他插件对同键 add_model_folder_path
+    # 的路径追加仍生效
     folder_paths.folder_names_and_paths[_key] = (_paths, set(_exts) | llm_extensions)
 
 # import 期打一条搜索目录清单 ("下拉框里没有模型" 的排查起点):

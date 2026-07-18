@@ -34,7 +34,7 @@ _DEFAULT_LANGUAGE = "en-US"
 _I18N_DIR = Path(__file__).resolve().parent
 
 # ComfyUI 前端 Comfy.Locale 短码 -> 本目录语言文件后缀. zh-TW 归入 zh-CN
-# (繁体用户读简体优于英语); 其余前端短码 (ja/ko/fr/ru/es) 无对应文案,
+# (繁体用户读简体优于英语); 其余前端短码 (ja/ko/fr 等) 无对应文案,
 # 与检测失败一并落默认英语
 _LOCALE_TO_LANGUAGE = {
     "en": "en-US",
