@@ -18,11 +18,17 @@ from src.i18n import locale_settings  # noqa: E402
 
 
 class _FakeRequest:
-    def __init__(self, payload=None, raw_text=None):
+    def __init__(self, payload=None, raw_text=None, raw_bytes=None, charset=None):
         self._payload = payload
         self._raw_text = raw_text
+        self._raw_bytes = raw_bytes
+        self._charset = charset
 
     async def json(self):
+        if self._raw_bytes is not None:
+            # 复刻 aiohttp json() 经 text() 按 Content-Type charset 解码的路径:
+            # 未知 charset 使 bytes.decode 抛 LookupError (非 ValueError 子类)
+            return json.loads(self._raw_bytes.decode(self._charset or "utf-8"))
         if self._raw_text is not None:
             return json.loads(self._raw_text)
         return self._payload
@@ -53,6 +59,14 @@ class TestFrontendLocaleRoute(unittest.TestCase):
 
     def test_invalid_json_rejected(self):
         response = self._post(raw_text="{not valid json")
+        self.assertEqual(response.status, 400)
+        self.assertFalse(self.path.is_file())
+
+    def test_bogus_charset_rejected(self):
+        # 回归: 请求头伪造未知 charset (application/json; charset=bogus) 时
+        # json() 解码抛 LookupError, 修复前不被 except ValueError 捕获, aiohttp
+        # 将 handler 异常转为 500; 应视同入参非法返回 400 且不落盘
+        response = self._post(raw_bytes=b'{"locale": "zh"}', charset="bogus")
         self.assertEqual(response.status, 400)
         self.assertFalse(self.path.is_file())
 

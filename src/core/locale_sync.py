@@ -27,7 +27,8 @@ _MAX_LOCALE_LENGTH = 16
 async def _set_frontend_locale(request):
     try:
         payload = await request.json()
-    except ValueError:
+    except (ValueError, LookupError):
+        # LookupError: json() 按 Content-Type 的 charset 解码请求体, 伪造未知 charset 时抛出
         return web.Response(status=400)
     locale = payload.get("locale") if isinstance(payload, dict) else None
     if not isinstance(locale, str) or not locale or len(locale) > _MAX_LOCALE_LENGTH:
