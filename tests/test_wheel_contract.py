@@ -37,6 +37,16 @@ class TestWheelPrivateApiContract(unittest.TestCase):
         for attr in ("self.n_tokens", "self._ctx", "self._model", "self._hybrid_cache_mgr", "self.chat_format", "self.metadata"):
             self.assertIn(attr, source)
 
+    def test_hybrid_cache_mgr_clear(self):
+        # instruct._run() 的 hybrid 重置路径直接调 llm._hybrid_cache_mgr.clear();
+        # 属性名本身由 test_instance_attributes_assigned_in_llama_source 锁定,
+        # 这里锁定其绑定类型 (Llama.__init__ 中赋值为 HybridCheckpointCache
+        # 实例或 None) 与该类 clear 方法的存在性
+        from llama_cpp.llama_cache import HybridCheckpointCache
+
+        self.assertIn("self._hybrid_cache_mgr = HybridCheckpointCache(", inspect.getsource(Llama))
+        self.assertTrue(callable(HybridCheckpointCache.clear))
+
     def test_mmproj_path_instance_attribute_in_handler_source(self):
         # instruct.require_mmproj 经 getattr(handler, "mmproj_path", None) 判定
         # mmproj 是否配置: 属性被 wheel 重命名不会立刻报错, 而是恒判 "未配置"
