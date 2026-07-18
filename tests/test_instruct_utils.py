@@ -9,7 +9,7 @@ from tests import comfy_stubs
 
 comfy_stubs.install()
 
-from src.core import instruct  # noqa: E402
+from src.core import instruct, prompts  # noqa: E402
 from src.core.instruct import strip_thinking_blocks  # noqa: E402
 from src.core.prompts import instruct_presets, preset_content  # noqa: E402
 from src.core.storage import LLAMA_CPP_STORAGE  # noqa: E402
@@ -424,6 +424,13 @@ class TestPresetConfig(unittest.TestCase):
         expected = re.escape(LANG["nodes"]["instruct"]["common"]["errors"]["unknown_preset_prompt"].format(name="不存在的预设"))
         with self.assertRaisesRegex(ValueError, expected):
             preset_content("不存在的预设")
+
+    def test_preset_missing_content_raises_key_error(self):
+        # 回归: spec 缺 content 键是开发期配置错误, 修复前被 except KeyError
+        # 一并罩住, 转成 unknown_preset_prompt 的 "未知的预设" 报错, 指引用户
+        # 重选下拉框, 与实际原因相悖; 现应原样抛 KeyError 暴露真实原因
+        with mock.patch.dict(prompts.user_prompt_presets, {"缺content的预设": {"use": ["text"]}}), self.assertRaises(KeyError):
+            preset_content("缺content的预设")
 
 
 if __name__ == "__main__":

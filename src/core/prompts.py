@@ -104,9 +104,10 @@ def preset_content(name):
 
     预设改名/删除后, 经连线传入的旧工作流值可能失配 (widget 常量会先被
     ComfyUI 的 combo 前置校验拦截), 报错与 resolve_config 的 unknown
-    handler 风格对齐, 不暴露裸 KeyError.
+    handler 风格对齐, 不暴露裸 KeyError; spec 缺 content 键属开发期
+    配置错误, 不归入此类, 原样抛 KeyError 暴露真实原因.
     """
-    try:
-        return user_prompt_presets[name]["content"]
-    except KeyError:
-        raise ValueError(LANG["nodes"]["instruct"]["common"]["errors"]["unknown_preset_prompt"].format(name=name)) from None
+    spec = user_prompt_presets.get(name)
+    if spec is None:
+        raise ValueError(LANG["nodes"]["instruct"]["common"]["errors"]["unknown_preset_prompt"].format(name=name))
+    return spec["content"]
