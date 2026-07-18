@@ -18,7 +18,14 @@ _JSON_ONE_BOX = '[{"bbox_2d": [1, 1, 4, 4], "label": "a"}]'
 
 
 def _frames(batch_sizes, size=16):
-    return [torch.zeros((n, size, size, 3), dtype=torch.float32) for n in batch_sizes]
+    # 逐帧灌入互不相同的像素值(跨批次连续编号), 逐值断言可区分帧来源;
+    # 0.11 的倍数经画框路径的 uint8 往返不保值, 画过框的帧冒充不了原帧
+    frames = []
+    index = 1
+    for n in batch_sizes:
+        frames.append(torch.stack([torch.full((size, size, 3), 0.11 * (index + k), dtype=torch.float32) for k in range(n)]))
+        index += n
+    return frames
 
 
 class TestJsonToBBoxesRestructure(unittest.TestCase):
@@ -38,6 +45,12 @@ class TestJsonToBBoxesRestructure(unittest.TestCase):
         bboxes, image_list = self._process(3, [2, 2])
         self.assertEqual(len(bboxes), 3)
         self.assertEqual([b.shape[0] for b in image_list], [2, 2])
+        # 4 帧中前 3 帧配对画框, 末帧未配对; _frames 确定性, 重建一份作为输入的期望值
+        expected = _frames([2, 2])
+        # 前提自证: 配对帧确实被画框路径改写, 逐值相等断言才有区分度
+        self.assertFalse(torch.equal(image_list[1][0], expected[1][0]))
+        # 未配对帧与输入逐值相等, 锁定 "原样不画框" 的内容而非只锁形状
+        self.assertTrue(torch.equal(image_list[1][1], expected[1][1]))
 
     def test_single_json_many_frames(self):
         bboxes, image_list = self._process(1, [2, 2])
