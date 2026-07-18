@@ -13,7 +13,7 @@ comfy_stubs.install()
 
 from server import PromptServer  # noqa: E402
 
-from src.core import locale_sync  # noqa: E402, F401  (import 即注册路由到替身)
+from src.core import locale_sync  # noqa: E402  (import 即注册路由到替身)
 from src.i18n import locale_settings  # noqa: E402
 
 
@@ -89,6 +89,13 @@ class TestFrontendLocaleRoute(unittest.TestCase):
         response = self._post(payload={"locale": ""})
         self.assertEqual(response.status, 400)
         self.assertFalse(self.path.is_file())
+
+    def test_max_length_locale_accepted(self):
+        # 长度恰为 _MAX_LOCALE_LENGTH 的合法边界值: 校验为 >, 若回归成 >= 此用例检出
+        locale = "x" * locale_sync._MAX_LOCALE_LENGTH
+        response = self._post(payload={"locale": locale})
+        self.assertEqual(response.status, 200)
+        self.assertEqual(locale_settings.get_language_setting("frontend_locale"), locale)
 
     def test_overlong_locale_rejected(self):
         response = self._post(payload={"locale": "x" * (locale_sync._MAX_LOCALE_LENGTH + 1)})
