@@ -47,8 +47,8 @@ class TestExtensionSetRebuild(unittest.TestCase):
     def test_list_extensions_rebuilt_as_set(self):
         # 键已被其他插件以 (paths, list) 形态注册时, import 期须重建为 set
         # 并合并 .gguf, 避免 AttributeError 使整个插件加载失败
-        original = dict(folder_paths.folder_names_and_paths)
-        self.addCleanup(folder_paths.folder_names_and_paths.update, original)
+        # patch.dict 退出时先 clear 再回填快照, 测试新增键不残留于进程级替身 dict
+        self.enterContext(mock.patch.dict(folder_paths.folder_names_and_paths))
         folder_paths.folder_names_and_paths["llm"] = (["/x"], [".bin"])
         folder_paths.folder_names_and_paths["LLM"] = (["/x"], {".gguf"})
 
@@ -63,8 +63,8 @@ class TestExtensionSetRebuild(unittest.TestCase):
         # 集合 (最典型是 supported_pt_extensions, ComfyUI 约 20 个内置键共用
         # 同一 set 实例). 本插件须复制重建而非原位 update, 否则 .gguf 会
         # 泄漏进 checkpoints/loras 等全部内置下拉框
-        original = dict(folder_paths.folder_names_and_paths)
-        self.addCleanup(folder_paths.folder_names_and_paths.update, original)
+        # patch.dict 退出时先 clear 再回填快照, 测试新增键不残留于进程级替身 dict
+        self.enterContext(mock.patch.dict(folder_paths.folder_names_and_paths))
         shared = {".safetensors"}
         folder_paths.folder_names_and_paths["checkpoints"] = (["/ckpt"], shared)
         folder_paths.folder_names_and_paths["llm"] = (["/x"], shared)
