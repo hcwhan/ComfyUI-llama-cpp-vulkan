@@ -1,4 +1,4 @@
-"""src/core/devices.py 的单元测试: 显式选卡翻译与回退, log_backend_summary 文案分支."""
+"""src/core/devices.py 的单元测试: 显式选卡翻译与回退, _selectable_devices 选取规则, log_backend_summary 文案分支."""
 
 import unittest
 
@@ -33,15 +33,21 @@ class TestResolveDeviceSelection(unittest.TestCase):
         self.assertEqual(devices.resolve_device_selection(label), (0, devices.SPLIT_MODE_NONE))
 
     def test_igpu_label_falls_back_when_dgpu_present(self):
-        # 有独显时核显不在可选列表, 显式传核显 label 回退 Auto
+        # 有独显时核显不在可选列表, 显式传核显 label 回退 Auto 并留警告
         label = devices._device_label(_FAKE_IGPU)
-        self.assertEqual(devices.resolve_device_selection(label), (0, devices.SPLIT_MODE_LAYER))
+        with self.assertLogs("llama-cpp-vulkan", level="WARNING") as logs:
+            self.assertEqual(devices.resolve_device_selection(label), (0, devices.SPLIT_MODE_LAYER))
+        expected = LANG["logs"]["devices"]["device_not_selectable"].format(gpu_device=label)
+        self.assertTrue(any(expected in m for m in logs.output))
 
     def test_unknown_label_falls_back_to_auto(self):
-        self.assertEqual(
-            devices.resolve_device_selection("no such device"),
-            (0, devices.SPLIT_MODE_LAYER),
-        )
+        with self.assertLogs("llama-cpp-vulkan", level="WARNING") as logs:
+            self.assertEqual(
+                devices.resolve_device_selection("no such device"),
+                (0, devices.SPLIT_MODE_LAYER),
+            )
+        expected = LANG["logs"]["devices"]["device_not_selectable"].format(gpu_device="no such device")
+        self.assertTrue(any(expected in m for m in logs.output))
 
     def test_igpu_selectable_when_no_dgpu(self):
         devices._gpu_devices = [_FAKE_IGPU]
@@ -49,7 +55,7 @@ class TestResolveDeviceSelection(unittest.TestCase):
         self.assertEqual(devices.resolve_device_selection(label), (0, devices.SPLIT_MODE_NONE))
 
 
-class TestSelectableDeviceDedup(unittest.TestCase):
+class TestSelectableDevices(unittest.TestCase):
     def setUp(self):
         self._orig = devices._gpu_devices
         self.addCleanup(setattr, devices, "_gpu_devices", self._orig)
@@ -75,6 +81,12 @@ class TestSelectableDeviceDedup(unittest.TestCase):
         devices._gpu_devices = [first, second]
         self.assertEqual(devices._selectable_devices(), [first, second])
 
+    def test_multiple_igpus_only_first_selectable(self):
+        # 无独显时 llama.cpp 只把第一个核显加入 model->devices, 其余核显不可选
+        second_igpu = {"name": "Vulkan2", "desc": "Fake iGPU 2", "type": "IGPU", "device_id": None}
+        devices._gpu_devices = [_FAKE_IGPU, second_igpu]
+        self.assertEqual(devices._selectable_devices(), [_FAKE_IGPU])
+
 
 class TestLogBackendSummary(unittest.TestCase):
     def setUp(self):
@@ -94,6 +106,22 @@ class TestLogBackendSummary(unittest.TestCase):
         with self.assertLogs("llama-cpp-vulkan", level="INFO") as logs:
             devices.log_backend_summary(1, devices.SPLIT_MODE_NONE)
         expected = LANG["logs"]["devices"]["active_gpu"].format(name="Vulkan2", desc="Fake dGPU 2", type="GPU")
+        self.assertTrue(any(expected in m for m in logs.output))
+
+    def test_out_of_range_main_gpu_falls_back_to_first(self):
+        # 防御分支: main_gpu 超出可选列表时按首个设备打日志
+        devices._gpu_devices = [_FAKE_DGPU, _FAKE_DGPU2]
+        with self.assertLogs("llama-cpp-vulkan", level="INFO") as logs:
+            devices.log_backend_summary(9, devices.SPLIT_MODE_NONE)
+        expected = LANG["logs"]["devices"]["active_gpu"].format(name="Vulkan0", desc="Fake dGPU", type="GPU")
+        self.assertTrue(any(expected in m for m in logs.output))
+
+    def test_single_gpu_layer_split_logs_single_device(self):
+        # LAYER 模式单卡不走多卡列表文案, 与显式选卡共用单设备文案
+        devices._gpu_devices = [_FAKE_DGPU]
+        with self.assertLogs("llama-cpp-vulkan", level="INFO") as logs:
+            devices.log_backend_summary(0, devices.SPLIT_MODE_LAYER)
+        expected = LANG["logs"]["devices"]["active_gpu"].format(name="Vulkan0", desc="Fake dGPU", type="GPU")
         self.assertTrue(any(expected in m for m in logs.output))
 
     def test_no_backend_logs_warning(self):
