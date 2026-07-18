@@ -1,5 +1,6 @@
-// web/widget_utils.js 的单元测试: toggleWidget 双轨隐藏语义
-// (hidden 标志 + type/computeSize), 原始值缓存与无变化时的短路返回;
+// web/widget_utils.js 的单元测试: toggleWidget 三轨隐藏语义
+// (canvas 认的实例 hidden 标志 + Vue 层认的 options.hidden + 兼容旧前端的
+// type/computeSize), 原始值缓存与无变化时的短路返回;
 // reflowNode 三种重排模式 (SNAP / 只增不减 / 不动) 与提示词输入框补高.
 
 import assert from "node:assert/strict";
@@ -16,22 +17,25 @@ const makePromptWidget = (minHeight = 50) => ({
     computeLayoutSize: () => ({ minHeight }),
 });
 
-test("隐藏: hidden 标志与 type/computeSize 双轨同时生效", () => {
+test("隐藏: hidden 标志, options.hidden 与 type/computeSize 三轨同时生效", () => {
     const widget = makeWidget("max_size", 256, "number");
     const changed = toggleWidget(widget, false);
     assert.equal(changed, true);
     assert.equal(widget.hidden, true);
+    // 回归: 旧实现不写 options.hidden, Vue 渲染层 (Nodes 2.0) 只认该轨, 隐藏失效
+    assert.equal(widget.options.hidden, true);
     assert.equal(widget.type, "hidden");
     assert.deepEqual(widget.computeSize(), [0, -4]);
 });
 
-test("重新显示: 恢复原始 type 与 computeSize", () => {
+test("重新显示: 三轨全部恢复", () => {
     const widget = makeWidget("max_size", 256, "number");
     const origComputeSize = widget.computeSize;
     toggleWidget(widget, false);
     const changed = toggleWidget(widget, true);
     assert.equal(changed, true);
     assert.equal(widget.hidden, false);
+    assert.equal(widget.options.hidden, false);
     assert.equal(widget.type, "number");
     assert.equal(widget.computeSize, origComputeSize);
 });

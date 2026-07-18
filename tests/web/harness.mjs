@@ -33,11 +33,13 @@ export const loadWebModule = async (name) => {
 export { extensions, settingValues } from "./comfy_app_stub.mjs";
 export { fetchApiCalls, setFetchApiError } from "./comfy_api_stub.mjs";
 
-// 与 ComfyUI 前端 widget 对象的最小对齐: name/value/type/computeSize/callback
+// 与 ComfyUI 前端 widget 对象的最小对齐: name/value/type/options/computeSize/callback
+// (真实前端 addWidget 保证 options 恒为对象, toggleWidget 依赖该形状写 options.hidden)
 export const makeWidget = (name, value, type = "number") => ({
     name,
     value,
     type,
+    options: {},
     computeSize: () => [100, 20],
     callback: undefined,
 });

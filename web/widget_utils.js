@@ -1,7 +1,9 @@
 // 前端 widget 联动的共用工具 (被 vlm_loader.js / image_instruct.js 引用).
 
-// 隐藏需 hidden 标志与 type="hidden" + 零高度 computeSize 双管齐下:
-// 新前端的 Vue 渲染层认 hidden 标志, canvas 布局认 type/computeSize.
+// 隐藏三轨同写, 对齐前端 1.45.20 的两条渲染链路与旧前端:
+// canvas 的布局/绘制/命中认实例 hidden 标志; Vue 渲染层 (Nodes 2.0) 只认
+// options.hidden, 不读实例标志; type="hidden" + 零高度 computeSize 在
+// 当前版本无独立判定点, 作为兼容旧前端的历史轨道保留.
 // 不动 serialize, 隐藏值仍按声明序序列化. 返回是否发生切换
 export const toggleWidget = (widget, show) => {
     if (widget.__origType === undefined) {
@@ -13,6 +15,7 @@ export const toggleWidget = (widget, show) => {
         return false;
     }
     widget.hidden = !show;
+    widget.options.hidden = !show;
     widget.type = show ? widget.__origType : "hidden";
     widget.computeSize = show ? widget.__origComputeSize : () => [0, -4];
     return true;
