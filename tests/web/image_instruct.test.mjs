@@ -18,17 +18,20 @@ const MODE_EACH = "Per-Image";
 const MODE_BATCH = "Batch";
 
 // 模块级 eachModeValue/batchModeValue 在每个测试开头显式重置, 测试之间互不泄漏
-const registerDef = (options = { each_mode_value: MODE_EACH, batch_mode_value: MODE_BATCH }) => {
+const registerDef = (
+    options = { each_mode_value: MODE_EACH, batch_mode_value: MODE_BATCH },
+    name = NODE_NAME,
+) => {
     ext.beforeRegisterNodeDef(null, {
-        name: NODE_NAME,
+        name,
         input: { required: { mode: [[MODE_EACH, MODE_BATCH], options] } },
     });
 };
 
-const createNode = (modeValue) => {
+const createNode = (modeValue, { incrementSeed = false } = {}) => {
     const node = makeNode(NODE_NAME, [
         makeWidget("mode", modeValue, "combo"),
-        makeWidget("increment_seed", false, "toggle"),
+        makeWidget("increment_seed", incrementSeed, "toggle"),
         makeWidget("max_size", 256, "number"),
     ]);
     ext.nodeCreated(node);
@@ -63,7 +66,8 @@ test("Batch 档创建: max_size 可见, increment_seed 隐藏", () => {
 
 test("切换 mode: 显隐互补随动且值保留, 无变化时不重排", () => {
     registerDef();
-    const node = createNode(MODE_BATCH);
+    // increment_seed 初始用非默认值 true, 使 "值保留" 断言与默认值区分开
+    const node = createNode(MODE_BATCH, { incrementSeed: true });
     switchMode(node, MODE_EACH);
     assert.equal(findWidget(node, "max_size").type, "hidden");
     assert.equal(findWidget(node, "increment_seed").type, "toggle");
@@ -74,7 +78,7 @@ test("切换 mode: 显隐互补随动且值保留, 无变化时不重排", () =>
     assert.equal(findWidget(node, "max_size").type, "number");
     assert.equal(findWidget(node, "max_size").value, 256);
     assert.equal(findWidget(node, "increment_seed").type, "hidden");
-    assert.equal(findWidget(node, "increment_seed").value, false);
+    assert.equal(findWidget(node, "increment_seed").value, true);
     assert.equal(node.setSizeCalls, 3);
 });
 
@@ -105,6 +109,16 @@ test("其他 comfyClass 的节点不被处理", () => {
     ext.nodeCreated(node);
     assert.equal(findWidget(node, "max_size").type, "number");
     assert.equal(findWidget(node, "increment_seed").type, "toggle");
+});
+
+test("beforeRegisterNodeDef 忽略其他节点的 nodeData", () => {
+    registerDef();
+    // 若无 name 守卫, 其他节点的 nodeData (无自定义 key) 会把模块级
+    // 档位值冲成 null, 联动全局失效
+    registerDef({}, "other_node");
+    const node = createNode(MODE_BATCH);
+    assert.equal(findWidget(node, "increment_seed").type, "hidden");
+    assert.equal(findWidget(node, "max_size").type, "number");
 });
 
 test("onConfigure 恢复序列化值后再同步, 不重排尺寸", () => {
