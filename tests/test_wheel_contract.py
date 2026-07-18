@@ -69,12 +69,16 @@ class TestWheelPrivateApiContract(unittest.TestCase):
             self.assertTrue(hasattr(_ggml, name), f"llama_cpp._ggml missing symbol: {name}")
 
         # devices.py 与 check_devices.py 绕过 _ggml 封装 (wheel 未提供),
-        # 经 libggml_base CDLL 直取的三个 C 符号; CDLL 的 hasattr 会真实
-        # 解析符号 (getattr -> dlsym/GetProcAddress), 与 import 期同路径
+        # 经 libggml_base CDLL 直取的 C 符号; CDLL 的 hasattr 会真实
+        # 解析符号 (getattr -> dlsym/GetProcAddress), 与 import 期同路径.
+        # ggml_backend_dev_get_props 的 props 结构体布局 (devices.py 的
+        # _GGMLBackendDevProps) 无法静态锁定, 升级 wheel 时人工对照
+        # ggml-backend.h 复核
         for name in (
             "ggml_backend_dev_name",
             "ggml_backend_dev_description",
             "ggml_backend_dev_type",
+            "ggml_backend_dev_get_props",
         ):
             self.assertTrue(hasattr(_ggml.libggml_base, name), f"libggml_base missing C symbol: {name}")
 

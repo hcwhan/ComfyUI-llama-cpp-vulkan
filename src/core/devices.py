@@ -32,6 +32,33 @@ libggml_base.ggml_backend_dev_description.restype = ctypes.c_char_p
 libggml_base.ggml_backend_dev_type.argtypes = [ctypes.c_void_p]
 libggml_base.ggml_backend_dev_type.restype = ctypes.c_int32
 
+
+# 布局须与 wheel 的 ggml-backend.h 中 ggml_backend_dev_caps /
+# ggml_backend_dev_props 逐字段一致 (ggml_backend_dev_get_props 按 C ABI 填充)
+class _GGMLBackendDevCaps(ctypes.Structure):
+    _fields_ = [
+        ("async_", ctypes.c_bool),
+        ("host_buffer", ctypes.c_bool),
+        ("buffer_from_host_ptr", ctypes.c_bool),
+        ("events", ctypes.c_bool),
+    ]
+
+
+class _GGMLBackendDevProps(ctypes.Structure):
+    _fields_ = [
+        ("name", ctypes.c_char_p),
+        ("description", ctypes.c_char_p),
+        ("memory_free", ctypes.c_size_t),
+        ("memory_total", ctypes.c_size_t),
+        ("type", ctypes.c_int32),
+        ("device_id", ctypes.c_char_p),
+        ("caps", _GGMLBackendDevCaps),
+    ]
+
+
+libggml_base.ggml_backend_dev_get_props.argtypes = [ctypes.c_void_p, ctypes.POINTER(_GGMLBackendDevProps)]
+libggml_base.ggml_backend_dev_get_props.restype = None
+
 # 设备类型取 wheel 导出的枚举, 消除魔法数与 wheel 升级时的漂移面
 _GGML_BACKEND_DEVICE_TYPE_GPU = int(GGMLBackendDevType.GGML_BACKEND_DEVICE_TYPE_GPU)
 _GGML_BACKEND_DEVICE_TYPE_IGPU = int(GGMLBackendDevType.GGML_BACKEND_DEVICE_TYPE_IGPU)
@@ -59,7 +86,11 @@ def _detect_gpu_devices():
                 name = libggml_base.ggml_backend_dev_name(dev).decode("utf-8", errors="replace")
                 desc = libggml_base.ggml_backend_dev_description(dev).decode("utf-8", errors="replace").strip()
                 type_name = _DEV_TYPE_NAMES.get(dev_type, "GPU")
-                devices.append({"name": name, "desc": desc, "type": type_name})
+                props = _GGMLBackendDevProps()
+                libggml_base.ggml_backend_dev_get_props(dev, ctypes.byref(props))
+                # C 侧 NULL (id 未知) 映射为 None
+                device_id = props.device_id.decode("utf-8", errors="replace") if props.device_id else None
+                devices.append({"name": name, "desc": desc, "type": type_name, "device_id": device_id})
         return devices
     except Exception as e:
         logger.warning(LOG_PREFIX + _LOGS["detection_failed"].format(e=e))
@@ -78,11 +109,21 @@ else:
 def _selectable_devices():
     """按 llama.cpp 收集 model->devices 的规则, 返回 main_gpu 实际可选的设备.
 
-    llama.cpp 只把独显 (type==GPU) 按枚举顺序加入设备列表;
+    llama.cpp 只把独显 (type==GPU) 按枚举顺序加入设备列表, 且对 device_id
+    (PCI bus id) 与已收集独显相同者跳过 (双方均非空才比较, 保留先枚举者;
+    同一物理卡被多个后端/ICD 枚举两次的场景);
     仅当系统没有任何独显时, 才加入第一个核显 (IGPU).
     其余设备无法通过 main_gpu 参数选中, 因此不在下拉框中展示.
     """
-    dgpus = [d for d in _gpu_devices if d["type"] == "GPU"]
+    dgpus = []
+    for d in _gpu_devices:
+        if d["type"] != "GPU":
+            continue
+        # 复刻上游 same-device_id 去重: 若不去重, 双 ICD 场景下拉框索引会与
+        # llama.cpp 实际设备列表错位
+        if d["device_id"] is not None and any(kept["device_id"] == d["device_id"] for kept in dgpus):
+            continue
+        dgpus.append(d)
     if dgpus:
         return dgpus
     return [d for d in _gpu_devices if d["type"] == "IGPU"][:1]
