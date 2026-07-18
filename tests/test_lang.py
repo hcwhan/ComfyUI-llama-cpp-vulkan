@@ -41,13 +41,16 @@ class TestResolveLanguage(unittest.TestCase):
             return resolved, stored
 
     def test_explicit_language_bypasses_settings(self):
-        # 非 auto 时原样返回, 不触碰 ComfyUI 设置 (get_user_directory 被调用即失败)
-        def _fail():
-            raise AssertionError("LANGUAGE 非 auto 时不应读 ComfyUI 设置")
+        # 非 auto 时原样返回, 不触碰 ComfyUI 设置 (第 1 级) 与插件根
+        # settings.json (第 2 级), 读写哨兵任一被调用即失败
+        def _fail(*args):
+            raise AssertionError("LANGUAGE 非 auto 时不应读写语言设置")
 
         with (
             patch.object(lang, "LANGUAGE", "zh-CN"),
             patch.object(locale_settings.folder_paths, "get_user_directory", _fail),
+            patch.object(locale_settings, "get_language_setting", _fail),
+            patch.object(locale_settings, "set_language_setting", _fail),
         ):
             self.assertEqual(lang._resolve_language(), ("zh-CN", "LANGUAGE"))
 
@@ -166,9 +169,19 @@ class TestLocaleMappingContract(unittest.TestCase):
                 self.assertTrue((lang._I18N_DIR / f"language_{lang_code}.py").is_file())
 
     def test_stub_user_directory_has_no_settings_file(self):
-        # comfy_stubs 的用户目录必须不存在, 保证其他测试模块 import 期加载确定性的默认英语
+        # 第 1 级隔离: comfy_stubs 的用户目录必须不存在, Comfy.Locale 确定性走
+        # "设置文件缺失" 分支 (与下一用例合并担保 import 期确定性默认英语)
         stub_settings = os.path.join(locale_settings.folder_paths.get_user_directory(), "default", "comfy.settings.json")
         self.assertFalse(os.path.exists(stub_settings))
+
+    def test_stub_settings_path_isolated_from_repo(self):
+        # 第 2 级隔离: comfy_stubs 须把插件根 settings.json 重定向出仓库根
+        # (junction 部署下该运行时产物真实存在于仓库根, 不隔离则测试进程
+        # import 期按其内容解析语言, 且 read_comfy_locale 的落盘收尾会改写
+        # 生产文件) 且指向不存在的文件, frontend_locale 确定性走 "文件缺失" 分支
+        settings_path = locale_settings._SETTINGS_PATH
+        self.assertNotIn(Path(__file__).resolve().parents[1], settings_path.parents)
+        self.assertFalse(settings_path.exists())
 
 
 if __name__ == "__main__":

@@ -2,13 +2,15 @@
 
 src 的部分模块在 import 时就访问 ComfyUI 运行时(注册模型目录, monkey-patch
 卸载钩子, 取 ProgressBar 类), 测试进程没有 ComfyUI, 用替身满足 import 期依赖.
-llama_cpp 使用真实安装(纯函数测试不触发推理).
+另将 i18n 的插件根 settings.json 路径重定向出仓库根, 隔离语言解析的持久化
+状态(理由见 install 内注释). llama_cpp 使用真实安装(纯函数测试不触发推理).
 """
 
 import os
 import sys
 import tempfile
 import types
+from pathlib import Path
 
 
 def install():
@@ -59,8 +61,9 @@ def install():
     folder_paths.get_filename_list = lambda key: []
     folder_paths.get_full_path = lambda key, filename: None
 
-    # 指向一个不存在的目录 (不创建): i18n 的语言自动检测在测试进程中
-    # 确定性地走 "设置文件缺失" 分支, 回退默认英语
+    # 语言解析第 1 级 (Comfy.Locale) 的隔离: 指向一个不存在的目录 (不创建),
+    # 确定性地走 "设置文件缺失" 分支; 第 2 级的隔离见 install 末尾的
+    # settings.json 重定向, 两级齐备才保证 import 期 LANG 确定性回退默认英语
     _user_dir = os.path.join(tempfile.gettempdir(), "comfyui-llama-cpp-vulkan-tests", "user")
     folder_paths.get_user_directory = lambda: _user_dir
 
@@ -91,3 +94,16 @@ def install():
     sys.modules["comfy.utils"] = utils
     sys.modules["folder_paths"] = folder_paths
     sys.modules["server"] = server
+
+    # 语言解析第 2 级 (插件根 settings.json) 的隔离: 该文件是 gitignore 的
+    # 运行时产物, junction 部署 (custom_nodes 直指本仓库) 下正常使用 ComfyUI
+    # 后会真实存在于仓库根. 若不重定向: (a) 测试进程 import 期 LANG 会按其
+    # frontend_locale 解析而非确定性回退默认英语; (b) lang import 期
+    # read_comfy_locale() 以 set_language_setting("comfy_locale", None) 收尾,
+    # 跑一次单测就会改写生产运行时文件. 预导入 locale_settings (须在替身
+    # 注册之后: 其 import 期有 import folder_paths; 且早于 lang import,
+    # 时序可行) 并把 _SETTINGS_PATH 指向临时目录下不存在的文件 (不创建),
+    # 确定性走 "文件缺失" 分支; 单测内的针对性 patch 仍按用例自行覆盖.
+    from src.i18n import locale_settings
+
+    locale_settings._SETTINGS_PATH = Path(tempfile.gettempdir()) / "comfyui-llama-cpp-vulkan-tests" / "settings.json"
