@@ -5,7 +5,11 @@ import struct
 import tempfile
 import unittest
 
-from src.core.gguf_layers import get_model_meta
+from tests import comfy_stubs
+
+comfy_stubs.install()
+
+from src.core.gguf_layers import get_model_meta  # noqa: E402
 
 
 def _block_count(path):
