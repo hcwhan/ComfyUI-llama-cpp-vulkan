@@ -82,10 +82,11 @@ class TestInterruptWatcher(unittest.TestCase):
 
 
 class _FakeRunLlm:
-    """_run 收尾分支所需的最小 llm 替身 (hybrid 判定与重置三件套)."""
+    """_run 收尾分支所需的最小 llm 替身 (hybrid 判定, 重置三件套与 close 计数)."""
 
     def __init__(self, hybrid=False):
         self.n_tokens = 7
+        self.close_calls = 0
         self._model = types.SimpleNamespace(
             is_hybrid=lambda: hybrid,
             is_recurrent=lambda: False,
@@ -95,6 +96,9 @@ class _FakeRunLlm:
 
     def abort(self):
         pass
+
+    def close(self):
+        self.close_calls += 1
 
 
 class TestRunFinalization(unittest.TestCase):
@@ -146,10 +150,13 @@ class TestRunFinalization(unittest.TestCase):
         self.assertNotIn("max_gen_tokens", captured)
 
     def test_force_offload_cleans_after_success(self):
-        self._install(_FakeRunLlm())
+        llm = _FakeRunLlm()
+        self._install(llm)
         self._run(lambda *args: "ok", force_offload=True)
         self.assertIsNone(LLAMA_CPP_STORAGE.llm)
         self.assertIsNone(LLAMA_CPP_STORAGE.current_config)
+        # 锁定正常关闭路径: close 被真实调用, 而非走 clean() 的异常兜底分支
+        self.assertEqual(llm.close_calls, 1)
 
     def test_matching_config_logs_reuse(self):
         # current_config 与 llama_model 相同: 不触发加载, 打复用日志
@@ -189,10 +196,12 @@ class TestRunFinalization(unittest.TestCase):
 
     def test_runner_exception_still_finalizes(self):
         # finally 收尾: 异常路径同样执行 force_offload 卸载
-        self._install(_FakeRunLlm())
+        llm = _FakeRunLlm()
+        self._install(llm)
         with self.assertRaises(RuntimeError):
             self._run(mock.Mock(side_effect=RuntimeError("boom")), force_offload=True)
         self.assertIsNone(LLAMA_CPP_STORAGE.llm)
+        self.assertEqual(llm.close_calls, 1)
 
 
 if __name__ == "__main__":
