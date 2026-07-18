@@ -73,15 +73,19 @@ class TestJsonToPixelBboxes(unittest.TestCase):
 
 class TestDrawBbox(unittest.TestCase):
     def test_bad_box_skipped_other_boxes_drawn(self):
-        # 回归: 单个坏框(非有限值使 PIL 抛错; 反向坐标已在
+        # 回归: 单个坏框(非有限值使 PIL 抛错, 实测 Pillow 12.3.0 下 NaN 框
+        # 迟至 draw.text 步才抛, 此前 rectangle 可能已留下残迹; 反向坐标已在
         # json_to_pixel_bboxes 归一, 不再到达画框路径)只跳过该框,
         # 不放弃整张图 - 与 SEGS/MASK 路径的逐框容错粒度一致
         image = torch.zeros(32, 32, 3)
         boxes = [(float("nan"), 10.0, 5.0, 15.0), (2.0, 2.0, 12.0, 12.0)]
         out = draw_bbox(image, boxes, ["bad", "good"])
         self.assertEqual(tuple(out.shape), (1, 32, 32, 3))
-        # 正常框已画出: 全黑输入的输出不再全零
-        self.assertGreater(out.sum().item(), 0)
+        # 正常框已画出: 其专属标签颜色出现在输出像素中 (uint8 经 /255.0
+        # 往返精确, 可逐通道精确比对); 若只断言 out.sum() > 0, 坏框在
+        # 抛错前留下的 rectangle 残迹也能使其通过, 证明不了正常框仍画出
+        good_color = torch.tensor(_label_color("good"), dtype=torch.float32) / 255.0
+        self.assertTrue((out[0] == good_color).all(dim=-1).any().item())
 
     def test_all_valid_boxes_drawn(self):
         image = torch.zeros(32, 32, 3)
