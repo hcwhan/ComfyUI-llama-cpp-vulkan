@@ -22,6 +22,7 @@ from src.core.handlers import (  # noqa: E402
     image_token_handlers,
     thinking_modes,
 )
+from src.i18n.lang import LANG  # noqa: E402
 
 # 思考相关构造参数名单: 仅收录影响单轮输出的开关
 _THINK_PARAM_NAMES = ("enable_thinking", "force_reasoning")
@@ -172,6 +173,15 @@ class TestThinkingModes(unittest.TestCase):
         self.assertEqual(modes["GLM-4.1V-Thinking"], "forced")
         self.assertEqual(modes["Gemma3"], "none")
 
+    def test_missing_handler_excluded(self):
+        # "只含可用 handler" 语义: 从 HANDLERS 摘除一个条目模拟 wheel 缺类
+        # (_HANDLER_SPECS 仍含它), 名单须跟随消失; 全类可用环境下
+        # test_keys_match_available_handlers 无法区分实现遍历的是哪张表,
+        # 若实现改为遍历 _HANDLER_SPECS 则在此报出
+        pruned = {label: ctor for label, ctor in HANDLERS.items() if label != "Qwen3.6"}
+        with mock.patch.object(handlers, "HANDLERS", pruned):
+            self.assertNotIn("Qwen3.6", thinking_modes())
+
 
 class TestImageTokenHandlers(unittest.TestCase):
     def test_audio_only_labels_exist_in_specs(self):
@@ -185,25 +195,36 @@ class TestImageTokenHandlers(unittest.TestCase):
         self.assertIn("-Generic-", labels)
         self.assertEqual(set(labels) | _AUDIO_ONLY_LABELS, set(HANDLERS))
 
+    def test_missing_handler_excluded(self):
+        # 同 TestThinkingModes.test_missing_handler_excluded: 名单只含
+        # 可用 handler, 缺类条目 (仍在 _HANDLER_SPECS 中) 不得出现
+        pruned = {label: ctor for label, ctor in HANDLERS.items() if label != "Qwen3-VL"}
+        with mock.patch.object(handlers, "HANDLERS", pruned):
+            self.assertNotIn("Qwen3-VL", image_token_handlers())
+
 
 class TestResolveHandlers(unittest.TestCase):
     def test_missing_class_dropped_others_kept(self):
         # wheel 升级导致类缺失时: 该选项从下拉框剔除 (打 warning),
-        # 不静默吞错也不阻断整个注册表
+        # 不静默吞错也不阻断整个注册表; assertLogs 兼收敛测试输出
         specs = {
             "Fake-Handler": ("NoSuchHandlerClass", None, handlers.THINK_UNSUPPORTED),
             "Gemma3": ("Gemma3ChatHandler", None, handlers.THINK_UNSUPPORTED),
         }
-        with mock.patch.object(handlers, "_HANDLER_SPECS", specs):
+        with mock.patch.object(handlers, "_HANDLER_SPECS", specs), self.assertLogs("llama-cpp-vulkan", level="WARNING") as logs:
             resolved = handlers._resolve_handlers()
         self.assertNotIn("Fake-Handler", resolved)
         self.assertIn("Gemma3", resolved)
+        expected = LANG["logs"]["handlers"]["handlers_unavailable"].format(missing="Fake-Handler (NoSuchHandlerClass)")
+        self.assertTrue(any(expected in m for m in logs.output))
 
     def test_kwargs_prebound_via_partial(self):
-        # 声明了固定 kwargs 的条目须经 functools.partial 预绑定构造参数
+        # 声明了固定 kwargs 的条目须经 functools.partial 预绑定构造参数;
+        # .func 同一性锁定绑定的确是注册表声明的那个类
         specs = {"-Generic-": ("GenericMTMDChatHandler", {"chat_format": None}, handlers.THINK_UNSUPPORTED)}
         with mock.patch.object(handlers, "_HANDLER_SPECS", specs):
             resolved = handlers._resolve_handlers()
+        self.assertIs(resolved["-Generic-"].func, _handler_module.GenericMTMDChatHandler)
         self.assertEqual(resolved["-Generic-"].keywords, {"chat_format": None})
 
 
