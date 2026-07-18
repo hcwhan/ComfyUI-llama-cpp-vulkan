@@ -1,12 +1,16 @@
-"""src/nodes/util/node_parse_json.py 的单元测试: 五种输出类型的转换边缘语义."""
+"""src/nodes/util/node_parse_json.py 的单元测试: 五种输出类型的转换边缘语义与空 key 校验."""
 
+import re
 import unittest
 
 from tests import comfy_stubs
 
 comfy_stubs.install()
 
+from src.i18n.lang import LANG  # noqa: E402
 from src.nodes.util.node_parse_json import parse_json_node  # noqa: E402
+
+_KEY_EMPTY = re.escape(LANG["nodes"]["util"]["parse_json"]["errors"]["key_empty"])
 
 
 class TestParseJsonNodeConversions(unittest.TestCase):
@@ -88,6 +92,14 @@ class TestParseJsonNodeConversions(unittest.TestCase):
         any_val, string, *_ = self.node.process('{"a": 1}', "missing", default="fallback")
         self.assertEqual(any_val, "fallback")
         self.assertEqual(string, "fallback")
+
+    def test_empty_key_raises(self):
+        with self.assertRaisesRegex(ValueError, _KEY_EMPTY):
+            self._run('{"a": 1}', "")
+
+    def test_whitespace_key_raises(self):
+        with self.assertRaisesRegex(ValueError, _KEY_EMPTY):
+            self._run('{"a": 1}', "  ")
 
 
 if __name__ == "__main__":
