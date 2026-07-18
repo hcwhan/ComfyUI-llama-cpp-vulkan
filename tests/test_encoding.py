@@ -4,6 +4,7 @@ import base64
 import io
 import unittest
 import wave
+from unittest import mock
 
 import numpy as np
 import torch
@@ -12,6 +13,7 @@ from tests import comfy_stubs
 
 comfy_stubs.install()
 
+from src.shared import encoding  # noqa: E402
 from src.shared.encoding import audio2base64, scale_image, tensor_to_uint8  # noqa: E402
 
 
@@ -50,6 +52,8 @@ class TestAudio2Base64(unittest.TestCase):
         waveform = torch.stack([torch.full((8,), 0.5), torch.full((8,), -0.5)]).unsqueeze(0)
         channels, width, rate, samples = _decode_wav(audio2base64({"waveform": waveform, "sample_rate": 16000}))
         self.assertEqual((channels, width, rate), (1, 2, 16000))
+        # 先锁样本数: 空数组下 (samples == X).all() 恒真
+        self.assertEqual(len(samples), 8)
         self.assertTrue((samples == 0).all())
 
     def test_out_of_range_samples_clipped(self):
@@ -62,6 +66,8 @@ class TestAudio2Base64(unittest.TestCase):
         clip1 = torch.zeros((1, 4))
         waveform = torch.stack([clip0, clip1])
         _, _, _, samples = _decode_wav(audio2base64({"waveform": waveform, "sample_rate": 8000}))
+        # 先锁样本数: 空数组下 (samples == X).all() 恒真
+        self.assertEqual(len(samples), 4)
         self.assertTrue((samples == 16383).all())
 
 
@@ -76,9 +82,12 @@ class TestScaleImage(unittest.TestCase):
         self.assertEqual(arr.shape, (50, 100, 3))
 
     def test_image_within_limit_returned_unchanged(self):
-        # 回归: 不超 max_size 时短路返回, 跳过等尺寸重采样, 像素值不得有重采样扰动
+        # 回归: 不超 max_size 时短路返回, 跳过重采样; 像素相等锁不住短路
+        # (Pillow 对等尺寸 resize 返回等值副本), 须断言 fromarray 未被调用
         image = torch.rand((32, 64, 3))
-        arr = scale_image(image, 128)
+        with mock.patch.object(encoding.Image, "fromarray") as fromarray:
+            arr = scale_image(image, 128)
+        fromarray.assert_not_called()
         self.assertEqual(arr.shape, (32, 64, 3))
         self.assertTrue((arr == tensor_to_uint8(image)).all())
 

@@ -233,7 +233,8 @@ class TestImageInstructInferBatch(_ImageInstructTestBase):
         self.assertEqual(_png_size(content[1]), (16, 8))
 
     def test_small_images_not_upscaled(self):
-        # 不超 max_size 的多图不做等尺寸重采样, 原分辨率进消息
+        # 不超 max_size 的多图不被放大, 原分辨率进消息 (跳过等尺寸重采样的
+        # 短路行为由 test_encoding.py 的等尺寸短路用例锁定)
         llm = _FakeVlm(["批量结果"])
         self._install(llm)
         self._process(torch.zeros(2, 4, 4, 3), max_size=8)
