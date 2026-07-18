@@ -264,13 +264,22 @@ class TestLoadModelStateMachine(unittest.TestCase):
 
     def test_unload_hook_cleans_storage(self):
         # monkey-patch 后的 mm.unload_all_models 经 sys.modules 动态取当前
-        # 生效模块的类 (热重载加固), 调用即清理单例并级联原函数
+        # 生效模块的类 (热重载加固), 调用即清理单例并级联原函数.
+        # 原函数在 storage import 期已被捕获为 mm.unload_all_models_backup
+        # (替身 no-op), 无法回溯替换捕获动作; 但 patched_unload_all_models
+        # 调用期动态取该属性, 换成计数 mock 即可断言级联
         LLAMA_CPP_STORAGE.load_model(self._config())
         loaded = LLAMA_CPP_STORAGE.llm
-        storage.mm.unload_all_models()
+        backup = mock.Mock()
+        with mock.patch.object(storage.mm, "unload_all_models_backup", backup):
+            # 实参取哨兵值, 只验证包装层 *args/**kwargs 原样透传,
+            # 与真实 ComfyUI 的函数签名无关
+            storage.mm.unload_all_models("sentinel", keep=True)
         self.assertTrue(loaded.closed)
         self.assertIsNone(LLAMA_CPP_STORAGE.llm)
         self.assertIsNone(LLAMA_CPP_STORAGE.current_config)
+        # 回归: patched_unload_all_models 漏调原函数或漏传实参时此处检出
+        backup.assert_called_once_with("sentinel", keep=True)
 
 
 class TestLoadModelMmprojBranches(unittest.TestCase):
