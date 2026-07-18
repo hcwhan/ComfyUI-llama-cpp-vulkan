@@ -10,6 +10,7 @@ from tests import comfy_stubs
 comfy_stubs.install()
 
 from src.core.gguf_layers import get_model_meta  # noqa: E402
+from src.i18n.lang import LANG  # noqa: E402
 
 
 def _block_count(path):
@@ -112,20 +113,32 @@ class TestBlockCountParsing(unittest.TestCase):
         self.assertIsNone(_block_count(path))
 
     def test_implausible_array_count_falls_back(self):
-        # 回归: KV 区错位使数组 count 读成天文数字时, 须立即报错走回退
-        # (返回空 dict), 而不是以几字节步长扫过整个文件打转数分钟
+        # 回归: KV 区错位使数组 count 读成天文数字时, 须由 _MAX_ARRAY_COUNT
+        # 守卫立即报错走回退 (返回空 dict), 而不是以几字节步长扫过整个文件
+        # 打转数分钟. 断言 parse_failed 警告含守卫文案: 若守卫被移除, 小测试
+        # 文件上后续解析同样以 struct.error (短读) 告终并回退 None, 仅靠
+        # assertIsNone 锁不住守卫本身
         huge_array = (
             _string("tokenizer.ggml.tokens") + struct.pack("<I", _T_ARRAY) + struct.pack("<I", _T_UINT32) + struct.pack("<Q", 10**12)
         )
         path = self._write_temp(_gguf_bytes([huge_array, _kv_uint32("llama.block_count", 32)]))
-        self.assertIsNone(_block_count(path))
+        expected = LANG["common"]["gguf_errors"]["array_count_implausible"].format(count=10**12)
+        with self.assertLogs("llama-cpp-vulkan", level="WARNING") as cm:
+            self.assertIsNone(_block_count(path))
+        self.assertTrue(any(expected in line for line in cm.output))
 
     def test_implausible_string_length_falls_back(self):
-        # 回归: KV 区错位使字符串长度读成天文数字时, 须立即报错走回退
-        # (返回空 dict), 而不是按该长度尝试一次大缓冲分配
+        # 回归: KV 区错位使字符串长度读成天文数字时, 须由 _MAX_STRING_LEN
+        # 守卫立即报错走回退 (返回空 dict), 而不是按该长度尝试一次大缓冲
+        # 分配. 断言 parse_failed 警告含守卫文案: 若守卫被移除, 小测试文件上
+        # f.read 短读后解码为普通字符串, 后续解析以 struct.error 告终并回退
+        # None, 仅靠 assertIsNone 锁不住守卫本身
         huge_key = struct.pack("<Q", 10**12) + b"general.architecture"
         path = self._write_temp(_gguf_bytes([huge_key, _kv_uint32("llama.block_count", 32)]))
-        self.assertIsNone(_block_count(path))
+        expected = LANG["common"]["gguf_errors"]["string_length_implausible"].format(length=10**12)
+        with self.assertLogs("llama-cpp-vulkan", level="WARNING") as cm:
+            self.assertIsNone(_block_count(path))
+        self.assertTrue(any(expected in line for line in cm.output))
 
     def test_gguf_v1_rejected(self):
         # v1 的计数字段是 32 位, 按 v2+ 布局读会错乱, 应直接按不支持返回 None
