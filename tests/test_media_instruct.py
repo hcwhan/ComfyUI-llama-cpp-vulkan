@@ -4,12 +4,16 @@
 - video: "连续视频" 语义提示注入 system prompt (空 system_prompt 时单独
   成条, 非空时前置), 均匀抽帧 -> 多帧逐帧缩放到 max_size (单帧保持原
   分辨率) -> 全部帧并入单条 user 消息
+- video: 抽帧接线以可区分像素锁定 (选中的是均匀间隔帧而非前 N 帧)
 - audio: AUDIO dict 经 audio2base64 混为单声道 16-bit WAV,
   以 input_audio 内容项注入单条 user 消息
+- video/audio: require_mmproj 失败分支 (chat_handler 无 mmproj_path 时
+  抛 ValueError, 不发起请求)
 """
 
 import base64
 import io
+import re
 import types
 import unittest
 import wave
@@ -23,6 +27,7 @@ from tests import comfy_stubs
 comfy_stubs.install()
 
 from src.core.storage import LLAMA_CPP_STORAGE  # noqa: E402
+from src.i18n.lang import LANG  # noqa: E402
 from src.nodes.instruct.media.audio.node_instruct import llama_cpp_audio_instruct  # noqa: E402
 from src.nodes.instruct.media.video.node_instruct import llama_cpp_video_instruct  # noqa: E402
 
@@ -55,6 +60,12 @@ def _png_size(content_item):
     """image_url 内容项的 data URL -> PNG 实际 (宽, 高), 用于断言缩放行为."""
     b64 = content_item["image_url"]["url"].split(",", 1)[1]
     return Image.open(io.BytesIO(base64.b64decode(b64))).size
+
+
+def _png_pixel(content_item):
+    """image_url 内容项的 data URL -> PNG (0, 0) 像素 R 通道值, 用于区分选中的是哪一帧."""
+    b64 = content_item["image_url"]["url"].split(",", 1)[1]
+    return Image.open(io.BytesIO(base64.b64decode(b64))).getpixel((0, 0))[0]
 
 
 class _MediaInstructTestBase(unittest.TestCase):
@@ -94,10 +105,14 @@ class TestVideoInstructProcess(_MediaInstructTestBase):
         return out
 
     def test_multi_frame_sampled_scaled_into_single_message(self):
-        # 5 帧按 max_frames=3 均匀抽帧, 多帧逐帧缩放 (H8xW16 按 max_size=8
-        # -> H4xW8, 断言取 PIL (宽, 高) 即 (8, 4)),
-        # 全部帧并入单条 user 消息 (文本项 + 3 个 image_url 项), 一次推理
-        out = self._process(torch.zeros(5, 8, 16, 3), max_frames=3, max_size=8)
+        # 5 帧灌入可区分像素 (i/4 -> uint8 0/63/127/191/255), 按 max_frames=3
+        # 均匀抽帧应选中第 0/2/4 帧 (解码像素 0/127/255; 若取帧行回归为
+        # frames[:3], 像素序列变为 0/63/127, 本断言即报出); 多帧逐帧缩放
+        # (H8xW16 按 max_size=8 -> H4xW8, 断言取 PIL (宽, 高) 即 (8, 4),
+        # 纯色帧缩放不改变像素值), 全部帧并入单条 user 消息
+        # (文本项 + 3 个 image_url 项), 一次推理
+        frames = torch.stack([torch.full((8, 16, 3), i / 4.0) for i in range(5)])
+        out = self._process(frames, max_frames=3, max_size=8)
         self.assertEqual(out, "结果文本")
         self.assertEqual(self.llm.calls, 1)
         content = self._user_content()
@@ -105,6 +120,7 @@ class TestVideoInstructProcess(_MediaInstructTestBase):
         self.assertEqual(content[0]["text"], "描述这段视频")
         for item in content[1:]:
             self.assertEqual(_png_size(item), (8, 4))
+        self.assertEqual([_png_pixel(item) for item in content[1:]], [0, 127, 255])
 
     def test_single_frame_keeps_original_resolution(self):
         # 单帧不缩放: 16 宽超出 max_size=8 也保持原分辨率
@@ -127,6 +143,15 @@ class TestVideoInstructProcess(_MediaInstructTestBase):
         self.assertEqual(system["role"], "system")
         self.assertIn("连续的视频", system["content"])
         self.assertTrue(system["content"].endswith("你是视频分析助手"))
+
+    def test_missing_mmproj_raises_before_request(self):
+        # runner 第一句 require_mmproj 校验: chat_handler 无 mmproj_path 时
+        # 抛 ValueError (文案引用 LANG), 且不发起 completion 请求
+        LLAMA_CPP_STORAGE.chat_handler = types.SimpleNamespace(mmproj_path=None)
+        expected = LANG["nodes"]["instruct"]["common"]["errors"]["mmproj_not_configured"].format(kind="Video")
+        with self.assertRaisesRegex(ValueError, re.escape(expected)):
+            self._process(torch.zeros(2, 4, 4, 3))
+        self.assertEqual(self.llm.calls, 0)
 
 
 class TestAudioInstructProcess(_MediaInstructTestBase):
@@ -159,6 +184,15 @@ class TestAudioInstructProcess(_MediaInstructTestBase):
             self.assertEqual(wav.getsampwidth(), 2)
             self.assertEqual(wav.getframerate(), 16000)
             self.assertEqual(wav.getnframes(), 100)
+
+    def test_missing_mmproj_raises_before_request(self):
+        # runner 第一句 require_mmproj 校验: chat_handler 无 mmproj_path 时
+        # 抛 ValueError (文案引用 LANG), 且不发起 completion 请求
+        LLAMA_CPP_STORAGE.chat_handler = types.SimpleNamespace(mmproj_path=None)
+        expected = LANG["nodes"]["instruct"]["common"]["errors"]["mmproj_not_configured"].format(kind="Audio")
+        with self.assertRaisesRegex(ValueError, re.escape(expected)):
+            self._process({"waveform": torch.zeros(1, 2, 100), "sample_rate": 16000})
+        self.assertEqual(self.llm.calls, 0)
 
 
 if __name__ == "__main__":
