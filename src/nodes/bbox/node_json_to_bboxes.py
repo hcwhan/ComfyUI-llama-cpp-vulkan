@@ -73,6 +73,11 @@ class json_to_bboxes:
         batch_sizes = []
         for img_item in image or []:
             img_batch = img_item.unsqueeze(0) if img_item.ndim == 3 else img_item
+            # 单通道输入(个别第三方节点的灰度输出)在入口统一 repeat 为 3 通道:
+            # 画框帧经 tensor_to_uint8 恒为 3 通道, 若不归一, 同批次内透传/
+            # 回退帧保持单通道, 与画框帧混拼时 torch.cat 因通道数不匹配抛错
+            if img_batch.shape[-1] == 1:
+                img_batch = img_batch.repeat(1, 1, 1, 3)
             batch_sizes.append(img_batch.shape[0])
             flat_images.extend(img_batch[n : n + 1] for n in range(img_batch.shape[0]))
 

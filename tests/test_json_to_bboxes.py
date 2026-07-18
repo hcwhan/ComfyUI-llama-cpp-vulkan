@@ -63,6 +63,16 @@ class TestJsonToBBoxesRestructure(unittest.TestCase):
         self.assertEqual(len(bboxes), 4)
         self.assertEqual([b.shape[0] for b in image_list], [2, 1, 1])
 
+    def test_single_channel_frames_normalized_to_rgb(self):
+        # 回归: 单通道 IMAGE 批次 (个别第三方节点的灰度输出) 且 JSON 少于帧时,
+        # 画框帧经 tensor_to_uint8 恒为 3 通道, 修复前透传帧保持单通道,
+        # 同批次 torch.cat 因通道数不匹配抛 RuntimeError; 入口归一后
+        # 全部输出帧恒为 3 通道
+        frames = [torch.full((2, 16, 16, 1), 0.5, dtype=torch.float32)]
+        bboxes, image_list = self.node.process([_JSON_ONE_BOX], [BBOX_MODE_SIMPLE], [""], frames)
+        self.assertEqual(len(bboxes), 1)
+        self.assertEqual([b.shape for b in image_list], [(2, 16, 16, 3)])
+
     def test_no_images_returns_empty_image_list(self):
         bboxes, image_list = self.node.process([_JSON_ONE_BOX], [BBOX_MODE_SIMPLE], [""], None)
         self.assertEqual(len(bboxes), 1)
