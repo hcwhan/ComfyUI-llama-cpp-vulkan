@@ -1,6 +1,7 @@
 """src/i18n/locale_settings.py 的单元测试: settings.json 读写语义 (language 分组, 保留其余内容, 容错)."""
 
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -46,13 +47,25 @@ class TestLocaleSettings(unittest.TestCase):
         self.assertEqual(self._stored(), {"language": {"frontend_locale": "en"}})
 
     def test_unchanged_value_does_not_rewrite(self):
+        # 黑盒断言不落盘: 先把 mtime 回拨 1 秒 (远超文件系统时间戳分辨率),
+        # 若发生重写 mtime 会刷新为当前时间; 内容比对兜底重写后内容有变的情形
         locale_settings.set_language_setting("frontend_locale", "zh")
-        with patch.object(Path, "write_text", side_effect=AssertionError("内容无变化时不应落盘")):
-            locale_settings.set_language_setting("frontend_locale", "zh")
-            locale_settings.set_language_setting("comfy_locale", None)
+        stale_ns = os.stat(self.path).st_mtime_ns - 10**9
+        os.utime(self.path, ns=(stale_ns, stale_ns))
+        before = self.path.read_bytes()
+        locale_settings.set_language_setting("frontend_locale", "zh")
+        locale_settings.set_language_setting("comfy_locale", None)
+        self.assertEqual(os.stat(self.path).st_mtime_ns, stale_ns)
+        self.assertEqual(self.path.read_bytes(), before)
 
     def test_corrupted_file_treated_as_empty(self):
         self.path.write_text("{not valid json", encoding="utf-8")
+        self.assertIsNone(locale_settings.get_language_setting("frontend_locale"))
+        locale_settings.set_language_setting("frontend_locale", "zh")
+        self.assertEqual(self._stored(), {"language": {"frontend_locale": "zh"}})
+
+    def test_non_dict_top_level_treated_as_empty(self):
+        self.path.write_text(json.dumps(["zh"]), encoding="utf-8")
         self.assertIsNone(locale_settings.get_language_setting("frontend_locale"))
         locale_settings.set_language_setting("frontend_locale", "zh")
         self.assertEqual(self._stored(), {"language": {"frontend_locale": "zh"}})
