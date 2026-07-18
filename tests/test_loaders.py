@@ -20,6 +20,8 @@ from src.nodes.model.node_loaders import (  # noqa: E402
 # 报错文案以语言文件为单一真源, 断言随语言文件自动跟随
 _MODEL_NOT_SELECTED = re.escape(LANG["nodes"]["model"]["common"]["errors"]["model_not_selected"])
 _MODEL_NOT_FOUND = re.escape(LANG["common"]["storage_errors"]["model_not_found"].format(model="m.gguf"))
+_MMPROJ_NOT_SELECTED = re.escape(LANG["nodes"]["model"]["vlm_loader"]["errors"]["mmproj_not_selected"])
+_HANDLER_NOT_SELECTED = re.escape(LANG["nodes"]["model"]["vlm_loader"]["errors"]["handler_not_selected"])
 
 
 class TestLlmLoaderValidation(unittest.TestCase):
@@ -53,11 +55,11 @@ class TestVlmLoaderValidation(unittest.TestCase):
             self._load(model="None")
 
     def test_mmproj_none_rejected(self):
-        with self.assertRaisesRegex(ValueError, "mmproj"):
+        with self.assertRaisesRegex(ValueError, _MMPROJ_NOT_SELECTED):
             self._load(mmproj="None")
 
     def test_handler_none_rejected(self):
-        with self.assertRaisesRegex(ValueError, "chat handler"):
+        with self.assertRaisesRegex(ValueError, _HANDLER_NOT_SELECTED):
             self._load(handler="None")
 
     def test_max_tokens_below_min_rejected(self):

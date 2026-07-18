@@ -48,12 +48,14 @@ class TestResolveConfig(unittest.TestCase):
             storage.resolve_config(_config(mmproj="m.gguf", chat_handler="Qwen3-VL"))
 
     def test_mmproj_without_handler_raises(self):
-        with self.assertRaisesRegex(ValueError, "chat handler"):
+        expected = re.escape(_STORAGE_ERRORS["handler_required_for_mmproj"])
+        with self.assertRaisesRegex(ValueError, expected):
             storage.resolve_config(_config(mmproj="m.gguf", chat_handler="None"))
 
     def test_handler_without_mmproj_raises(self):
         handler = next(iter(HANDLERS))
-        with self.assertRaisesRegex(ValueError, "mmproj"):
+        expected = re.escape(_STORAGE_ERRORS["mmproj_required_for_handler"].format(chat_handler=handler))
+        with self.assertRaisesRegex(ValueError, expected):
             storage.resolve_config(_config(mmproj="None", chat_handler=handler))
 
     def test_text_only_config_resolves(self):

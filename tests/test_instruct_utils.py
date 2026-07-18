@@ -114,8 +114,10 @@ class TestBuildUserPrompt(unittest.TestCase):
         self.assertIn("bbox_2d", text)
 
     def test_placeholder_preset_requires_custom(self):
-        with self.assertRaises(ValueError):
-            self._text("视觉 - BBox 目标检测 (需custom_prompt)", "  ")
+        preset = "视觉 - BBox 目标检测 (需custom_prompt)"
+        expected = re.escape(LANG["nodes"]["instruct"]["common"]["errors"]["preset_requires_custom_prompt"].format(preset_prompt=preset))
+        with self.assertRaisesRegex(ValueError, expected):
+            self._text(preset, "  ")
 
     def test_rewrite_preset_keeps_instruction_and_custom(self):
         # 回归: 改写增强预设必须同时保留改写指令与待改写的用户提示词
@@ -125,8 +127,10 @@ class TestBuildUserPrompt(unittest.TestCase):
         self.assertIn("文生图创作", text)
 
     def test_rewrite_preset_requires_custom(self):
-        with self.assertRaises(ValueError):
-            llama_cpp_text_instruct()._build_user_prompt("创意 - 提示词增强 (需custom_prompt)", "")
+        preset = "创意 - 提示词增强 (需custom_prompt)"
+        expected = re.escape(LANG["nodes"]["instruct"]["common"]["errors"]["preset_requires_custom_prompt"].format(preset_prompt=preset))
+        with self.assertRaisesRegex(ValueError, expected):
+            llama_cpp_text_instruct()._build_user_prompt(preset, "")
 
 
 class TestSingleCompletionContentFlattening(unittest.TestCase):
@@ -358,7 +362,8 @@ class TestRequireUserText(unittest.TestCase):
     def test_blank_preset_empty_custom_rejected_before_model_load(self):
         # runner 不应被调用: 拦截必须发生在 _prepare_messages(触发加载)之前
         node = llama_cpp_text_instruct()
-        with self.assertRaises(ValueError):
+        expected = re.escape(LANG["nodes"]["instruct"]["common"]["errors"]["user_prompt_empty"])
+        with self.assertRaisesRegex(ValueError, expected):
             node._run(
                 llama_model={},
                 seed=0,

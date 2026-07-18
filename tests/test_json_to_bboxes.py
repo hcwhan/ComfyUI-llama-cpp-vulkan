@@ -12,6 +12,7 @@ comfy_stubs.install()
 from src.i18n.common_static import BBOX_MODE_QWEN3, BBOX_MODE_SIMPLE  # noqa: E402
 from src.i18n.lang import LANG  # noqa: E402
 from src.nodes.bbox.node_json_to_bboxes import json_to_bboxes  # noqa: E402
+from src.shared.text_utils import parse_json  # noqa: E402
 
 _JSON_ONE_BOX = '[{"bbox_2d": [1, 1, 4, 4], "label": "a"}]'
 
@@ -56,10 +57,13 @@ class TestJsonToBBoxesRestructure(unittest.TestCase):
 
     def test_parse_error_reports_segment_index(self):
         # 回归: 逐段解析失败的报错须带分段索引 (从 1 起, 与前缀行 Image N 对齐),
-        # 便于定位坏在哪张图的输出; 坏段是第 2 段, 报错应为 JSON #2
-        with self.assertRaises(ValueError) as ctx:
+        # 便于定位坏在哪张图的输出; 坏段是第 2 段, 报错应为 JSON #2.
+        # {error} 实参取 parse_json 对同一坏段的真实报错, 使全文案精确断言
+        with self.assertRaises(ValueError) as inner:
+            parse_json("not json")
+        expected = re.escape(LANG["nodes"]["bbox"]["json_to_bboxes"]["errors"]["json_parse_failed"].format(i=2, error=inner.exception))
+        with self.assertRaisesRegex(ValueError, expected):
             self.node.process([_JSON_ONE_BOX, "not json"], [BBOX_MODE_SIMPLE], [""], None)
-        self.assertIn("JSON #2", str(ctx.exception))
 
 
 _JSON_LABELED = (
