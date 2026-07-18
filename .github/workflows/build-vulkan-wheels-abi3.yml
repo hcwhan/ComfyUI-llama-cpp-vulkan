@@ -25,10 +25,54 @@ env:
 
 jobs:
   # ----------------------------------------------------------------
+  #  Resolve ref to commit SHA (pin both platform builds)
+  # ----------------------------------------------------------------
+  # 前置把 ref 统一解析为 commit SHA: 若两个 build job 各自 checkout 分支名,
+  # 构建窗口内上游有新 push 时两平台会取到不同 commit (混源), release 的版本
+  # 一致性校验拦不住版本号未变的情况; 解析后统一 checkout 同一 SHA, release
+  # body 也以此追溯实际构建的源码 commit.
+  resolve_ref:
+    name: Resolve ref to commit SHA
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      commit_sha: ${{ steps.resolve.outputs.commit_sha }}
+    steps:
+      - name: Resolve ref
+        id: resolve
+        env:
+          REF: ${{ inputs.jamepeng_ref }}
+        run: |
+          REPO_URL="https://github.com/JamePeng/llama-cpp-python.git"
+          # 分支优先于同名 tag; tag 优先取 ^{} 剥离行 (注解 tag 对象指向的
+          # commit), 轻量 tag 无剥离行时取 tag 行本身
+          SHA=$(git ls-remote "$REPO_URL" "refs/heads/$REF" | cut -f1)
+          if [ -z "$SHA" ]; then
+            TAG_LINES=$(git ls-remote "$REPO_URL" "refs/tags/$REF" "refs/tags/$REF^{}")
+            SHA=$(printf '%s\n' "$TAG_LINES" | awk '/\^\{\}$/ { print $1; exit }')
+            if [ -z "$SHA" ]; then
+              SHA=$(printf '%s\n' "$TAG_LINES" | awk 'NR == 1 { print $1 }')
+            fi
+          fi
+          # 分支/tag 均未命中: ref 应当本身就是完整 commit SHA, 原样透传
+          # (短 SHA 不放行: actions/checkout 按 SHA fetch 只认 40 位全长)
+          if [ -z "$SHA" ]; then
+            if printf '%s' "$REF" | grep -qiE '^[0-9a-f]{40}$'; then
+              SHA="$REF"
+            else
+              echo "Cannot resolve '$REF' to a commit in JamePeng/llama-cpp-python"
+              exit 1
+            fi
+          fi
+          echo "Resolved '$REF' -> $SHA"
+          echo "commit_sha=$SHA" >> "$GITHUB_OUTPUT"
+
+  # ----------------------------------------------------------------
   #  Windows build (single universal wheel)
   # ----------------------------------------------------------------
   build_windows:
     name: Build Vulkan wheel (Windows abi3)
+    needs: resolve_ref
     runs-on: windows-2022
     timeout-minutes: 180
 
@@ -41,7 +85,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           repository: JamePeng/llama-cpp-python
-          ref: ${{ inputs.jamepeng_ref }}
+          ref: ${{ needs.resolve_ref.outputs.commit_sha }}
           submodules: recursive
 
       - name: Set up MSVC
@@ -147,6 +191,7 @@ jobs:
   # ----------------------------------------------------------------
   build_linux:
     name: Build Vulkan wheel (Linux abi3)
+    needs: resolve_ref
     runs-on: ubuntu-22.04
     timeout-minutes: 120
 
@@ -155,7 +200,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           repository: JamePeng/llama-cpp-python
-          ref: ${{ inputs.jamepeng_ref }}
+          ref: ${{ needs.resolve_ref.outputs.commit_sha }}
           submodules: recursive
 
       # See the Windows job for why the version source is patched.
@@ -244,7 +289,7 @@ jobs:
   # ----------------------------------------------------------------
   release:
     name: Create Release
-    needs: [build_windows, build_linux]
+    needs: [resolve_ref, build_windows, build_linux]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -286,6 +331,7 @@ jobs:
             **ABI3 universal build** - one wheel per platform, compatible with CPython 3.10+.
 
             Source: [JamePeng/llama-cpp-python](https://github.com/JamePeng/llama-cpp-python) @ `${{ inputs.jamepeng_ref }}`
+            Commit: [`${{ needs.resolve_ref.outputs.commit_sha }}`](https://github.com/JamePeng/llama-cpp-python/commit/${{ needs.resolve_ref.outputs.commit_sha }})
 
             ## Platforms
 
