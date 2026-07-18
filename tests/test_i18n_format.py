@@ -1,13 +1,15 @@
 """src/i18n 语言文件排版约定与跨语言一致性的单元测试.
 
 锁定 language_*.py 的排版规则 (见语言文件 docstring 的排版约定):
+- 换行只允许出现在字面量末尾: 多字面量拼接的成员内部不得含 \\n,
+  单字面量必须是纯单行文本 (含换行的文本必须写成多字面量形态)
 - 多字面量拼接的非末位字面量必须以 \\n 结尾: 保证源码行与 UI 显示行一一对应,
   漏写 \\n 会把两个显示行粘连成一行
 - 多字面量拼接的末位字面量不能以 \\n 结尾: UI 文本不带尾随空行
 - errors 类分组 (键名以 errors 结尾) 的文案必须是单行
 
-前两条基于 tokenize 做源码级检查, 不 import 语言文件, 与运行时行为解耦;
-第三条按路径加载 LANG dict 检查 (纯数据文件, 无第三方依赖).
+前三条基于 tokenize 做源码级检查, 不 import 语言文件, 与运行时行为解耦;
+第四条按路径加载 LANG dict 检查 (纯数据文件, 无第三方依赖).
 
 另锁定多语言文件间的结构契约 (AGENTS.md 的 "逐行一一对应" 约定):
 - 全部语言文件的 LANG 叶子键路径列表 (含顺序) 完全一致
@@ -64,10 +66,9 @@ def _placeholder_names(text):
     return {field for _, field, _, _ in string.Formatter().parse(text) if field}
 
 
-def _concat_runs(source):
-    """返回源码中全部隐式拼接串, 每串为相邻 STRING token 列表 (长度 >= 2).
+def _string_runs(source):
+    """返回源码中全部字符串串, 每串为相邻 STRING token 列表 (长度 1 为单字面量形态).
 
-    模块 docstring 与普通单字面量是长度 1 的串, 不属于多字面量形态, 被过滤;
     dict 的 key/value 字符串之间隔着 ':' 等 OP token, 不会被误并为一串.
     """
     runs = []
@@ -78,19 +79,57 @@ def _concat_runs(source):
         elif tok.type in _JOINABLE_TYPES:
             continue
         else:
-            if len(current) > 1:
+            if current:
                 runs.append(current)
             current = []
-    if len(current) > 1:
+    if current:
         runs.append(current)
     return runs
 
 
+def _concat_runs(source):
+    """返回源码中全部隐式拼接串 (长度 >= 2 的串).
+
+    模块 docstring 与普通单字面量是长度 1 的串, 不属于多字面量形态, 被过滤.
+    """
+    return [run for run in _string_runs(source) if len(run) > 1]
+
+
+def _module_docstring_start(source):
+    """返回模块 docstring 字面量的 (行, 列) 起始位置, 无 docstring 时 None."""
+    body = ast.parse(source).body
+    if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant) and isinstance(body[0].value.value, str):
+        return (body[0].value.lineno, body[0].value.col_offset)
+    return None
+
+
 class TestLanguageFileLayout(unittest.TestCase):
     def test_language_files_exist(self):
-        # 目录结构变动导致 glob 落空时, 三条逐文件排版测试会静默变成空跑
-        # (循环体不执行), 在此拦截; 两条跨语言测试对空集是解包报错, 不静默
-        self.assertTrue(_language_files(), f"{_I18N_DIR} 下找不到 language_*.py")
+        # 单个语言文件被误删时 glob 仍非空: 逐文件排版测试对缺失文件静默漏检,
+        # 跨语言一致性测试退化为剩余文件自比对而放行, 故显式断言两个文件都存在
+        names = {path.name for path in _language_files()}
+        for required in ("language_en-US.py", "language_zh-CN.py"):
+            self.assertIn(required, names, f"{_I18N_DIR} 下缺少 {required}")
+
+    def test_newline_only_at_literal_end(self):
+        # 拼接成员内部含 \n 会破坏 "每 UI 行一个源码行" 的对应关系, 含换行的
+        # 单字面量则整体绕过下方两条首末位检查; 模块 docstring 不是文案, 豁免
+        for path in _language_files():
+            source = path.read_text(encoding="utf-8")
+            docstring_start = _module_docstring_start(source)
+            for run in _string_runs(source):
+                for tok in run:
+                    if tok.start == docstring_start:
+                        continue
+                    value = ast.literal_eval(tok.string)
+                    if len(run) > 1:
+                        offending = "\n" in value[:-1]
+                        message = f"{path.name}:{tok.start[0]} 拼接成员内部不得含 \\n (换行只许作为成员末字符): {tok.string}"
+                    else:
+                        offending = "\n" in value
+                        message = f"{path.name}:{tok.start[0]} 单字面量不得含 \\n (含换行的文本须写成多字面量形态): {tok.string}"
+                    with self.subTest(file=path.name, line=tok.start[0]):
+                        self.assertFalse(offending, message)
 
     def test_non_last_literals_end_with_newline(self):
         for path in _language_files():
