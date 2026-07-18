@@ -1,11 +1,14 @@
 """src/shared/text_utils.py 的单元测试: 代码围栏剥离, 逐张结果拆分, JSON 解析, 嵌套取值."""
 
+import json
+import re
 import unittest
 
 from tests import comfy_stubs
 
 comfy_stubs.install()
 
+from src.i18n.lang import LANG  # noqa: E402
 from src.shared.text_utils import get_nested_value, parse_json, split_image_results, strip_code_fence  # noqa: E402
 
 
@@ -29,6 +32,10 @@ class TestStripCodeFence(unittest.TestCase):
 
     def test_unclosed_fence_strips_opening_only(self):
         self.assertEqual(strip_code_fence('```json\n{"a": 1'), '{"a": 1')
+
+    def test_orphan_trailing_fence_stripped(self):
+        # 仅尾部围栏(开栏标记缺失, 如上文被截断后续写)时, 剥离孤立的闭合围栏
+        self.assertEqual(strip_code_fence('{"a": 1}\n```'), '{"a": 1}')
 
     def test_fenced_block_with_trailing_prose(self):
         # 回归: 围栏块之后追加尾随说明时, 回退提取第一个完整块,
@@ -121,8 +128,13 @@ class TestParseJson(unittest.TestCase):
     def test_fenced_json(self):
         self.assertEqual(parse_json('```json\n[{"b": 2}]\n```'), [{"b": 2}])
 
-    def test_invalid_json_raises_value_error(self):
-        with self.assertRaises(ValueError):
+    def test_invalid_json_raises_wrapped_value_error(self):
+        # JSONDecodeError 本身是 ValueError 子类, 裸 assertRaises(ValueError)
+        # 锁不住 i18n 包装; 复现底层报错拼出完整文案精确断言 (文案引用 LANG)
+        with self.assertRaises(json.JSONDecodeError) as inner:
+            json.loads("not json at all")
+        expected = re.escape(LANG["common"]["errors"]["unable_to_load_json"].format(e=inner.exception))
+        with self.assertRaisesRegex(ValueError, expected):
             parse_json("not json at all")
 
 
