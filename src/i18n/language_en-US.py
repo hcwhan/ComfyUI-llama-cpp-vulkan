@@ -303,6 +303,10 @@ LANG = {
                         "Only applies when sending multiple images, a single image keeps its original resolution."
                     ),
                 },
+                "errors": {
+                    # Guards the mode branch in the runner (unreachable via normal paths, mode comes from a combo and ComfyUI's pre-validation rejects values outside the list)
+                    "unknown_mode": "Unknown image inference mode: {mode}",
+                },
             },
 
             "video": {
@@ -420,7 +424,7 @@ LANG = {
             "parse_json": {
                 "description": (
                     "Parse a JSON string and fetch a value by dotted key, outputting the same value as five types.\n"
-                    "Conversion rules: string outputs valid JSON text for dict/list, str() result otherwise;\n"
+                    "Conversion rules: string outputs valid JSON text for dict/list, an empty string for None (including JSON null), and str() result otherwise;\n"
                     "int/float fall back to 0 / 0.0 on conversion failure; boolean tests numbers for non-zero,\n"
                     'and for text only "true" (case-insensitive) is true.\n'
                     'When the key misses and default is empty (blank widget / unconnected), the five outputs are (None, "", 0, 0.0, False).'

@@ -14,11 +14,13 @@
 - 批量模式: 全部图片并入单条 user 消息 (文本项 + N 个 image_url 项),
   多图逐张缩放到 max_size, 单图保持原分辨率 (tooltip 承诺 "仅在发送
   多张图片时生效")
+- 未知 mode: 显式抛带文案 ValueError, 不发起请求
 """
 
 import base64
 import io
 import itertools
+import re
 import types
 import unittest
 from unittest import mock
@@ -241,6 +243,21 @@ class TestImageInstructInferBatch(_ImageInstructTestBase):
         content = self._user_content(llm)
         for item in content[1:]:
             self.assertEqual(_png_size(item), (4, 4))
+
+
+class TestImageInstructUnknownMode(_ImageInstructTestBase):
+    MODE = "unknown-mode"
+
+    def test_unknown_mode_raises_value_error(self):
+        # 回归: 两个已知档位均显式比对 (枚举分支规范), 名单外的 mode 显式抛
+        # 带文案 ValueError 且不发起请求; 修复前 runner fall-through 隐式
+        # 返回 None, 经 _run 返回后下游消费时才抛非受控 AttributeError
+        llm = _FakeVlm([])
+        self._install(llm)
+        expected = re.escape(LANG["nodes"]["instruct"]["image"]["errors"]["unknown_mode"].format(mode=self.MODE))
+        with self.assertRaisesRegex(ValueError, expected):
+            self._process(torch.zeros(1, 4, 4, 3))
+        self.assertEqual(llm.calls, 0)
 
 
 if __name__ == "__main__":

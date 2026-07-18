@@ -303,6 +303,10 @@ LANG = {
                         "仅在发送多张图片时生效, 单张图片保持原分辨率."
                     ),
                 },
+                "errors": {
+                    # runner 的 mode 分支防御 (正常路径不可达, mode 来自 combo, ComfyUI 前置校验拒绝名单外的值)
+                    "unknown_mode": "未知的图片推理模式: {mode}",
+                },
             },
 
             "video": {
@@ -420,7 +424,7 @@ LANG = {
             "parse_json": {
                 "description": (
                     "解析 JSON 字符串并按点分 key 取值, 同一个值以五种类型输出.\n"
-                    "转换规则: string 遇 dict/list 输出合法 JSON 文本, 其余为 str() 结果;\n"
+                    "转换规则: string 遇 dict/list 输出合法 JSON 文本, 遇 None (含 JSON null) 输出空串, 其余为 str() 结果;\n"
                     "int/float 转换失败时回退 0 / 0.0; boolean 对数字按非零判定,\n"
                     '对文本仅 "true" (忽略大小写) 为真.\n'
                     'key 未命中且 default 为空 (未填写/未连线) 时, 五个输出为 (None, "", 0, 0.0, False).'

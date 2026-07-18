@@ -16,6 +16,7 @@ from .....shared.encoding import image_content_item, scale_image, tensor_to_uint
 from .....shared.logger import logger, node_log_prefix
 
 _TIPS = LANG["nodes"]["instruct"]["image"]["tooltips"]
+_ERRORS = LANG["nodes"]["instruct"]["image"]["errors"]
 _LOGS = LANG["logs"]["image_instruct"]
 
 
@@ -138,5 +139,8 @@ class llama_cpp_image_instruct(llama_cpp_media_instruct_base):
                 return self._infer_each(messages, user_content, images, seed, increment_seed, params, extract_text, watcher)
             if mode == IMAGE_MODE_BATCH:
                 return self._infer_batch(messages, user_content, images, seed, max_size, params, extract_text)
+            # 正常路径不可达 (mode 来自 combo, ComfyUI 前置校验拒绝名单外的值),
+            # 防御未知值
+            raise ValueError(_ERRORS["unknown_mode"].format(mode=mode))
 
         return self._run(vlm_model, seed, preset_prompt, custom_prompt, system_prompt, strip_thinking, force_offload, parameters, runner)
